@@ -1,0 +1,21 @@
+.aso-app {
+  max-width: var(--grid-container-width);
+  margin: 64px auto;
+
+  .label {
+    font-weight: 700;
+  }
+
+  .data {
+    margin-bottom: 24px;
+  }
+
+  .error {
+    color: #fff;
+    background-color: rgb(199, 36, 36);
+    border-radius: 8px;
+    padding: 4px 8px;
+    margin-top: -12px;
+    margin-bottom: 24px;
+  }
+}
