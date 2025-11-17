@@ -30,6 +30,28 @@ async function showPreview(meta) {
   document.body.innerHTML = doc.body.innerHTML;
 }
 
+function convertTags(el) {
+  const strongEls = el.querySelectorAll('strong');
+  strongEls.forEach((strong) => {
+    const { textContent } = strong;
+    strong.insertAdjacentHTML('afterend', `<b>${textContent}</b>`);
+    strong.remove();
+  });
+}
+
+function setupCopy(row, dataEl) {
+  const btn = document.createElement('button');
+  btn.textContent = 'Copy';
+  btn.addEventListener('click', () => {
+    convertTags(dataEl);
+
+    const blob = new Blob([text], { type: 'text/plain' });
+    const data = [new ClipboardItem({ [blob.type]: blob })];
+    navigator.clipboard.write(data);
+  });
+  row.append(btn);
+}
+
 
 function buildErrorRow(row, key, type, expected, received) {
   const div = document.createElement('div');
@@ -55,6 +77,8 @@ function decorateRow(row) {
   const [labelEl, dataEl] = cols;
   labelEl.classList.add('label');
   dataEl.classList.add('data');
+
+  setupCopy(row, dataEl);
 
   const key = labelEl.textContent.trim().toLowerCase();
   if (VALIDATIONS[key]) {
