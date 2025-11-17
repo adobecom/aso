@@ -2,6 +2,10 @@
   max-width: var(--grid-container-width);
   margin: 64px auto;
 
+  p {
+    margin: 0;
+  }
+
   .label {
     font-weight: 700;
   }
