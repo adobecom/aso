@@ -57,7 +57,7 @@ const getMetadata = (el) => [...el.childNodes].reduce((rdx, row) => {
   if (row.children && row.children.length >= 2) {
     const key = row.children[0].textContent.trim().toLowerCase();
     const content = row.children[1];
-    const text = convertTags(content);
+    const text = content.innerHTML.trim();
     if (key && text) rdx[key] = { text };
   }
   return rdx;
