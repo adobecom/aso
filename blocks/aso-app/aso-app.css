@@ -27,5 +27,9 @@
     &.error {
       background-color: rgb(199, 36, 36);
     }
+
+    &.info {
+      background-color: rgb(20, 115, 230);
+    }
   }
 }

@@ -1,53 +1,59 @@
-const VALIDATIONS = {
-  title: { length: 100 },
-  description: { length: 250 },
-}
+import { getValidations } from './aso-utils.js';
 
-function buildSuccessRow(row) {
+function buildSuccessRow(row, received, expected) {
   const div = document.createElement('div');
   div.className = 'note success';
-  div.textContent = `The content is valid.`;
+  div.textContent = `The content is valid. ${received}/${expected} characters.`;
 
   row.append(div);
 }
 
-async function showPreview(meta) {
-  const resp = await fetch('/mocks/play-store.html');
-  if (!resp.ok) {
-    console.log('could not get html');
-    return;
-  }
-  let html = await resp.text();
-  html = html
-    .replaceAll('{TITLE}', meta.title.text)
-    .replaceAll('{DEVELOPER}', meta.developer.text)
-    .replaceAll('{DESCRIPTION}', meta.description.text);
-
-
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const styles = doc.head.querySelectorAll('link');
-  document.head.append(...styles);
-  document.body.innerHTML = doc.body.innerHTML;
-}
-
 function convertTags(el) {
-  const strongEls = el.querySelectorAll('strong');
-  strongEls.forEach((strong) => {
-    const { textContent } = strong;
-    strong.insertAdjacentHTML('afterend', `<b>${textContent}</b>`);
-    strong.remove();
+  const clone = el.cloneNode(true);
+
+  const hasOtherTags = clone.querySelector('strong, em, b, i, h1, h2, h3, h4, h5, h6, span, div, a');
+  
+  clone.querySelectorAll('br').forEach((br) => {
+    br.replaceWith('\n');
   });
+
+  if (!hasOtherTags) {
+    clone.querySelectorAll('p').forEach((p) => {
+      p.replaceWith(...p.childNodes);
+    });
+    return (clone.textContent || clone.innerText).trim();
+  }
+
+  clone.querySelectorAll('strong').forEach((strong) => {
+    const b = document.createElement('b');
+    b.innerHTML = strong.innerHTML;
+    strong.replaceWith(b);
+  });
+
+  clone.querySelectorAll('p').forEach((p) => {
+    p.replaceWith(...p.childNodes);
+  });
+
+  clone.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
+    Array.from(heading.attributes).forEach((attr) => {
+      heading.removeAttribute(attr.name);
+    });
+  });
+
+  return clone.innerHTML.trim();
 }
 
 function setupCopy(row, dataEl) {
   const btn = document.createElement('button');
   btn.textContent = 'Copy';
-  btn.addEventListener('click', () => {
-    convertTags(dataEl);
-
-    const blob = new Blob([text], { type: 'text/plain' });
-    const data = [new ClipboardItem({ [blob.type]: blob })];
-    navigator.clipboard.write(data);
+  btn.addEventListener('click', async () => {
+    const content = convertTags(dataEl);
+    
+    try {
+      await navigator.clipboard.writeText(content);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
   });
   row.append(btn);
 }
@@ -61,19 +67,22 @@ function buildErrorRow(row, key, type, expected, received) {
   row.append(div);
 }
 
-function validateRow(row, key, dataEl) {
-  const rules = VALIDATIONS[key];
-  const text = dataEl.innerHTML;
-  if (text.length > rules.length) {
-    console.log('error');
-    buildErrorRow(row, key, 'characters', rules.length, text.length);
+function validateRow(row, key, dataEl, validations) {
+  const rules = validations[key];
+  if (!rules) return;
+
+  const content = convertTags(dataEl);
+  if (content.length > rules.length) {
+    buildErrorRow(row, key, 'characters', rules.length, content.length);
   } else {
-    buildSuccessRow(row);
+    buildSuccessRow(row, content.length, rules.length);
   }
 }
 
-function decorateRow(row) {
+function decorateRow(row, validations) {
   const { children: cols } = row;
+  if (!cols || cols.length < 2) return;
+  
   const [labelEl, dataEl] = cols;
   labelEl.classList.add('label');
   dataEl.classList.add('data');
@@ -81,35 +90,25 @@ function decorateRow(row) {
   setupCopy(row, dataEl);
 
   const key = labelEl.textContent.trim().toLowerCase();
-  if (VALIDATIONS[key]) {
-    validateRow(row, key, dataEl);
+  if (validations[key]) {
+    validateRow(row, key, dataEl, validations);
   }
 }
 
-const getMetadata = (el) => [...el.childNodes].reduce((rdx, row) => {
-  if (row.children) {
-    const key = row.children[0].textContent.trim().toLowerCase();
-    const content = row.children[1];
-    const text = content.textContent.trim();
-    if (key && text) rdx[key] = { text };
-  }
-  return rdx;
-}, {});
-
-export default function init(el) {
-  const meta = getMetadata(el);
+export default async function init(el) {
+  const { message, validations } = await getValidations(el);
 
   const rows = el.querySelectorAll(':scope > div');
   if (rows.length === 0) return;
   rows.forEach((row) => {
     row.classList.add('data-row');
-    if (row.children) decorateRow(row);
+    if (row.children) decorateRow(row, validations);
   });
 
-  const btn = document.createElement('button');
-  btn.textContent = 'Preview Play Store';
-  btn.addEventListener('click', () => {
-    showPreview(meta);
-  });
-  el.append(btn);
+  if (message) {
+    const note = document.createElement('div');
+    note.className = 'note info';
+    note.textContent = message;
+    el.append(note);
+  }
 }

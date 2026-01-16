@@ -1,0 +1,49 @@
+{
+  ":version": 3,
+  ":names": ["aso-app"],
+  ":type": "sheet",
+  "aso-app (apple, listing)": {
+    "data": [
+      {
+        "field name": "Title",
+        "character count": "30"
+      },
+      {
+        "field name": "Subtitle",
+        "character count": ""
+      },
+      {
+        "field name": "Developer",
+        "character count": "50"
+      },
+      {
+        "field name": "Icon",
+        "character count": ""
+      },
+      {
+        "field name": "Description",
+        "character count": "170"
+      },
+      {
+        "field name": "Screenshots"
+      }
+    ]
+  },
+  "aso-app (google, promo)": {
+    "data": [
+      {
+        "field name": "Title",
+        "character count": "50"
+      },
+      {
+        "field name": "Description",
+        "character count": "80"
+      },
+      {
+        "field name": "Image",
+        "character count": ""
+      }
+    ]
+  }
+}
+

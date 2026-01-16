@@ -68,6 +68,8 @@ const CONFIG = {
     de: { ietf: 'de-DE', tk: 'hah7vzn.css' },
     kr: { ietf: 'ko-KR', tk: 'zfo3ouc' },
   },
+  header: { off: true },
+  footer: { off: true },
 };
 
 // Decorate the page with site specific needs.
