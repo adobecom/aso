@@ -2,9 +2,22 @@ const BLOCK_SCHEMA_PATH = '/.da/block-schema.json';
 
 let allValidations;
 
+function cleanProseMirrorArtifacts(element) {
+  element.querySelectorAll('.ProseMirror-widget, .ProseMirror-yjs-cursor, .ProseMirror-trailingBreak').forEach((elem) => {
+    elem.remove();
+  });
+}
+
+function isDAPreview() {
+  return window.location.search.includes('dapreview');
+}
+
 export function convertTags(el, options = {}) {
   const { addParagraphBreaks = false } = options;
   const clone = el.cloneNode(true);
+  if (isDAPreview()) {
+    cleanProseMirrorArtifacts(clone);
+  }
   clone.querySelectorAll('*').forEach((elem) => {
     Array.from(elem.attributes).forEach((attr) => {
       elem.removeAttribute(attr.name);
