@@ -11,7 +11,7 @@ function setupCopy(row, dataEl) {
   const btn = document.createElement('button');
   btn.textContent = 'Copy';
   btn.addEventListener('click', async () => {
-    const content = convertTags(dataEl);
+    const content = convertTags(dataEl, { addParagraphBreaks: true });
 
     try {
       await navigator.clipboard.writeText(content);
@@ -45,7 +45,7 @@ function validateRow(row, key, dataEl, validations) {
   const rules = validations[key];
   if (!rules) return;
 
-  const content = convertTags(dataEl);
+  const content = convertTags(dataEl, { addParagraphBreaks: true });
   if (content.length > rules.length) {
     buildErrorRow(row, key, 'characters', rules.length, content.length);
   } else {
