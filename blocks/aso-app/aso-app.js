@@ -1,46 +1,10 @@
-import { getValidations } from './aso-utils.js';
+import { getValidations, convertTags } from './aso-utils.js';
 
 function buildSuccessRow(row, received, expected) {
   const div = document.createElement('div');
   div.className = 'note success';
   div.textContent = `The content is valid. ${received}/${expected} characters.`;
-
   row.append(div);
-}
-
-function convertTags(el) {
-  const clone = el.cloneNode(true);
-
-  const hasOtherTags = clone.querySelector('strong, em, b, i, h1, h2, h3, h4, h5, h6, span, div, a');
-  
-  clone.querySelectorAll('br').forEach((br) => {
-    br.replaceWith('\n');
-  });
-
-  if (!hasOtherTags) {
-    clone.querySelectorAll('p').forEach((p) => {
-      p.replaceWith(...p.childNodes);
-    });
-    return (clone.textContent || clone.innerText).trim();
-  }
-
-  clone.querySelectorAll('strong').forEach((strong) => {
-    const b = document.createElement('b');
-    b.innerHTML = strong.innerHTML;
-    strong.replaceWith(b);
-  });
-
-  clone.querySelectorAll('p').forEach((p) => {
-    p.replaceWith(...p.childNodes);
-  });
-
-  clone.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
-    Array.from(heading.attributes).forEach((attr) => {
-      heading.removeAttribute(attr.name);
-    });
-  });
-
-  return clone.innerHTML.trim();
 }
 
 function setupCopy(row, dataEl) {
@@ -48,16 +12,26 @@ function setupCopy(row, dataEl) {
   btn.textContent = 'Copy';
   btn.addEventListener('click', async () => {
     const content = convertTags(dataEl);
-    
+
     try {
       await navigator.clipboard.writeText(content);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      const textarea = document.createElement('textarea');
+      textarea.value = content;
+      textarea.setAttribute('readonly', '');
+      textarea.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;';
+      document.body.appendChild(textarea);
+      textarea.select();
+      textarea.setSelectionRange(0, content.length);
+      try {
+        document.execCommand('copy');
+      } finally {
+        document.body.removeChild(textarea);
+      }
     }
   });
   row.append(btn);
 }
-
 
 function buildErrorRow(row, key, type, expected, received) {
   const div = document.createElement('div');
@@ -82,7 +56,7 @@ function validateRow(row, key, dataEl, validations) {
 function decorateRow(row, validations) {
   const { children: cols } = row;
   if (!cols || cols.length < 2) return;
-  
+
   const [labelEl, dataEl] = cols;
   labelEl.classList.add('label');
   dataEl.classList.add('data');
@@ -109,6 +83,6 @@ export default async function init(el) {
     const note = document.createElement('div');
     note.className = 'note info';
     note.textContent = message;
-    el.append(note);
+    el.prepend(note);
   }
 }

@@ -6,3 +6,10 @@
  * 
  *
  */
+
+/* Hide debugging labels and notifications */
+.con-label,
+.milo-preflight-overlay,
+.preflight-notification {
+  display: none !important;
+}

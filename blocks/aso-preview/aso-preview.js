@@ -22,7 +22,7 @@ function convertTags(el) {
   const clone = el.cloneNode(true);
 
   const hasOtherTags = clone.querySelector('strong, em, b, i, h1, h2, h3, h4, h5, h6, span, div, a');
-  
+
   clone.querySelectorAll('br').forEach((br) => {
     br.replaceWith('\n');
   });
@@ -85,4 +85,3 @@ export default async function init(el) {
   });
   el.append(btn);
 }
-

@@ -40,4 +40,3 @@ export function countButtons(text) {
     (btn) => btn.textContent === text,
   ).length;
 }
-

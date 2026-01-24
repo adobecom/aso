@@ -26,7 +26,6 @@ export const [setLibs, getLibs] = (() => {
   ];
 })();
 
-
 function decorateArea(area = document) {
   const eagerLoad = (parent, selector) => {
     const img = parent.querySelector(selector);
@@ -39,7 +38,7 @@ function decorateArea(area = document) {
       eagerLoad(document, 'img');
       return;
     }
-  
+
     // First image of first row
     eagerLoad(marquee, 'div:first-child img');
     // Last image of last column of last row
@@ -48,7 +47,7 @@ function decorateArea(area = document) {
 }
 
 // Add project-wide style path here.
-const STYLES = '';
+const STYLES = '/styles/styles.css';
 
 // Use 'https://milo.adobe.com/libs' if you cannot map '/libs' to milo's origin.
 const LIBS = '/libs';
@@ -92,6 +91,21 @@ const miloLibs = setLibs(LIBS);
     link.setAttribute('href', path);
     document.head.appendChild(link);
   });
+}());
+
+(function hideHeaderFooter() {
+  if (CONFIG.header?.off) {
+    const headerMeta = document.createElement('meta');
+    headerMeta.setAttribute('name', 'header');
+    headerMeta.setAttribute('content', 'off');
+    document.head.appendChild(headerMeta);
+  }
+  if (CONFIG.footer?.off) {
+    const footerMeta = document.createElement('meta');
+    footerMeta.setAttribute('name', 'footer');
+    footerMeta.setAttribute('content', 'off');
+    document.head.appendChild(footerMeta);
+  }
 }());
 
 async function loadPage() {

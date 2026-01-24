@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASO Dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://use.typekit.net/pps7abe.css">
+  <link rel="stylesheet" href="/tools/aso-dashboard/aso-dashboard.css">
+  <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
+  <script src="/tools/aso-dashboard/aso-dashboard.js" type="module"></script>
+</head>
+<body>
+  <header class="page-header">
+    <div class="header-bg"></div>
+    <div class="header-fg">
+      <div class="header-fg-left">
+        <h1 class="heading">ASO Dashboard</h1>
+      </div>
+    </div>
+  </header>
+  <main>
+    <div class="container">
+      <div class="tabs">
+        <button class="tab-button active" data-tab="preview">Preview</button>
+        <button class="tab-button" data-tab="export">Export</button>
+      </div>
+
+      <!-- Preview Tab Content -->
+      <div class="tab-content active" data-tab-content="preview">
+        <div class="controls-section">
+          <div class="controls">
+            <div class="control-group">
+              <label for="product">Product</label>
+              <select id="product" class="select-dropdown">
+                <option value="">Loading...</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label for="language">Language</label>
+              <select id="language" class="select-dropdown">
+                <option value="">Loading...</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label for="device">Device</label>
+              <select id="device" class="select-dropdown">
+                <option value="apple">Apple</option>
+                <option value="google">Google</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="preview-section">
+          <div class="preview-container">
+            <div id="preview-frame-container" class="preview-frame-container">
+              <p class="preview-placeholder">Select a product, language, and device to view preview</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export Tab Content -->
+      <div class="tab-content" data-tab-content="export">
+        <div class="export-container">
+          <h2 class="export-title">Export Multiple Products</h2>
+          <p class="export-description">Select products, languages, and devices to export to Excel</p>
+          
+          <!-- Products Section -->
+          <div class="export-section" id="products-section">
+            <h3>
+              <span>Products <span class="selection-count" id="products-count">(0 selected)</span></span>
+              <button class="select-all-link" data-target="products">Select All</button>
+            </h3>
+            <div class="checkbox-group" id="products-checkboxes">
+              <p>Loading products...</p>
+            </div>
+          </div>
+
+          <!-- Languages Section -->
+          <div class="export-section" id="languages-section">
+            <h3>
+              <span>Languages <span class="selection-count" id="languages-count">(0 selected)</span></span>
+              <button class="select-all-link" data-target="languages">Select All</button>
+            </h3>
+            <div class="checkbox-group" id="languages-checkboxes">
+              <p>Loading languages...</p>
+            </div>
+          </div>
+
+          <!-- Devices Section -->
+          <div class="export-section" id="devices-section">
+            <h3>Device</h3>
+            <div class="checkbox-group horizontal">
+              <div class="checkbox-item">
+                <input type="checkbox" id="device-apple" value="apple">
+                <label for="device-apple">Apple</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="device-google" value="google">
+                <label for="device-google">Google</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Export Button -->
+          <button class="export-button" id="export-button" disabled>
+            Export to Excel
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

@@ -2,6 +2,42 @@ const BLOCK_SCHEMA_PATH = '/.da/block-schema.json';
 
 let allValidations;
 
+export function convertTags(el, options = {}) {
+  const { addParagraphBreaks = false } = options;
+  const clone = el.cloneNode(true);
+  const hasOtherTags = clone.querySelector('strong, em, b, i, h1, h2, h3, h4, h5, h6, span, div, a');
+  clone.querySelectorAll('br').forEach((br) => {
+    br.replaceWith('\n');
+  });
+  if (!hasOtherTags) {
+    clone.querySelectorAll('p').forEach((p) => {
+      const separator = addParagraphBreaks ? '\n\n' : '';
+      const textNode = document.createTextNode(p.textContent + separator);
+      p.replaceWith(textNode);
+    });
+    return clone.textContent.trim();
+  }
+  clone.querySelectorAll('strong').forEach((strong) => {
+    const b = document.createElement('b');
+    b.innerHTML = strong.innerHTML;
+    strong.replaceWith(b);
+  });
+  clone.querySelectorAll('p').forEach((p, index, arr) => {
+    const fragment = document.createDocumentFragment();
+    fragment.append(...p.childNodes);
+    if (addParagraphBreaks && index < arr.length - 1) {
+      fragment.append(document.createTextNode('\n\n'));
+    }
+    p.replaceWith(fragment);
+  });
+  clone.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
+    Array.from(heading.attributes).forEach((attr) => {
+      heading.removeAttribute(attr.name);
+    });
+  });
+  return clone.innerHTML.trim();
+}
+
 function buildValidationsFromSchema(schemaData) {
   const validations = {};
 
@@ -9,9 +45,7 @@ function buildValidationsFromSchema(schemaData) {
     const charCount = field['character count'];
     if (charCount && charCount !== '') {
       const fieldName = field['field name'].toLowerCase();
-      validations[fieldName] = {
-        length: parseInt(charCount, 10),
-      };
+      validations[fieldName] = { length: parseInt(charCount, 10) };
     }
   });
 
@@ -86,4 +120,3 @@ export async function getValidations(el) {
 
   return result('', allValidations[matchedSchemaKey]);
 }
-
