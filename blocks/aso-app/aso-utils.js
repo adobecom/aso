@@ -5,10 +5,19 @@ let allValidations;
 export function convertTags(el, options = {}) {
   const { addParagraphBreaks = false } = options;
   const clone = el.cloneNode(true);
-  const hasOtherTags = clone.querySelector('strong, em, b, i, h1, h2, h3, h4, h5, h6, span, div, a');
-  clone.querySelectorAll('br').forEach((br) => {
-    br.replaceWith('\n');
+  clone.querySelectorAll('*').forEach((elem) => {
+    Array.from(elem.attributes).forEach((attr) => {
+      elem.removeAttribute(attr.name);
+    });
   });
+  clone.querySelectorAll('br').forEach((br) => {
+    if (br.parentElement && br.parentElement.childNodes.length === 1 && br.parentElement.textContent.trim() === '') {
+      br.parentElement.remove();
+    } else {
+      br.replaceWith('\n');
+    }
+  });
+  const hasOtherTags = clone.querySelector('strong, em, b, i, h1, h2, h3, h4, h5, h6, span, div, a');
   if (!hasOtherTags) {
     clone.querySelectorAll('p').forEach((p) => {
       const separator = addParagraphBreaks ? '\n\n' : '';
@@ -29,11 +38,6 @@ export function convertTags(el, options = {}) {
       fragment.append(document.createTextNode('\n\n'));
     }
     p.replaceWith(fragment);
-  });
-  clone.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
-    Array.from(heading.attributes).forEach((attr) => {
-      heading.removeAttribute(attr.name);
-    });
   });
   return clone.innerHTML.trim();
 }

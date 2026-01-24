@@ -69,7 +69,24 @@ function decorateRow(row, validations) {
   }
 }
 
+function getBlockTitle(el) {
+  const blockTypes = ['listing', 'promo', 'images-videos'];
+  const classes = Array.from(el.classList);
+  const blockType = classes.find((cls) => blockTypes.includes(cls));
+  if (!blockType) return 'ASO Block';
+  return blockType
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export default async function init(el) {
+  const blockTitle = getBlockTitle(el);
+  const header = document.createElement('div');
+  header.className = 'block-header';
+  header.textContent = blockTitle;
+  el.prepend(header);
+
   const { message, validations } = await getValidations(el);
 
   const rows = el.querySelectorAll(':scope > div');
@@ -83,6 +100,6 @@ export default async function init(el) {
     const note = document.createElement('div');
     note.className = 'note info';
     note.textContent = message;
-    el.prepend(note);
+    header.insertAdjacentElement('afterend', note);
   }
 }
