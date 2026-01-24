@@ -2,7 +2,8 @@ const BLOCK_SCHEMA_PATH = '/.da/block-schema.json';
 
 let allValidations;
 
-function cleanProseMirrorArtifacts(element) {
+function cleanEditorArtifacts(element) {
+  element.querySelectorAll('#da-cursor-position').forEach((elem) => elem.remove());
   const pmElements = element.querySelectorAll('[class*="ProseMirror-"]');
   pmElements.forEach((elem) => {
     if (elem.getAttribute('contenteditable') === 'false' || elem.classList.contains('ProseMirror-widget')) {
@@ -27,12 +28,31 @@ export function convertTags(el, options = {}) {
   const { addParagraphBreaks = false } = options;
   const clone = el.cloneNode(true);
   if (isDAPreview()) {
-    cleanProseMirrorArtifacts(clone);
+    cleanEditorArtifacts(clone);
   }
   clone.querySelectorAll('*').forEach((elem) => {
     Array.from(elem.attributes).forEach((attr) => {
       elem.removeAttribute(attr.name);
     });
+  });
+  clone.querySelectorAll('span, div, a').forEach((tag) => {
+    const parent = tag.parentNode;
+    if (parent) {
+      while (tag.firstChild) {
+        parent.insertBefore(tag.firstChild, tag);
+      }
+      tag.remove();
+    }
+  });
+  clone.querySelectorAll('strong').forEach((strong) => {
+    const b = document.createElement('b');
+    b.innerHTML = strong.innerHTML;
+    strong.replaceWith(b);
+  });
+  clone.querySelectorAll('em').forEach((em) => {
+    const i = document.createElement('i');
+    i.innerHTML = em.innerHTML;
+    em.replaceWith(i);
   });
   clone.querySelectorAll('br').forEach((br) => {
     if (br.parentElement && br.parentElement.childNodes.length === 1 && br.parentElement.textContent.trim() === '') {
@@ -41,7 +61,7 @@ export function convertTags(el, options = {}) {
       br.replaceWith('\n');
     }
   });
-  const hasOtherTags = clone.querySelector('strong, em, b, i, h1, h2, h3, h4, h5, h6, span, div, a');
+  const hasOtherTags = clone.querySelector('b, i, u, h1, h2, h3, h4, h5, h6');
   if (!hasOtherTags) {
     clone.querySelectorAll('p').forEach((p) => {
       const separator = addParagraphBreaks ? '\n\n' : '';
@@ -50,11 +70,6 @@ export function convertTags(el, options = {}) {
     });
     return clone.textContent.trim();
   }
-  clone.querySelectorAll('strong').forEach((strong) => {
-    const b = document.createElement('b');
-    b.innerHTML = strong.innerHTML;
-    strong.replaceWith(b);
-  });
   clone.querySelectorAll('p').forEach((p, index, arr) => {
     const fragment = document.createDocumentFragment();
     fragment.append(...p.childNodes);
