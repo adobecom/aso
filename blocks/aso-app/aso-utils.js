@@ -3,13 +3,24 @@ const BLOCK_SCHEMA_PATH = '/.da/block-schema.json';
 let allValidations;
 
 function cleanProseMirrorArtifacts(element) {
-  element.querySelectorAll('.ProseMirror-widget, .ProseMirror-yjs-cursor, .ProseMirror-trailingBreak').forEach((elem) => {
-    elem.remove();
+  const pmElements = element.querySelectorAll('[class*="ProseMirror-"]');
+  pmElements.forEach((elem) => {
+    if (elem.getAttribute('contenteditable') === 'false' || elem.classList.contains('ProseMirror-widget')) {
+      elem.remove();
+    } else {
+      const parent = elem.parentNode;
+      if (parent) {
+        while (elem.firstChild) {
+          parent.insertBefore(elem.firstChild, elem);
+        }
+        elem.remove();
+      }
+    }
   });
 }
 
 function isDAPreview() {
-  return window.location.search.includes('dapreview');
+  return window.location.search.includes('dapreview') || window.location.href.includes('da.live/edit');
 }
 
 export function convertTags(el, options = {}) {
