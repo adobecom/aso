@@ -149,7 +149,9 @@ async function generateExcel(data, products, languages, devices) {
   data.forEach((pageData) => {
     const { product, language, blocks } = pageData;
     Object.entries(blocks).forEach(([blockKey, blockInstances]) => {
-      const [blockDevice, blockType] = blockKey.split('-');
+      const firstHyphen = blockKey.indexOf('-');
+      const blockDevice = blockKey.substring(0, firstHyphen);
+      const blockType = blockKey.substring(firstHyphen + 1);
       const sheetKey = `${blockType}-${product}`;
       if (!groupedData[sheetKey]) {
         groupedData[sheetKey] = { product, blockType, google: {}, apple: {} };
