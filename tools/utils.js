@@ -1,6 +1,7 @@
-export async function authFetch(url, token, errorContext, mimeType = 'json') {
+export async function authFetch(url, token, errorContext, mimeType = 'json', cacheBust = false) {
   try {
-    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const fetchUrl = cacheBust ? `${url}${url.includes('?') ? '&' : '?'}cb=${Date.now()}` : url;
+    const resp = await fetch(fetchUrl, { headers: { Authorization: `Bearer ${token}` } });
     if (!resp.ok) {
       console.error(`Failed to fetch ${errorContext}:`, resp.status);
       return null;

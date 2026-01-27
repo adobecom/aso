@@ -21,13 +21,15 @@ async function fetchBlockSchema(org, repo, token) {
 async function fetchPageHTML(org, repo, path, token) {
   const htmlPath = path.endsWith('.html') ? path : `${path}.html`;
   const url = `https://admin.da.live/source/${org}/${repo}${htmlPath}`;
-  return fetchHTML(url, token, 'page HTML');
+  return fetchHTML(url, token, 'page HTML', true);
 }
 async function fetchExistingKeywords(org, repo, keywordsPath, token) {
   return authFetch(
     `https://admin.da.live/source/${org}/${repo}${keywordsPath}`,
     token,
     'existing keywords',
+    'json',
+    true
   );
 }
 
@@ -208,7 +210,8 @@ async function handleGenerate() {
       button.disabled = false;
       return;
     }
-    window.open(`https://da.live/sheet#/${org}/${repo}${keywordsPath}`, '_blank');
+    const sheetPath = keywordsPath.replace(/\.json$/, '');
+    window.open(`https://da.live/sheet#/${org}/${repo}${sheetPath}`, '_blank');
     hideMessages();
     let statusMsg = 'Opened keyword file in new tab';
     if (orphanedBlocks.length > 0) {

@@ -1,7 +1,7 @@
 import { authFetch } from '../utils.js';
 
-export async function fetchHTML(url, token, errorContext = 'HTML') {
-  return authFetch(url, token, errorContext, 'html');
+export async function fetchHTML(url, token, errorContext = 'HTML', cacheBust = false) {
+  return authFetch(url, token, errorContext, 'html', cacheBust);
 }
 
 export function parseHTML(htmlString) {

@@ -82,7 +82,7 @@ function getBlockTitle(el) {
 
 export default async function init(el) {
   const blockTitle = getBlockTitle(el);
-  const header = document.createElement('div');
+  const header = document.createElement('h2');
   header.className = 'block-header';
   header.textContent = blockTitle;
   el.prepend(header);

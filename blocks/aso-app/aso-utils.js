@@ -24,6 +24,13 @@ function isDAPreview() {
   return window.location.search.includes('dapreview') || window.location.href.includes('da.live/edit');
 }
 
+function normalizeWhitespace(text) {
+  return text
+    .replace(/\s+\n/g, '\n') // Remove whitespace before newlines
+    .replace(/\n\s+/g, '\n') // Remove whitespace after newlines
+    .replace(/  +/g, ' '); // Collapse multiple spaces to one
+}
+
 export function convertTags(el, options = {}) {
   const { addParagraphBreaks = false } = options;
   const clone = el.cloneNode(true);
@@ -63,12 +70,12 @@ export function convertTags(el, options = {}) {
   });
   const hasOtherTags = clone.querySelector('b, i, u, h1, h2, h3, h4, h5, h6');
   if (!hasOtherTags) {
-    clone.querySelectorAll('p').forEach((p) => {
-      const separator = addParagraphBreaks ? '\n\n' : '';
-      const textNode = document.createTextNode(p.textContent + separator);
+    clone.querySelectorAll('p').forEach((p, index, arr) => {
+      const separator = addParagraphBreaks && index < arr.length - 1 ? '\n\n' : '';
+      const textNode = document.createTextNode(p.textContent.trim() + separator);
       p.replaceWith(textNode);
     });
-    return clone.textContent.trim();
+    return normalizeWhitespace(clone.textContent.trim());
   }
   clone.querySelectorAll('p').forEach((p, index, arr) => {
     const fragment = document.createDocumentFragment();
@@ -78,7 +85,7 @@ export function convertTags(el, options = {}) {
     }
     p.replaceWith(fragment);
   });
-  return clone.innerHTML.trim();
+  return normalizeWhitespace(clone.innerHTML.trim());
 }
 
 function buildValidationsFromSchema(schemaData) {
