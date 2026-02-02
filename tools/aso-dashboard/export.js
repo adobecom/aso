@@ -1,4 +1,4 @@
-import { authFetch, fetchProducts, fetchLanguages } from './utils.js';
+import { authFetch, fetchProducts, fetchLanguages, getRelativeProductsPath } from './utils.js';
 import { convertTags } from '../../blocks/aso-app/aso-utils.js';
 
 let excelJSLoaded = false;
@@ -54,11 +54,12 @@ function getSelectedItems() {
 }
 
 function buildPagePaths(products, languages, devices) {
+  const productsPath = getRelativeProductsPath();
   const paths = [];
   products.forEach((product) => {
     languages.forEach((language) => {
       devices.forEach((device) => {
-        paths.push({ product, language, device, path: `/${language}/products/${product}/${device}` });
+        paths.push({ product, language, device, path: `/${language.replace(/^\//, '')}/${productsPath}/${product}/${device}` });
       });
     });
   });
@@ -66,14 +67,11 @@ function buildPagePaths(products, languages, devices) {
 }
 
 async function fetchPageContent(org, repo, path, token) {
-  const extensions = ['.html', ''];
-  for (const ext of extensions) {
-    try {
-      const response = await fetch(`https://admin.da.live/source/${org}/${repo}${path}${ext}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (response.ok) return await response.text();
-    } catch (err) {
-      continue;
-    }
+  try {
+    const response = await fetch(`https://admin.da.live/source/${org}/${repo}${path}.html`, { headers: { Authorization: `Bearer ${token}` } });
+    if (response.ok) return await response.text();
+  } catch (err) {
+    // Fetch failed
   }
   return null;
 }
@@ -108,9 +106,9 @@ function createSheetData(sheetData, languages) {
   ['google', 'apple'].forEach((device) => {
     if (Object.keys(sheetData[device]).length === 0) return;
     const deviceHeader = [device.charAt(0).toUpperCase() + device.slice(1)];
-    for (let i = 0; i < languages.length; i++) deviceHeader.push('');
+    for (let i = 0; i < languages.length; i += 1) deviceHeader.push('');
     rows.push(deviceHeader);
-    Object.entries(sheetData[device]).forEach(([instanceKey, langData]) => {
+    Object.entries(sheetData[device]).forEach(([, langData]) => {
       rows.push(['Languages', ...languages]);
       const allFields = new Set();
       Object.values(langData).forEach((fields) => {
@@ -170,7 +168,7 @@ async function generateExcel(data, products, languages, devices) {
     const worksheet = workbook.addWorksheet(sheetKey);
     worksheet.addRows(sheetArray);
     worksheet.getColumn(1).width = 30;
-    for (let i = 2; i <= languages.length + 1; i++) {
+    for (let i = 2; i <= languages.length + 1; i += 1) {
       worksheet.getColumn(i).width = 50;
     }
     worksheet.eachRow((row, rowNumber) => {
@@ -212,6 +210,24 @@ async function generateExcel(data, products, languages, devices) {
   window.URL.revokeObjectURL(url);
 }
 
+function updateExportButtonState() {
+  const hasProducts = getSelectedCheckboxes('.product-checkbox').length > 0;
+  const hasLanguages = getSelectedCheckboxes('.language-checkbox').length > 0;
+  const hasDevices = document.getElementById('device-apple').checked
+    || document.getElementById('device-google').checked;
+  document.getElementById('export-button').disabled = !(hasProducts && hasLanguages && hasDevices);
+}
+
+function showExportStatus(message, duration = 2000) {
+  const exportButton = document.getElementById('export-button');
+  exportButton.textContent = message;
+  exportButton.classList.remove('loading');
+  setTimeout(() => {
+    exportButton.textContent = 'Export to Excel';
+    updateExportButtonState();
+  }, duration);
+}
+
 async function handleExport(org, repo, token) {
   const exportButton = document.getElementById('export-button');
   exportButton.classList.add('loading');
@@ -220,11 +236,16 @@ async function handleExport(org, repo, token) {
   try {
     const schema = await fetchBlockSchema(org, repo, token);
     const validBlockTypes = extractBlockTypesFromSchema(schema);
-    if (validBlockTypes.length === 0) throw new Error('No block types found');
+    if (validBlockTypes.length === 0) {
+      showExportStatus('No block types found');
+      return;
+    }
     const { products, languages, devices } = getSelectedItems();
     const pagePaths = buildPagePaths(products, languages, devices);
     const allData = [];
+    // eslint-disable-next-line no-restricted-syntax
     for (const pageInfo of pagePaths) {
+      // eslint-disable-next-line no-await-in-loop
       const html = await fetchPageContent(org, repo, pageInfo.path, token);
       if (html) {
         const blocks = parseAsoBlocks(html, validBlockTypes);
@@ -232,20 +253,9 @@ async function handleExport(org, repo, token) {
       }
     }
     await generateExcel(allData, products, languages, devices);
-    exportButton.textContent = 'Export Complete!';
-    setTimeout(() => {
-      exportButton.textContent = 'Export to Excel';
-      exportButton.classList.remove('loading');
-      updateExportButtonState();
-    }, 2000);
+    showExportStatus('Export Complete!');
   } catch (error) {
-    console.error('Export failed:', error);
-    exportButton.textContent = 'Export Failed';
-    exportButton.classList.remove('loading');
-    setTimeout(() => {
-      exportButton.textContent = 'Export to Excel';
-      updateExportButtonState();
-    }, 2000);
+    showExportStatus('Export Failed');
   }
 }
 
@@ -266,14 +276,6 @@ function updateSelectionCount(type) {
   const count = Array.from(checkboxes).filter((cb) => cb.checked).length;
   const countElement = document.getElementById(`${type}-count`);
   if (countElement) countElement.textContent = `(${count} selected)`;
-}
-
-function updateExportButtonState() {
-  const hasProducts = getSelectedCheckboxes('.product-checkbox').length > 0;
-  const hasLanguages = getSelectedCheckboxes('.language-checkbox').length > 0;
-  const hasDevices = document.getElementById('device-apple').checked
-    || document.getElementById('device-google').checked;
-  document.getElementById('export-button').disabled = !(hasProducts && hasLanguages && hasDevices);
 }
 
 function populateCheckboxes(containerId, items, type) {
@@ -312,6 +314,7 @@ function setupListeners(org, repo, token) {
   document.getElementById('export-button').addEventListener('click', () => handleExport(org, repo, token));
 }
 
+// eslint-disable-next-line import/prefer-default-export
 export async function init({ context, token }) {
   const { org, repo } = context;
   const products = await fetchProducts({ context, token });

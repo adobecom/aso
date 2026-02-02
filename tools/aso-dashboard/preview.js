@@ -1,4 +1,4 @@
-import { fetchProducts, fetchLanguages } from './utils.js';
+import { fetchProducts, fetchLanguages, getRelativeProductsPath } from './utils.js';
 
 function getDropdownValues() {
   return {
@@ -11,7 +11,8 @@ function getDropdownValues() {
 function buildPreviewURL() {
   const { product, language, device } = getDropdownValues();
   if (!product || !language || !device) return null;
-  return `https://main--aso--adobecom.aem.page/${language}/products/${product}/${device}`;
+  const productsPath = getRelativeProductsPath();
+  return `https://main--aso--adobecom.aem.page/${language.replace(/^\//, '')}/${productsPath}/${product}/${device}`;
 }
 
 function updatePreview() {
@@ -51,6 +52,7 @@ function setupListeners() {
   });
 }
 
+// eslint-disable-next-line import/prefer-default-export
 export async function init({ context, token }) {
   const products = await fetchProducts({ context, token });
   populateDropdown('product', products);
