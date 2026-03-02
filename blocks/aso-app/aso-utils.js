@@ -2,27 +2,13 @@ const BLOCK_SCHEMA_PATH = '/.da/block-schema.json';
 
 let allValidations;
 
-function cleanEditorArtifacts(element) {
-  element.querySelectorAll('#da-cursor-position').forEach((elem) => elem.remove());
-  const pmElements = element.querySelectorAll('[class*="ProseMirror-"]');
-  pmElements.forEach((elem) => {
-    if (elem.getAttribute('contenteditable') === 'false' || elem.classList.contains('ProseMirror-widget')) {
-      elem.remove();
-    } else {
-      const parent = elem.parentNode;
-      if (parent) {
-        while (elem.firstChild) {
-          parent.insertBefore(elem.firstChild, elem);
-        }
-        elem.remove();
-      }
-    }
-  });
+function cleanupDATags(element) {
+  if (window.location.search.includes('dapreview') || window.location.href.includes('da.live/edit')) {
+    element.querySelectorAll('#da-cursor-position').forEach((elem) => elem.remove());
+  }
 }
 
-function isDAPreview() {
-  return window.location.search.includes('dapreview') || window.location.href.includes('da.live/edit');
-}
+const LIST_INDENT = 4;
 
 function normalizeWhitespace(text) {
   return text
@@ -31,53 +17,97 @@ function normalizeWhitespace(text) {
     .replace(/  +/g, ' '); // Collapse multiple spaces to one
 }
 
-export function convertTags(el, options = {}) {
-  const { addParagraphBreaks = false } = options;
-  const clone = el.cloneNode(true);
-  if (isDAPreview()) {
-    cleanEditorArtifacts(clone);
-  }
-  clone.querySelectorAll('*').forEach((elem) => {
-    Array.from(elem.attributes).forEach((attr) => {
-      elem.removeAttribute(attr.name);
-    });
+function collapseMultipleNewlines(text) {
+  return text.replace(/\n{2,}/g, '\n');
+}
+
+function removeWhitespaceOnlyTextNodes(root) {
+  Array.from(root.childNodes).forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE && /^\s*$/.test(node.data) && /\n/.test(node.data)) {
+      const replacement = document.createTextNode('\n');
+      node.parentNode.replaceChild(replacement, node);
+    }
   });
-  clone.querySelectorAll('span, div, a').forEach((tag) => {
+}
+
+/** One walk: collect every ul/ol with its nesting depth; process innermost first. */
+function convertListsToText(root) {
+  const entries = [];
+  function walk(node, depth) {
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    Array.from(node.children).forEach((child) => {
+      if (child.tagName === 'UL' || child.tagName === 'OL') {
+        entries.push({ list: child, depth });
+        walk(child, depth + 1);
+      } else {
+        walk(child, depth);
+      }
+    });
+  }
+  walk(root, 0);
+  entries.sort((a, b) => b.depth - a.depth); // innermost first
+  entries.forEach(({ list, depth }) => {
+    const indent = ' '.repeat(LIST_INDENT * depth);
+    const items = Array.from(list.children)
+      .filter((el) => el.tagName === 'LI')
+      .map((li) => li.textContent.trim().replace(/\n\s*\n/g, '\n'));
+    const lines = list.tagName === 'UL'
+      ? items.map((t) => `- ${t}`)
+      : items.map((t, i) => `${i + 1}. ${t}`);
+    const indented = indent ? lines.map((line) => indent + line) : lines;
+    const next = list.nextElementSibling;
+    const nextIsList = next && (next.tagName === 'UL' || next.tagName === 'OL');
+    const trailing = nextIsList ? '' : '\n';
+    const formatted = lines.length ? `\n${indented.join('\n')}${trailing}` : '\n';
+    list.replaceWith(document.createTextNode(formatted));
+  });
+}
+
+export function convertTags(el, { addParagraphBreaks = false } = {}) {
+  const clone = el.cloneNode(true);
+  cleanupDATags(clone);
+  convertListsToText(clone);
+
+  const all = clone.querySelectorAll('*');
+  const byTag = (names) => Array.from(all).filter((e) => names.includes(e.tagName));
+  const hasOtherTags = Array.from(all).some((e) => ['B', 'I', 'U', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'STRONG', 'EM'].includes(e.tagName));
+
+  all.forEach((elem) => {
+    Array.from(elem.attributes).forEach((attr) => elem.removeAttribute(attr.name));
+  });
+  byTag(['SPAN', 'DIV', 'A']).reverse().forEach((tag) => {
     const parent = tag.parentNode;
     if (parent) {
-      while (tag.firstChild) {
-        parent.insertBefore(tag.firstChild, tag);
-      }
+      while (tag.firstChild) parent.insertBefore(tag.firstChild, tag);
       tag.remove();
     }
   });
-  clone.querySelectorAll('strong').forEach((strong) => {
-    const b = document.createElement('b');
-    b.innerHTML = strong.innerHTML;
-    strong.replaceWith(b);
+  const tagReplacements = { STRONG: 'b', EM: 'i' };
+  byTag(['STRONG', 'EM']).forEach((elem) => {
+    const newEl = document.createElement(tagReplacements[elem.tagName]);
+    newEl.innerHTML = elem.innerHTML;
+    elem.replaceWith(newEl);
   });
-  clone.querySelectorAll('em').forEach((em) => {
-    const i = document.createElement('i');
-    i.innerHTML = em.innerHTML;
-    em.replaceWith(i);
-  });
-  clone.querySelectorAll('br').forEach((br) => {
-    if (br.parentElement && br.parentElement.childNodes.length === 1 && br.parentElement.textContent.trim() === '') {
+  byTag(['BR']).forEach((br) => {
+    if (br.parentElement?.childNodes.length === 1 && br.parentElement.textContent.trim() === '') {
       br.parentElement.remove();
     } else {
       br.replaceWith('\n');
     }
   });
-  const hasOtherTags = clone.querySelector('b, i, u, h1, h2, h3, h4, h5, h6');
+
+  const pList = byTag(['P']);
   if (!hasOtherTags) {
-    clone.querySelectorAll('p').forEach((p, index, arr) => {
+    pList.forEach((p, index, arr) => {
       const separator = addParagraphBreaks && index < arr.length - 1 ? '\n\n' : '';
-      const textNode = document.createTextNode(p.textContent.trim() + separator);
-      p.replaceWith(textNode);
+      p.replaceWith(document.createTextNode(p.textContent.trim() + separator));
     });
-    return normalizeWhitespace(clone.textContent.trim());
+    removeWhitespaceOnlyTextNodes(clone);
+    const text = collapseMultipleNewlines(clone.textContent.trim());
+    // Collapse 2+ spaces to one per line, but preserve leading spaces (list indent)
+    return text.split('\n').map((line) => line.replace(/^(\s*)(.*)$/, (_, lead, rest) => lead + rest.replace(/  +/g, ' '))).join('\n');
   }
-  clone.querySelectorAll('p').forEach((p, index, arr) => {
+  pList.forEach((p, index, arr) => {
     const fragment = document.createDocumentFragment();
     fragment.append(...p.childNodes);
     if (addParagraphBreaks && index < arr.length - 1) {
@@ -85,7 +115,7 @@ export function convertTags(el, options = {}) {
     }
     p.replaceWith(fragment);
   });
-  return normalizeWhitespace(clone.innerHTML.trim());
+  return collapseMultipleNewlines(normalizeWhitespace(clone.innerHTML.trim()));
 }
 
 function buildValidationsFromSchema(schemaData) {
@@ -135,11 +165,11 @@ async function loadBlockValidations() {
   return allValidations;
 }
 
-function findMatchingSchemaKey(sortedTypes, allValidations) {
-  for (let i = sortedTypes.length; i > 0; i--) {
+function findMatchingSchemaKey(sortedTypes, validationsMap) {
+  for (let i = sortedTypes.length; i > 0; i -= 1) {
     const classesToTry = sortedTypes.slice(0, i);
     const schemaKey = buildSchemaKey(classesToTry);
-    if (allValidations[schemaKey]) {
+    if (validationsMap[schemaKey]) {
       return schemaKey;
     }
   }

@@ -144,6 +144,58 @@ describe('aso-utils', () => {
       expect(result).to.equal('Line one\nLine two\nLine three');
     });
 
+    it('converts ul/li to dash-bullet lines', () => {
+      const div = document.createElement('div');
+      div.innerHTML = '<ul><li>One</li><li>Two</li><li>Three</li></ul>';
+      const result = convertTags(div);
+      expect(result).to.equal('- One\n- Two\n- Three');
+    });
+
+    it('converts ol/li to numbered lines', () => {
+      const div = document.createElement('div');
+      div.innerHTML = '<ol><li>First</li><li>Second</li></ol>';
+      const result = convertTags(div);
+      expect(result).to.equal('1. First\n2. Second');
+    });
+
+    it('converts nested ul/ol and ul+ol with p inside li to formatted text', () => {
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <ul>
+          <li><p>First bullet</p></li>
+          <li><p>Second bullet</p></li>
+          <li>
+            <p>Third bullet with nested lists</p>
+            <ul>
+              <li>Nested bullet one</li>
+              <li>Nested bullet two</li>
+            </ul>
+            <ol>
+              <li>Nested number one</li>
+              <li>Nested number two</li>
+            </ol>
+          </li>
+        </ul>
+        <ol>
+          <li>Ordered first</li>
+          <li>Ordered second</li>
+          <li>Ordered third</li>
+        </ol>
+      `;
+      const result = convertTags(div);
+      const expected = `- First bullet
+- Second bullet
+- Third bullet with nested lists
+    - Nested bullet one
+    - Nested bullet two
+    1. Nested number one
+    2. Nested number two
+1. Ordered first
+2. Ordered second
+3. Ordered third`;
+      expect(result).to.equal(expected);
+    });
+
     it('preserves allowed HTML tags', () => {
       const div = document.createElement('div');
       div.innerHTML = '<p>This is <b>bold</b> and <i>italic</i> text</p>';
