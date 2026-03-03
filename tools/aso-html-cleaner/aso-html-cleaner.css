@@ -1,3 +1,4 @@
+/* Shared plugin style: align with aso-keywords.css */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -54,20 +55,6 @@ body {
   cursor: not-allowed;
 }
 
-.status-section {
-  text-align: left;
-  padding: 12px;
-  background: #f5f5f5;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #505050;
-}
-
-.status-section p {
-  margin: 0;
-}
-
-
 .error-section {
   padding: 12px;
   background: #ffebee;
@@ -75,9 +62,21 @@ body {
   border-left: 3px solid #f44336;
 }
 
-#error-message {
+.error-section p {
   color: #c62828;
   font-size: 13px;
+  margin: 0;
+}
+
+.status-section {
+  padding: 12px;
+  background: #e8f5e9;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #505050;
+}
+
+.status-section p {
   margin: 0;
 }
 
