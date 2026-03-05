@@ -195,7 +195,6 @@ describe('aso-utils', () => {
 3. Ordered third`;
       expect(result).to.equal(expected);
     });
-
     it('preserves allowed HTML tags', () => {
       const div = document.createElement('div');
       div.innerHTML = '<p>This is <b>bold</b> and <i>italic</i> text</p>';
@@ -229,6 +228,14 @@ describe('aso-utils', () => {
       div.innerHTML = '<h3>Title</h3><p>Content</p>';
       const result = convertTags(div);
       expect(result).to.equal('<h3>Title</h3>Content');
+    });
+
+    it('decodes &amp; in output so copy and export show e.g. Terms & Conditions', () => {
+      const div = document.createElement('div');
+      div.innerHTML = '<p>Read <strong>Terms &amp; Conditions</strong> here</p>';
+      const result = convertTags(div);
+      expect(result).to.equal('Read <b>Terms & Conditions</b> here');
+      expect(result).to.not.include('&amp;');
     });
   });
 });

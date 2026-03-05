@@ -115,7 +115,8 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
     }
     p.replaceWith(fragment);
   });
-  return collapseMultipleNewlines(normalizeWhitespace(clone.innerHTML.trim()));
+  const html = collapseMultipleNewlines(normalizeWhitespace(clone.innerHTML.trim()));
+  return html.replace(/&amp;/g, '&');
 }
 
 function buildValidationsFromSchema(schemaData) {
