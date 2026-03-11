@@ -134,7 +134,7 @@ describe('aso-utils', () => {
       const div = document.createElement('div');
       div.innerHTML = '<p>First</p><p>Second</p><p>Third</p>';
       const result = convertTags(div, { addParagraphBreaks: true });
-      expect(result).to.equal('First\nSecond\nThird');
+      expect(result).to.equal('First\n\nSecond\n\nThird');
     });
 
     it('converts br tags to newlines', () => {
@@ -142,6 +142,13 @@ describe('aso-utils', () => {
       div.innerHTML = '<p>Line one<br>Line two<br>Line three</p>';
       const result = convertTags(div);
       expect(result).to.equal('Line one\nLine two\nLine three');
+    });
+
+    it('converts div with br and double br to text with blank lines (copy flow)', () => {
+      const div = document.createElement('div');
+      div.innerHTML = 'First line<br><br>Second line<br>Third line<br><br>Fourth line';
+      const result = convertTags(div, { addParagraphBreaks: true });
+      expect(result).to.equal('First line\n\nSecond line\nThird line\n\nFourth line');
     });
 
     it('converts ul/li to dash-bullet lines', () => {

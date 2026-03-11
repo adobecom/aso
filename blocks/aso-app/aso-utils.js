@@ -17,7 +17,10 @@ function normalizeWhitespace(text) {
     .replace(/  +/g, ' '); // Collapse multiple spaces to one
 }
 
-function collapseMultipleNewlines(text) {
+function collapseMultipleNewlines(text, { preserveParagraphBreaks = false } = {}) {
+  if (preserveParagraphBreaks) {
+    return text.replace(/\n{3,}/g, '\n\n');
+  }
   return text.replace(/\n{2,}/g, '\n');
 }
 
@@ -103,7 +106,7 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
       p.replaceWith(document.createTextNode(p.textContent.trim() + separator));
     });
     removeWhitespaceOnlyTextNodes(clone);
-    const text = collapseMultipleNewlines(clone.textContent.trim());
+    const text = collapseMultipleNewlines(clone.textContent.trim(), { preserveParagraphBreaks: addParagraphBreaks });
     // Collapse 2+ spaces to one per line, but preserve leading spaces (list indent)
     return text.split('\n').map((line) => line.replace(/^(\s*)(.*)$/, (_, lead, rest) => lead + rest.replace(/  +/g, ' '))).join('\n');
   }
