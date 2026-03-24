@@ -1,5 +1,9 @@
 import { authFetch, fetchProducts, fetchLanguages, getRelativeProductsPath } from './utils.js';
 import { convertTags } from '../../blocks/aso-app/aso-utils.js';
+import {
+  isReleaseNotesField,
+  buildGooglePlayReleaseNotesBlob,
+} from './google-play-release-notes.js';
 
 let excelJSLoaded = false;
 const EXCELJS_CDN = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
@@ -101,21 +105,34 @@ function parseAsoBlocks(html, validBlockTypes) {
   return blocks;
 }
 
-function createSheetData(sheetData, languages) {
+export function createSheetData(sheetData, languages, blockType) {
+  const includeAggregatedPlayColumn = blockType === 'listing';
   const rows = [];
   ['google', 'apple'].forEach((device) => {
     if (Object.keys(sheetData[device]).length === 0) return;
     const deviceHeader = [device.charAt(0).toUpperCase() + device.slice(1)];
-    for (let i = 0; i < languages.length; i += 1) deviceHeader.push('');
+    const deviceSpanCols = includeAggregatedPlayColumn ? languages.length + 1 : languages.length;
+    for (let i = 0; i < deviceSpanCols; i += 1) deviceHeader.push('');
     rows.push(deviceHeader);
     Object.entries(sheetData[device]).forEach(([, langData]) => {
-      rows.push(['Languages', ...languages]);
+      rows.push(
+        includeAggregatedPlayColumn
+          ? ['Languages', 'Aggregated (Play paste)', ...languages]
+          : ['Languages', ...languages],
+      );
       const allFields = new Set();
       Object.values(langData).forEach((fields) => {
         Object.keys(fields).forEach((field) => allFields.add(field));
       });
       Array.from(allFields).forEach((fieldName) => {
-        const fieldRow = [fieldName];
+        const fieldRow = includeAggregatedPlayColumn ? [fieldName, ''] : [fieldName];
+        if (
+          includeAggregatedPlayColumn
+          && device === 'google'
+          && isReleaseNotesField(fieldName)
+        ) {
+          fieldRow[1] = buildGooglePlayReleaseNotesBlob(languages, langData, fieldName);
+        }
         languages.forEach((lang) => fieldRow.push(langData[lang]?.[fieldName] || ''));
         rows.push(fieldRow);
       });
@@ -164,19 +181,28 @@ async function generateExcel(data, products, languages, devices) {
     });
   });
   Object.entries(groupedData).forEach(([sheetKey, sheetData]) => {
-    const sheetArray = createSheetData(sheetData, languages);
+    const includeAggregatedPlayColumn = sheetData.blockType === 'listing';
+    const lastCol = includeAggregatedPlayColumn ? languages.length + 2 : languages.length + 1;
+    const sheetArray = createSheetData(sheetData, languages, sheetData.blockType);
     const worksheet = workbook.addWorksheet(sheetKey);
     worksheet.addRows(sheetArray);
     worksheet.getColumn(1).width = 30;
-    for (let i = 2; i <= languages.length + 1; i += 1) {
-      worksheet.getColumn(i).width = 50;
+    if (includeAggregatedPlayColumn) {
+      worksheet.getColumn(2).width = 65;
+      for (let i = 3; i <= lastCol; i += 1) {
+        worksheet.getColumn(i).width = 50;
+      }
+    } else {
+      for (let i = 2; i <= lastCol; i += 1) {
+        worksheet.getColumn(i).width = 50;
+      }
     }
     worksheet.eachRow((row, rowNumber) => {
       const firstCellValue = row.getCell(1).value;
       const isDeviceHeader = firstCellValue === 'Google' || firstCellValue === 'Apple';
       const isLanguagesHeader = firstCellValue === 'Languages';
       if (isDeviceHeader) {
-        worksheet.mergeCells(rowNumber, 1, rowNumber, languages.length + 1);
+        worksheet.mergeCells(rowNumber, 1, rowNumber, lastCol);
       }
       row.eachCell((cell, colNumber) => {
         cell.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
@@ -191,7 +217,13 @@ async function generateExcel(data, products, languages, devices) {
         }
         if (isLanguagesHeader) {
           cell.font = { bold: true, size: 11 };
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD3D3D3' } };
+          const localeHeaderFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD3D3D3' } };
+          const aggregatedHeaderFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3E5FC' } };
+          if (includeAggregatedPlayColumn) {
+            cell.fill = colNumber === 2 ? aggregatedHeaderFill : localeHeaderFill;
+          } else {
+            cell.fill = localeHeaderFill;
+          }
         }
         if (colNumber === 1 && !isDeviceHeader && !isLanguagesHeader && firstCellValue) {
           cell.font = { bold: true };
