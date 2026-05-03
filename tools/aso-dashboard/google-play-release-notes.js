@@ -1,4 +1,12 @@
-export const LOCALE_TAG_OVERRIDES = { 'es-mx': 'es-419' };
+/** Map AEM / path-style locale keys to Google Play Console release-notes locale tags. */
+export const LOCALE_TAG_OVERRIDES = {
+  'es-mx': 'es-419',
+  'fil-ph': 'fil',
+  'id-id': 'id',
+  'th-th': 'th',
+  'uk-ua': 'uk',
+  'vi-vn': 'vi',
+};
 
 /** @param {string} fieldName - First-column label (`textContent` from the label cell) */
 export function isReleaseNotesField(fieldName) {

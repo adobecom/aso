@@ -51,6 +51,14 @@ describe('google-play-release-notes', () => {
       expect(formatPlayLocaleTag('es-mx')).to.equal('es-419');
     });
 
+    it('maps path-style locales to Play language tags via LOCALE_TAG_OVERRIDES', () => {
+      expect(formatPlayLocaleTag('/fil-ph')).to.equal('fil');
+      expect(formatPlayLocaleTag('id-id')).to.equal('id');
+      expect(formatPlayLocaleTag('th-th')).to.equal('th');
+      expect(formatPlayLocaleTag('uk-ua')).to.equal('uk');
+      expect(formatPlayLocaleTag('vi-vn')).to.equal('vi');
+    });
+
     it('leaves numeric region subtags as digits (e.g. es-419)', () => {
       expect(formatPlayLocaleTag('es-419')).to.equal('es-419');
     });
