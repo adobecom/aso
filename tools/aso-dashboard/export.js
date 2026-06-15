@@ -70,12 +70,336 @@ function buildPagePaths(products, languages, devices) {
   return paths;
 }
 
+function isExportDebugEnabled() {
+  if (new URLSearchParams(window.location.search).get('exportDebug') === '1') return true;
+  const hashQuery = window.location.hash.includes('?')
+    ? window.location.hash.slice(window.location.hash.indexOf('?') + 1)
+    : window.location.hash.replace(/^#/, '');
+  if (hashQuery && new URLSearchParams(hashQuery).get('exportDebug') === '1') return true;
+  try {
+    return window.localStorage?.getItem('asoExportDebug') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function parseHtmlDocument(html) {
+  return new DOMParser().parseFromString(html, 'text/html');
+}
+
+function listListingFieldLabels(doc) {
+  const labels = [];
+  doc.querySelectorAll('.aso-app.listing.google, .aso-app.listing.apple').forEach((block) => {
+    block.querySelectorAll(':scope > div').forEach((row) => {
+      const children = Array.from(row.children);
+      if (children.length >= 2 && children[0].textContent.trim()) {
+        labels.push(children[0].textContent.trim());
+      }
+    });
+  });
+  return labels;
+}
+
+function analyzeParagraphGaps(html) {
+  const gaps = [];
+  const re = /<\/p>(\s*)<p\b/gi;
+  let match = re.exec(html);
+  while (match) {
+    gaps.push(match[1]);
+    match = re.exec(html);
+  }
+  const intentionalGaps = gaps.filter((gap) => gap && !/^\n[ \t]*$/.test(gap)).length;
+  return {
+    totalGaps: gaps.length,
+    intentionalGaps,
+    minifiedAdjacentGaps: gaps.filter((gap) => !gap).length,
+    edsPrettyPrintGaps: gaps.filter((gap) => gap && /^\n[ \t]*$/.test(gap)).length,
+    hasSpacedAdjacentP: html.includes('</p> <p>'),
+    hasMinifiedAdjacentP: html.includes('</p><p>'),
+    estimatedLineCount: gaps.length + 1 + intentionalGaps,
+    gapPreview: gaps.slice(0, 12).map((gap) => JSON.stringify(gap)),
+  };
+}
+
+function extractListingField(doc, fieldLabel) {
+  const blocks = doc.querySelectorAll('.aso-app.listing.google, .aso-app.listing.apple');
+  for (let i = 0; i < blocks.length; i += 1) {
+    const block = blocks[i];
+    const rows = block.querySelectorAll(':scope > div');
+    for (let j = 0; j < rows.length; j += 1) {
+      const row = rows[j];
+      const children = Array.from(row.children);
+      if (children.length >= 2 && children[0].textContent.trim() === fieldLabel) {
+        const fieldEl = children[1];
+        const fieldHtml = fieldEl.innerHTML;
+        const exportText = convertTags(fieldEl, { addParagraphBreaks: true });
+        return {
+          fieldHtml,
+          exportText,
+          exportLineCount: exportText.split('\n').length,
+          analysis: analyzeParagraphGaps(fieldHtml),
+        };
+      }
+    }
+  }
+  return null;
+}
+
+const EXPORT_CAPTURE_STORAGE_KEY = '__asoExportCapturedHtml';
+const EXPORT_CAPTURE_GLOBAL = '__asoExportCapturedHtml';
+const EXPORT_DEBUG_GLOBAL = '__asoExportDebug';
+
+function getExportCaptureGlobal() {
+  return window[EXPORT_CAPTURE_GLOBAL];
+}
+
+function setExportCaptureGlobal(value) {
+  window[EXPORT_CAPTURE_GLOBAL] = value;
+}
+
+function serializeCaptureEntry(entry) {
+  if (!entry) return null;
+  return {
+    path: entry.path,
+    fieldLabels: entry.fieldLabels,
+    html: entry.html,
+    fullDescriptionHtml: entry.fullDescriptionHtml,
+    descriptionHtml: entry.descriptionHtml,
+    fields: {
+      fullDescription: entry.fields?.fullDescription
+        ? {
+          fieldHtml: entry.fields.fullDescription.fieldHtml,
+          exportLineCount: entry.fields.fullDescription.exportLineCount,
+          analysis: entry.fields.fullDescription.analysis,
+        }
+        : null,
+      description: entry.fields?.description
+        ? {
+          fieldHtml: entry.fields.description.fieldHtml,
+          exportLineCount: entry.fields.description.exportLineCount,
+          analysis: entry.fields.description.analysis,
+        }
+        : null,
+    },
+    capturedAt: entry.capturedAt,
+  };
+}
+
+function readStoredExportCapture() {
+  try {
+    const raw = sessionStorage.getItem(EXPORT_CAPTURE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getExportCapture() {
+  if (getExportCaptureGlobal()?.pages?.length) {
+    return getExportCaptureGlobal();
+  }
+  return readStoredExportCapture();
+}
+
+function publishExportCapture() {
+  const capture = getExportCaptureGlobal();
+  if (!capture) return;
+  const stored = {
+    exportDebug: capture.exportDebug,
+    startedAt: capture.startedAt,
+    pages: capture.pages.map(serializeCaptureEntry),
+    last: serializeCaptureEntry(capture.last),
+  };
+  try {
+    sessionStorage.setItem(EXPORT_CAPTURE_STORAGE_KEY, JSON.stringify(stored));
+  } catch (err) {
+    console.warn('[aso export] Could not save to sessionStorage (quota?):', err.message);
+  }
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent[EXPORT_CAPTURE_GLOBAL] = stored;
+      window.parent[EXPORT_DEBUG_GLOBAL] = window[EXPORT_DEBUG_GLOBAL];
+    }
+  } catch {
+    // cross-origin parent
+  }
+}
+
+function captureExportHtml(path, html, { verbose = false } = {}) {
+  const doc = parseHtmlDocument(html);
+  const fullDescription = extractListingField(doc, 'Full Description');
+  const description = extractListingField(doc, 'Description');
+  const fieldLabels = listListingFieldLabels(doc);
+  const entry = {
+    path,
+    html,
+    fieldLabels,
+    fullDescriptionHtml: fullDescription?.fieldHtml ?? null,
+    descriptionHtml: description?.fieldHtml ?? null,
+    fields: {
+      fullDescription,
+      description,
+    },
+    analysis: { page: analyzeParagraphGaps(html) },
+    capturedAt: new Date().toISOString(),
+  };
+  if (!getExportCaptureGlobal()) {
+    setExportCaptureGlobal({ pages: [], exportDebug: isExportDebugEnabled() });
+  }
+  const capture = getExportCaptureGlobal();
+  capture.pages.push(entry);
+  capture.last = entry;
+  publishExportCapture();
+
+  if (verbose) {
+    console.group(`[aso export] ${path}`);
+    console.log('Listing field labels:', fieldLabels);
+    if (fullDescription) {
+      console.log('Full Description analysis:', fullDescription.analysis);
+      console.log('Full Description export lines:', fullDescription.exportLineCount);
+      console.log('Full Description HTML snippet:', fullDescription.fieldHtml.slice(0, 400));
+    } else {
+      console.warn('Full Description field not found in this page HTML');
+    }
+    if (description) {
+      console.log('Description analysis:', description.analysis);
+      console.log('Description export lines:', description.exportLineCount);
+    }
+    console.log('Full page HTML → window.__asoExportCapturedHtml.last.html');
+    console.log('Full Description HTML → window.__asoExportCapturedHtml.last.fullDescriptionHtml');
+    console.groupEnd();
+  }
+  return entry;
+}
+
+function logExportCaptureSummary() {
+  const capture = getExportCapture();
+  if (!capture?.pages?.length) {
+    console.warn('[aso export] No HTML captured. Check network/auth or your product/language/device selection.');
+    return;
+  }
+  publishExportCapture();
+  console.log(`[aso export] Captured ${capture.pages.length} page(s).`);
+  capture.pages.forEach((page) => {
+    const fd = page.fields?.fullDescription;
+    const desc = page.fields?.description;
+    console.log(
+      `[aso export] ${page.path}`,
+      `Full Description: ${fd ? `${fd.exportLineCount} lines, ${fd.analysis.intentionalGaps} intentional gaps` : 'not found'}`,
+      desc ? `Description: ${desc.exportLineCount} lines, ${desc.analysis.intentionalGaps} intentional gaps` : '',
+    );
+  });
+  console.log('[aso export] Read capture from ANY console context:');
+  console.log(`  JSON.parse(sessionStorage.getItem("${EXPORT_CAPTURE_STORAGE_KEY}"))`);
+  console.log('  window.__asoExportDebug.getLast()  (after selecting the dashboard iframe in DevTools → Console context)');
+  console.log('  window.__asoExportDebug.copyFullDescription("google")');
+}
+
+function registerExportDebugHelpers() {
+  const api = {
+    isEnabled: () => isExportDebugEnabled(),
+    enable: () => {
+      try {
+        window.localStorage.setItem('asoExportDebug', '1');
+      } catch {
+        // ignore
+      }
+      console.log('[aso export] Debug enabled in localStorage. Reload the dashboard, then export again.');
+    },
+    disable: () => {
+      try {
+        window.localStorage.removeItem('asoExportDebug');
+      } catch {
+        // ignore
+      }
+      console.log('[aso export] Debug disabled in localStorage.');
+    },
+    help: () => {
+      console.log(`
+[aso export] Debug helpers (work from parent or iframe console)
+  After export:
+    JSON.parse(sessionStorage.getItem("${EXPORT_CAPTURE_STORAGE_KEY}"))
+    window.__asoExportDebug.getLast()
+    window.__asoExportDebug.getPage("google")
+    window.__asoExportDebug.copyLastHtml()
+    window.__asoExportDebug.copyFullDescription("google")
+  Verbose per-page logs: ?exportDebug=1 on dashboard URL
+  If helpers are undefined: DevTools Console → context dropdown → pick the aso-dashboard frame
+`);
+    },
+    getCapture: () => getExportCapture(),
+    getLast: () => {
+      const capture = getExportCapture();
+      return capture?.last ?? capture?.pages?.slice(-1)[0] ?? null;
+    },
+    getPage: (pathPart) => {
+      const capture = getExportCapture();
+      if (!capture?.pages) return null;
+      return capture.pages.find((page) => page.path.includes(pathPart)) ?? null;
+    },
+    copyLastHtml: async () => {
+      const page = api.getLast();
+      const html = page?.html;
+      if (!html) {
+        console.warn('[aso export] No capture yet. Run Export first.');
+        return undefined;
+      }
+      await navigator.clipboard.writeText(html);
+      console.log(`[aso export] Copied full page HTML (${html.length} chars) for`, page.path);
+      return html.length;
+    },
+    copyFullDescription: async (pathPart = '') => {
+      const page = pathPart ? api.getPage(pathPart) : api.getLast();
+      const fieldHtml = page?.fullDescriptionHtml ?? page?.fields?.fullDescription?.fieldHtml;
+      if (!fieldHtml) {
+        console.warn('[aso export] No Full Description HTML on', page?.path ?? 'last page', 'labels:', page?.fieldLabels);
+        return undefined;
+      }
+      await navigator.clipboard.writeText(fieldHtml);
+      console.log(`[aso export] Copied Full Description HTML (${fieldHtml.length} chars) for`, page.path);
+      return fieldHtml.length;
+    },
+    downloadCaptureJson: () => {
+      const capture = getExportCapture();
+      if (!capture?.pages?.length) {
+        console.warn('[aso export] No capture to download.');
+        return;
+      }
+      const blob = new Blob([JSON.stringify(capture, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `aso-export-capture-${Date.now()}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      console.log('[aso export] Downloaded capture JSON');
+    },
+  };
+  window[EXPORT_DEBUG_GLOBAL] = api;
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent[EXPORT_DEBUG_GLOBAL] = api;
+    }
+  } catch {
+    // cross-origin parent
+  }
+}
+
 async function fetchPageContent(org, repo, path, token) {
   try {
     const response = await fetch(`https://admin.da.live/source/${org}/${repo}${path}.html`, { headers: { Authorization: `Bearer ${token}` } });
-    if (response.ok) return await response.text();
+    if (response.ok) {
+      const html = await response.text();
+      captureExportHtml(path, html, { verbose: isExportDebugEnabled() });
+      return html;
+    }
+    if (isExportDebugEnabled()) {
+      console.warn(`[aso export] Fetch failed for ${path}: HTTP ${response.status}`);
+    }
   } catch (err) {
-    // Fetch failed
+    if (isExportDebugEnabled()) {
+      console.warn(`[aso export] Fetch error for ${path}:`, err);
+    }
   }
   return null;
 }
@@ -275,6 +599,11 @@ async function handleExport(org, repo, token) {
     const { products, languages, devices } = getSelectedItems();
     const pagePaths = buildPagePaths(products, languages, devices);
     const allData = [];
+    setExportCaptureGlobal({
+      pages: [],
+      exportDebug: isExportDebugEnabled(),
+      startedAt: new Date().toISOString(),
+    });
     // eslint-disable-next-line no-restricted-syntax
     for (const pageInfo of pagePaths) {
       // eslint-disable-next-line no-await-in-loop
@@ -285,6 +614,7 @@ async function handleExport(org, repo, token) {
       }
     }
     await generateExcel(allData, products, languages, devices);
+    logExportCaptureSummary();
     showExportStatus('Export Complete!');
   } catch (error) {
     showExportStatus('Export Failed');
@@ -349,6 +679,12 @@ function setupListeners(org, repo, token) {
 // eslint-disable-next-line import/prefer-default-export
 export async function init({ context, token }) {
   const { org, repo } = context;
+  registerExportDebugHelpers();
+  if (isExportDebugEnabled()) {
+    console.log('[aso export] Verbose debug enabled (?exportDebug=1). Run window.__asoExportDebug.help() for commands.');
+  } else {
+    console.log(`[aso export] Export capture → sessionStorage.getItem("${EXPORT_CAPTURE_STORAGE_KEY}") after each export`);
+  }
   const products = await fetchProducts({ context, token });
   populateCheckboxes('products-checkboxes', products, 'products');
   const languages = await fetchLanguages({ context, token });

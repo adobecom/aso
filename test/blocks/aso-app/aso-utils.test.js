@@ -130,11 +130,18 @@ describe('aso-utils', () => {
       expect(result).to.equal('First paragraph Second paragraph');
     });
 
-    it('adds paragraph breaks when option is enabled', () => {
+    it('adds single newline between minified paragraphs when option is enabled', () => {
       const div = document.createElement('div');
       div.innerHTML = '<p>First</p><p>Second</p><p>Third</p>';
       const result = convertTags(div, { addParagraphBreaks: true });
-      expect(result).to.equal('First\n\nSecond\n\nThird');
+      expect(result).to.equal('First\nSecond\nThird');
+    });
+
+    it('adds blank lines when HTML has space between p tags', () => {
+      const div = document.createElement('div');
+      div.innerHTML = '<p>First</p> <p>Second</p><p>Third</p>';
+      const result = convertTags(div, { addParagraphBreaks: true });
+      expect(result).to.equal('First\n\nSecond\nThird');
     });
 
     it('converts br tags to newlines', () => {

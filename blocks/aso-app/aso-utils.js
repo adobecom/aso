@@ -33,6 +33,58 @@ function removeWhitespaceOnlyTextNodes(root) {
   });
 }
 
+/** Gaps between consecutive </p> and <p in field HTML (space = section break, empty = minified). */
+function captureParagraphGapsFromHtml(html) {
+  const gaps = [];
+  const re = /<\/p>(\s*)<p\b/gi;
+  let match = re.exec(html);
+  while (match) {
+    gaps.push(match[1]);
+    match = re.exec(html);
+  }
+  return gaps;
+}
+
+function isIntentionalParagraphGap(gapWhitespace) {
+  if (!gapWhitespace) return false;
+  // EDS pretty-print: newline + indent only (not a DA section break)
+  if (/^\n[ \t]*$/.test(gapWhitespace)) return false;
+  return true;
+}
+
+function captureGapBetweenNodes(prev, next) {
+  if (prev.parentNode !== next.parentNode) return '';
+  let gap = '';
+  let node = prev.nextSibling;
+  while (node && node !== next) {
+    if (node.nodeType === Node.TEXT_NODE) gap += node.data;
+    node = node.nextSibling;
+  }
+  return node === next ? gap : '';
+}
+
+function clearGapBetweenNodes(prev, next) {
+  let node = prev.nextSibling;
+  while (node && node !== next) {
+    const toRemove = node;
+    node = node.nextSibling;
+    toRemove.remove();
+  }
+}
+
+function getDirectChildParagraphs(root) {
+  return Array.from(root.childNodes).filter(
+    (node) => node.nodeType === Node.ELEMENT_NODE && node.tagName === 'P',
+  );
+}
+
+function resolveParagraphSeparator(prevP, nextP, gapFromHtml, addParagraphBreaks) {
+  if (!addParagraphBreaks) return '';
+  const gap = gapFromHtml ?? captureGapBetweenNodes(prevP, nextP);
+  if (isIntentionalParagraphGap(gap)) return '\n\n';
+  return '\n';
+}
+
 /** One walk: collect every ul/ol with its nesting depth; process innermost first. */
 function convertListsToText(root) {
   const entries = [];
@@ -67,6 +119,8 @@ function convertListsToText(root) {
 }
 
 export function convertTags(el, { addParagraphBreaks = false } = {}) {
+  const sourceHtml = el.innerHTML;
+  const htmlGaps = captureParagraphGapsFromHtml(sourceHtml);
   const clone = el.cloneNode(true);
   cleanupDATags(clone);
   convertListsToText(clone);
@@ -99,26 +153,66 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
     }
   });
 
-  const pList = byTag(['P']);
+  const pList = getDirectChildParagraphs(clone);
   if (!hasOtherTags) {
     pList.forEach((p, index, arr) => {
-      const separator = addParagraphBreaks && index < arr.length - 1 ? '\n\n' : '';
-      p.replaceWith(document.createTextNode(p.textContent.trim() + separator));
+      const trimmed = p.textContent.trim();
+      if (!trimmed) {
+        if (addParagraphBreaks) p.replaceWith(document.createTextNode('\n'));
+        else p.remove();
+        return;
+      }
+      const nextP = index < arr.length - 1 ? arr[index + 1] : null;
+      let separator = '';
+      if (nextP) {
+        separator = resolveParagraphSeparator(p, nextP, htmlGaps[index], addParagraphBreaks);
+        if (!addParagraphBreaks) {
+          const gap = htmlGaps[index] ?? captureGapBetweenNodes(p, nextP);
+          if (/^[ \t]+$/.test(gap)) separator = ' ';
+          else if (/^\n[ \t]*$/.test(gap)) separator = '\n';
+        }
+        clearGapBetweenNodes(p, nextP);
+      }
+      p.replaceWith(document.createTextNode(trimmed + separator));
     });
     removeWhitespaceOnlyTextNodes(clone);
-    const text = collapseMultipleNewlines(clone.textContent.trim(), { preserveParagraphBreaks: addParagraphBreaks });
+    const text = collapseMultipleNewlines(
+      clone.textContent.trim(),
+      { preserveParagraphBreaks: addParagraphBreaks },
+    );
     // Collapse 2+ spaces to one per line, but preserve leading spaces (list indent)
-    return text.split('\n').map((line) => line.replace(/^(\s*)(.*)$/, (_, lead, rest) => lead + rest.replace(/  +/g, ' '))).join('\n');
+    return text.split('\n').map((line) => line.replace(
+      /^(\s*)(.*)$/,
+      (_, lead, rest) => lead + rest.replace(/  +/g, ' '),
+    )).join('\n');
   }
   pList.forEach((p, index, arr) => {
+    const trimmed = p.textContent.trim();
+    if (!trimmed) {
+      if (addParagraphBreaks) p.replaceWith(document.createTextNode('\n'));
+      else p.remove();
+      return;
+    }
+    const nextP = index < arr.length - 1 ? arr[index + 1] : null;
+    let separator = '';
+    if (nextP) {
+      separator = resolveParagraphSeparator(p, nextP, htmlGaps[index], addParagraphBreaks);
+      if (!addParagraphBreaks) {
+        const gap = htmlGaps[index] ?? captureGapBetweenNodes(p, nextP);
+        if (/^[ \t]+$/.test(gap)) separator = ' ';
+        else if (/^\n[ \t]*$/.test(gap)) separator = '\n';
+      }
+      clearGapBetweenNodes(p, nextP);
+    }
     const fragment = document.createDocumentFragment();
     fragment.append(...p.childNodes);
-    if (addParagraphBreaks && index < arr.length - 1) {
-      fragment.append(document.createTextNode('\n\n'));
-    }
+    if (separator) fragment.append(document.createTextNode(separator));
     p.replaceWith(fragment);
   });
-  const html = collapseMultipleNewlines(normalizeWhitespace(clone.innerHTML.trim()));
+  const html = collapseMultipleNewlines(
+    normalizeWhitespace(clone.innerHTML.trim()),
+    { preserveParagraphBreaks: addParagraphBreaks },
+  );
   return html.replace(/&amp;/g, '&');
 }
 
