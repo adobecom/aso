@@ -103,6 +103,25 @@
             </div>
           </div>
 
+          <!-- Section break reference (optional; uses Firefly default when empty) -->
+          <div class="export-section section-break-section">
+            <h3>Listing spacing reference</h3>
+            <p class="section-break-help">
+              Paste the golden store export (plain text with blank lines between sections).
+              Leave empty to use the built-in Firefly template. Applied to Full Description / Description on export.
+            </p>
+            <div class="section-break-field">
+              <label for="section-ref-google">Google — Full Description</label>
+              <textarea id="section-ref-google" class="section-break-textarea" rows="6" placeholder="Leave empty for default Firefly template (25 paragraphs · 34 export lines)"></textarea>
+              <p class="section-break-summary" id="section-ref-google-summary"></p>
+            </div>
+            <div class="section-break-field">
+              <label for="section-ref-apple">Apple — Description</label>
+              <textarea id="section-ref-apple" class="section-break-textarea" rows="6" placeholder="Leave empty for default Firefly template (28 paragraphs · 38 export lines)"></textarea>
+              <p class="section-break-summary" id="section-ref-apple-summary"></p>
+            </div>
+          </div>
+
           <!-- Export Button -->
           <button class="export-button" id="export-button" disabled>
             Export to Excel

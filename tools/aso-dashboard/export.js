@@ -1,9 +1,19 @@
 import { authFetch, fetchProducts, fetchLanguages, getRelativeProductsPath } from './utils.js';
-import { convertTags } from '../../blocks/aso-app/aso-utils.js';
+import { convertTags, applySectionBreakMask } from '../../blocks/aso-app/aso-utils.js';
 import {
   isReleaseNotesField,
   buildGooglePlayReleaseNotesBlob,
 } from './google-play-release-notes.js';
+import {
+  buildExportGapMasks,
+  formatTemplateSummary,
+  gapMaskKey,
+  getDefaultPreviewText,
+  loadStoredReference,
+  parseReferenceText,
+  resolveReferenceText,
+  saveStoredReference,
+} from './section-break-template.js';
 
 let excelJSLoaded = false;
 const EXCELJS_CDN = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
@@ -404,7 +414,26 @@ async function fetchPageContent(org, repo, path, token) {
   return null;
 }
 
-function parseAsoBlocks(html, validBlockTypes) {
+function convertListingFieldValue(fieldEl, device, fieldName, blockType, gapMasks) {
+  let el = fieldEl;
+  if (blockType === 'listing' && gapMasks) {
+    const maskKey = gapMaskKey(device, fieldName);
+    const template = gapMasks[maskKey];
+    if (template?.sectionBreakAfter?.length) {
+      el = fieldEl.cloneNode(true);
+      const result = applySectionBreakMask(el, template.sectionBreakAfter);
+      if (!result.applied && isExportDebugEnabled()) {
+        console.warn(
+          `[aso export] Section template skipped for ${device} ${fieldName}:`,
+          `${result.actual} paragraphs (expected ${result.expected})`,
+        );
+      }
+    }
+  }
+  return convertTags(el, { addParagraphBreaks: true });
+}
+
+function parseAsoBlocks(html, validBlockTypes, gapMasks = null) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   const blocks = {};
@@ -419,7 +448,13 @@ function parseAsoBlocks(html, validBlockTypes) {
       const children = Array.from(row.children);
       if (children.length >= 2) {
         const fieldName = children[0].textContent.trim();
-        const fieldValue = convertTags(children[1], { addParagraphBreaks: true });
+        const fieldValue = convertListingFieldValue(
+          children[1],
+          device,
+          fieldName,
+          blockType,
+          gapMasks,
+        );
         if (fieldName) fields[fieldName] = fieldValue;
       }
     });
@@ -598,6 +633,10 @@ async function handleExport(org, repo, token) {
     }
     const { products, languages, devices } = getSelectedItems();
     const pagePaths = buildPagePaths(products, languages, devices);
+    const gapMasks = buildExportGapMasks({
+      googleReference: document.getElementById('section-ref-google')?.value ?? '',
+      appleReference: document.getElementById('section-ref-apple')?.value ?? '',
+    });
     const allData = [];
     setExportCaptureGlobal({
       pages: [],
@@ -609,7 +648,7 @@ async function handleExport(org, repo, token) {
       // eslint-disable-next-line no-await-in-loop
       const html = await fetchPageContent(org, repo, pageInfo.path, token);
       if (html) {
-        const blocks = parseAsoBlocks(html, validBlockTypes);
+        const blocks = parseAsoBlocks(html, validBlockTypes, gapMasks);
         allData.push({ ...pageInfo, blocks });
       }
     }
@@ -665,6 +704,36 @@ function handleSelectAll(target) {
   updateExportButtonState();
 }
 
+function updateSectionBreakSummary(device) {
+  const textarea = document.getElementById(`section-ref-${device}`);
+  const summary = document.getElementById(`section-ref-${device}-summary`);
+  if (!textarea || !summary) return;
+  const authorText = textarea.value;
+  const template = parseReferenceText(resolveReferenceText(device, authorText));
+  summary.textContent = formatTemplateSummary(template, { usingDefault: !authorText.trim() });
+}
+
+function setupSectionBreakReferences() {
+  ['google', 'apple'].forEach((device) => {
+    const textarea = document.getElementById(`section-ref-${device}`);
+    const summary = document.getElementById(`section-ref-${device}-summary`);
+    if (!textarea || !summary) return;
+
+    const stored = loadStoredReference(device);
+    textarea.value = stored;
+    summary.textContent = stored
+      ? formatTemplateSummary(parseReferenceText(stored), { usingDefault: false })
+      : getDefaultPreviewText(device);
+
+    const persist = () => {
+      saveStoredReference(device, textarea.value);
+      updateSectionBreakSummary(device);
+    };
+    textarea.addEventListener('input', persist);
+    textarea.addEventListener('blur', persist);
+  });
+}
+
 function setupListeners(org, repo, token) {
   const allCheckboxes = '.product-checkbox, .language-checkbox, #device-apple, #device-google';
   document.querySelectorAll(allCheckboxes).forEach((checkbox) => {
@@ -680,6 +749,7 @@ function setupListeners(org, repo, token) {
 export async function init({ context, token }) {
   const { org, repo } = context;
   registerExportDebugHelpers();
+  setupSectionBreakReferences();
   if (isExportDebugEnabled()) {
     console.log('[aso export] Verbose debug enabled (?exportDebug=1). Run window.__asoExportDebug.help() for commands.');
   } else {

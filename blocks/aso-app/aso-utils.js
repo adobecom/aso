@@ -85,6 +85,40 @@ function resolveParagraphSeparator(prevP, nextP, gapFromHtml, addParagraphBreaks
   return '\n';
 }
 
+function isIntentionalParagraphGapInDom(prev, next) {
+  return isIntentionalParagraphGap(captureGapBetweenNodes(prev, next));
+}
+
+/**
+ * Apply section breaks from a reference template (release workaround until da-live preserves gaps).
+ * sectionBreakAfter[i] true → insert space between </p> and <p> before convertTags.
+ */
+export function applySectionBreakMask(el, sectionBreakAfter) {
+  const paragraphs = getDirectChildParagraphs(el);
+  const expected = sectionBreakAfter.length + 1;
+  if (paragraphs.length !== expected) {
+    return {
+      applied: false,
+      reason: 'paragraphCountMismatch',
+      expected,
+      actual: paragraphs.length,
+    };
+  }
+  for (let i = 0; i < sectionBreakAfter.length; i += 1) {
+    if (!sectionBreakAfter[i]) {
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+    const prev = paragraphs[i];
+    const next = paragraphs[i + 1];
+    if (!isIntentionalParagraphGapInDom(prev, next)) {
+      clearGapBetweenNodes(prev, next);
+      prev.parentNode.insertBefore(document.createTextNode(' '), next);
+    }
+  }
+  return { applied: true };
+}
+
 /** One walk: collect every ul/ol with its nesting depth; process innermost first. */
 function convertListsToText(root) {
   const entries = [];

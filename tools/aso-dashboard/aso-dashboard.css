@@ -328,6 +328,41 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link),
   margin: 0 0 var(--spacing-600) 0;
 }
 
+.section-break-help {
+  color: var(--s2-gray-700);
+  font-size: 14px;
+  margin: 0 0 var(--spacing-400) 0;
+}
+
+.section-break-field {
+  margin-bottom: var(--spacing-400);
+}
+
+.section-break-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: var(--spacing-200);
+}
+
+.section-break-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--body-font-family);
+  font-size: 14px;
+  line-height: 1.4;
+  padding: var(--spacing-300);
+  border: 1px solid rgb(230 230 230);
+  border-radius: var(--s2-radius-100);
+  resize: vertical;
+  min-height: 120px;
+}
+
+.section-break-summary {
+  font-size: 13px;
+  color: var(--s2-gray-700);
+  margin: var(--spacing-200) 0 0;
+}
+
 .export-section {
   background: #fff;
   border-radius: var(--s2-radius-300);
