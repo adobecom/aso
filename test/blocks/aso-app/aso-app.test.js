@@ -6,6 +6,7 @@ import {
   createBlockElement,
   countButtons,
 } from './test-helpers.js';
+import { resetConstantsRuntimeCache } from '../../../blocks/aso-app/constants-runtime.js';
 
 const { default: init } = await import('../../../blocks/aso-app/aso-app.js');
 
@@ -280,6 +281,44 @@ describe('aso-app', () => {
         const successNote = row.querySelector('.note.success');
         expect(successNote).to.exist;
       });
+    });
+  });
+
+  describe('constants substitution', () => {
+    beforeEach(() => {
+      resetConstantsRuntimeCache();
+      window.history.pushState({}, '', '/ko/products/apple');
+      fetchStub.withArgs('/.da/translate.json').resolves({
+        ok: true,
+        json: async () => ({
+          languages: {
+            data: [
+              { locales: 'en', name: 'English' },
+              { locales: 'ko', name: 'Korean' },
+            ],
+          },
+        }),
+      });
+    });
+
+    it('substitutes constants into preview display', async () => {
+      const appleConstants = await loadMockHTML('apple-constants.html');
+      fetchStub.withArgs('/products/apple-constants').resolves({
+        ok: true,
+        text: async () => appleConstants,
+      });
+
+      const el = createBlockElement(
+        'aso-app apple listing',
+        '<div><div>Description</div><div><p>Intro {{legal-terms}} outro</p></div></div>',
+      );
+      document.body.innerHTML = '';
+      document.body.appendChild(el);
+      await init(el);
+
+      const dataEl = document.querySelector('.data');
+      expect(dataEl.innerHTML).to.include('[선택적 액세스 권한]');
+      expect(dataEl.innerHTML).to.not.include('{{legal-terms}}');
     });
   });
 });

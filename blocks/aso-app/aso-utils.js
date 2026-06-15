@@ -1,3 +1,5 @@
+import { substituteConstantTokens } from './constants-utils.js';
+
 const BLOCK_SCHEMA_PATH = '/.da/block-schema.json';
 
 let allValidations;
@@ -214,6 +216,12 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
     { preserveParagraphBreaks: addParagraphBreaks },
   );
   return html.replace(/&amp;/g, '&');
+}
+
+export function resolveFieldText(dataEl, constantsValues = {}, options = {}) {
+  const temp = document.createElement('div');
+  temp.innerHTML = substituteConstantTokens(dataEl?.innerHTML ?? '', constantsValues);
+  return convertTags(temp, options);
 }
 
 function buildValidationsFromSchema(schemaData) {

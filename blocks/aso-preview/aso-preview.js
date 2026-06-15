@@ -1,3 +1,6 @@
+import { resolveFieldText } from '../aso-app/aso-utils.js';
+import { loadConstantsValuesForPage } from '../aso-app/constants-runtime.js';
+
 async function showPreview(meta, variant) {
   const resp = await fetch('/mocks/play-store.html');
   if (!resp.ok) {
@@ -18,46 +21,11 @@ async function showPreview(meta, variant) {
   document.body.innerHTML = doc.body.innerHTML;
 }
 
-function convertTags(el) {
-  const clone = el.cloneNode(true);
-
-  const hasOtherTags = clone.querySelector('strong, em, b, i, h1, h2, h3, h4, h5, h6, span, div, a');
-
-  clone.querySelectorAll('br').forEach((br) => {
-    br.replaceWith('\n');
-  });
-
-  if (!hasOtherTags) {
-    clone.querySelectorAll('p').forEach((p) => {
-      p.replaceWith(...p.childNodes);
-    });
-    return (clone.textContent || clone.innerText).trim();
-  }
-
-  clone.querySelectorAll('strong').forEach((strong) => {
-    const b = document.createElement('b');
-    b.innerHTML = strong.innerHTML;
-    strong.replaceWith(b);
-  });
-
-  clone.querySelectorAll('p').forEach((p) => {
-    p.replaceWith(...p.childNodes);
-  });
-
-  clone.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
-    Array.from(heading.attributes).forEach((attr) => {
-      heading.removeAttribute(attr.name);
-    });
-  });
-
-  return clone.innerHTML.trim();
-}
-
-const getMetadata = (el) => [...el.childNodes].reduce((rdx, row) => {
+const getMetadata = (el, constantsValues) => [...el.childNodes].reduce((rdx, row) => {
   if (row.children && row.children.length >= 2) {
     const key = row.children[0].textContent.trim().toLowerCase();
     const content = row.children[1];
-    const text = content.innerHTML.trim();
+    const text = resolveFieldText(content, constantsValues, { addParagraphBreaks: true });
     if (key && text) rdx[key] = { text };
   }
   return rdx;
@@ -72,9 +40,10 @@ export default async function init(el) {
     return;
   }
 
+  const constantsValues = await loadConstantsValuesForPage();
   const meta = {};
   asoApps.forEach((asoApp) => {
-    const appMeta = getMetadata(asoApp);
+    const appMeta = getMetadata(asoApp, constantsValues);
     Object.assign(meta, appMeta);
   });
 

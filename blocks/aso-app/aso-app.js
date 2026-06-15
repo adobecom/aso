@@ -1,4 +1,11 @@
-import { getValidations, convertTags } from './aso-utils.js';
+import { getValidations, resolveFieldText } from './aso-utils.js';
+import {
+  applyConstantsToDisplay,
+  isDaEditMode,
+  loadConstantsValuesForPage,
+  shouldResolveConstantsForDisplay,
+} from './constants-runtime.js';
+import { hasConstantTokens } from './constants-utils.js';
 
 function buildSuccessRow(row, received, expected) {
   const div = document.createElement('div');
@@ -7,11 +14,13 @@ function buildSuccessRow(row, received, expected) {
   row.append(div);
 }
 
-function setupCopy(row, dataEl) {
+function setupCopy(row, dataEl, constantsValues) {
   const btn = document.createElement('button');
   btn.textContent = 'Copy';
   btn.addEventListener('click', async () => {
-    const content = convertTags(dataEl, { addParagraphBreaks: true });
+    const content = isDaEditMode()
+      ? resolveFieldText(dataEl, {}, { addParagraphBreaks: true })
+      : resolveFieldText(dataEl, constantsValues, { addParagraphBreaks: true });
 
     try {
       await navigator.clipboard.writeText(content);
@@ -41,11 +50,11 @@ function buildErrorRow(row, key, type, expected, received) {
   row.append(div);
 }
 
-function validateRow(row, key, dataEl, validations) {
+function validateRow(row, key, dataEl, validations, constantsValues) {
   const rules = validations[key];
   if (!rules) return;
 
-  const content = convertTags(dataEl, { addParagraphBreaks: true });
+  const content = resolveFieldText(dataEl, constantsValues, { addParagraphBreaks: true });
   if (content.length > rules.length) {
     buildErrorRow(row, key, 'characters', rules.length, content.length);
   } else {
@@ -53,7 +62,7 @@ function validateRow(row, key, dataEl, validations) {
   }
 }
 
-function decorateRow(row, validations) {
+function decorateRow(row, validations, constantsValues) {
   const { children: cols } = row;
   if (!cols || cols.length < 2) return;
 
@@ -61,11 +70,17 @@ function decorateRow(row, validations) {
   labelEl.classList.add('label');
   dataEl.classList.add('data');
 
-  setupCopy(row, dataEl);
+  if (hasConstantTokens(dataEl.innerHTML)) {
+    applyConstantsToDisplay(dataEl, constantsValues, {
+      resolveForDisplay: shouldResolveConstantsForDisplay(),
+    });
+  }
+
+  setupCopy(row, dataEl, constantsValues);
 
   const key = labelEl.textContent.trim().toLowerCase();
   if (validations[key]) {
-    validateRow(row, key, dataEl, validations);
+    validateRow(row, key, dataEl, validations, constantsValues);
   }
 }
 
@@ -87,13 +102,16 @@ export default async function init(el) {
   header.textContent = blockTitle;
   el.prepend(header);
 
-  const { message, validations } = await getValidations(el);
+  const [{ message, validations }, constantsValues] = await Promise.all([
+    getValidations(el),
+    loadConstantsValuesForPage(),
+  ]);
 
   const rows = el.querySelectorAll(':scope > div');
   if (rows.length === 0) return;
   rows.forEach((row) => {
     row.classList.add('data-row');
-    if (row.children) decorateRow(row, validations);
+    if (row.children) decorateRow(row, validations, constantsValues);
   });
 
   if (message) {

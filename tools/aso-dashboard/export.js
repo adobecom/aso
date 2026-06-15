@@ -1,5 +1,6 @@
 import { authFetch, fetchProducts, fetchLanguages, getRelativeProductsPath } from './utils.js';
-import { convertTags } from '../../blocks/aso-app/aso-utils.js';
+import { resolveFieldText } from '../../blocks/aso-app/aso-utils.js';
+import { loadConstantsValuesForPage } from '../../blocks/aso-app/constants-runtime.js';
 import {
   isReleaseNotesField,
   buildGooglePlayReleaseNotesBlob,
@@ -404,7 +405,26 @@ async function fetchPageContent(org, repo, path, token) {
   return null;
 }
 
-function parseAsoBlocks(html, validBlockTypes) {
+function createAdminFetch(org, repo, token) {
+  const adminOrigin = `https://admin.da.live/source/${org}/${repo}`;
+  return async (input) => {
+    const url = typeof input === 'string' ? input : input.url;
+    if (url === '/.da/translate.json') {
+      return fetch(`${adminOrigin}/.da/translate.json`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+    if (url.startsWith('/')) {
+      const sourcePath = url.endsWith('.html') ? url : `${url}.html`;
+      return fetch(`${adminOrigin}${sourcePath}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    }
+    return fetch(input);
+  };
+}
+
+export function parseAsoBlocks(html, validBlockTypes, constantsValues = {}) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   const blocks = {};
@@ -419,7 +439,7 @@ function parseAsoBlocks(html, validBlockTypes) {
       const children = Array.from(row.children);
       if (children.length >= 2) {
         const fieldName = children[0].textContent.trim();
-        const fieldValue = convertTags(children[1], { addParagraphBreaks: true });
+        const fieldValue = resolveFieldText(children[1], constantsValues, { addParagraphBreaks: true });
         if (fieldName) fields[fieldName] = fieldValue;
       }
     });
@@ -598,6 +618,7 @@ async function handleExport(org, repo, token) {
     }
     const { products, languages, devices } = getSelectedItems();
     const pagePaths = buildPagePaths(products, languages, devices);
+    const adminFetch = createAdminFetch(org, repo, token);
     const allData = [];
     setExportCaptureGlobal({
       pages: [],
@@ -609,7 +630,12 @@ async function handleExport(org, repo, token) {
       // eslint-disable-next-line no-await-in-loop
       const html = await fetchPageContent(org, repo, pageInfo.path, token);
       if (html) {
-        const blocks = parseAsoBlocks(html, validBlockTypes);
+        // eslint-disable-next-line no-await-in-loop
+        const constantsValues = await loadConstantsValuesForPage({
+          pathname: pageInfo.path,
+          fetch: adminFetch,
+        });
+        const blocks = parseAsoBlocks(html, validBlockTypes, constantsValues);
         allData.push({ ...pageInfo, blocks });
       }
     }

@@ -5,10 +5,11 @@ describe('aso-utils', () => {
   let fetchStub;
   let getValidations;
   let convertTags;
+  let resolveFieldText;
 
   before(async () => {
     fetchStub = await setupMockSchema();
-    ({ getValidations, convertTags } = await import('../../../blocks/aso-app/aso-utils.js'));
+    ({ getValidations, convertTags, resolveFieldText } = await import('../../../blocks/aso-app/aso-utils.js'));
   });
 
   after(() => {
@@ -250,6 +251,42 @@ describe('aso-utils', () => {
       const result = convertTags(div);
       expect(result).to.equal('Read <b>Terms & Conditions</b> here');
       expect(result).to.not.include('&amp;');
+    });
+  });
+
+  describe('resolveFieldText', () => {
+    it('merges constants then converts field html to plain text', () => {
+      const dataEl = document.createElement('div');
+      dataEl.innerHTML = '<p>Intro {{legal-terms}} outro</p>';
+      const values = { 'legal-terms': '<p>LEGAL</p>' };
+
+      expect(resolveFieldText(dataEl, values, { addParagraphBreaks: true })).to.include('LEGAL');
+      expect(resolveFieldText(dataEl, {}, { addParagraphBreaks: true })).to.include('{{legal-terms}}');
+    });
+
+    it('merges multiple slugs when all values are mapped', () => {
+      const dataEl = document.createElement('div');
+      dataEl.innerHTML = '<p>{{legal-terms}} {{privacy-note}}</p>';
+      const values = {
+        'legal-terms': '<p>LEGAL</p>',
+        'privacy-note': '<p>PRIVACY</p>',
+      };
+
+      const result = resolveFieldText(dataEl, values, { addParagraphBreaks: true });
+      expect(result).to.include('LEGAL');
+      expect(result).to.include('PRIVACY');
+      expect(result).to.not.include('{{');
+    });
+
+    it('clears unmapped slugs when partial values are provided', () => {
+      const dataEl = document.createElement('div');
+      dataEl.innerHTML = '<p>{{legal-terms}} {{privacy-note}}</p>';
+      const values = { 'legal-terms': '<p>LEGAL</p>' };
+
+      const result = resolveFieldText(dataEl, values, { addParagraphBreaks: true });
+      expect(result).to.include('LEGAL');
+      expect(result).to.not.include('{{privacy-note}}');
+      expect(result).to.not.include('PRIVACY');
     });
   });
 });

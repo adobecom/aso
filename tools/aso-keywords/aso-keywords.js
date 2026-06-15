@@ -1,7 +1,6 @@
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { authFetch, fetchLanguages } from '../utils.js';
 import { fetchHTML, parseHTML } from './utils.js';
-
 const displayMessage = (type, message) => {
   document.getElementById(`${type}-message`).innerHTML = message;
   document.getElementById(`${type}-section`).classList.remove('hidden');
@@ -23,14 +22,18 @@ async function fetchPageHTML(org, repo, path, token) {
   const url = `https://admin.da.live/source/${org}/${repo}${htmlPath}`;
   return fetchHTML(url, token, 'page HTML', true);
 }
-async function fetchExistingKeywords(org, repo, keywordsPath, token) {
+async function fetchExistingFile(org, repo, filePath, token, errorContext) {
   return authFetch(
-    `https://admin.da.live/source/${org}/${repo}${keywordsPath}`,
+    `https://admin.da.live/source/${org}/${repo}${filePath}`,
     token,
-    'existing keywords',
+    errorContext,
     'json',
-    true
+    true,
   );
+}
+
+async function fetchExistingKeywords(org, repo, keywordsPath, token) {
+  return fetchExistingFile(org, repo, keywordsPath, token, 'existing keywords');
 }
 
 function formatBlockKey(blockKey) {
@@ -138,27 +141,31 @@ function mergeKeywordsJSON(newJSON, existingJSON) {
   return { json: merged, orphanedBlocks };
 }
 
-async function saveKeywordsJSON(org, repo, keywordsPath, json, token) {
+async function saveJsonFile(org, repo, filePath, json, token, errorContext) {
   try {
     const jsonString = JSON.stringify(json);
     const formData = new FormData();
     const blob = new Blob([jsonString], { type: 'application/json' });
     formData.append('data', blob);
-    const resp = await fetch(`https://admin.da.live/source/${org}/${repo}${keywordsPath}`, {
+    const resp = await fetch(`https://admin.da.live/source/${org}/${repo}${filePath}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
     if (!resp.ok) {
       const errorText = await resp.text();
-      console.error('Failed to save keywords:', resp.status, errorText);
+      console.error(`Failed to save ${errorContext}:`, resp.status, errorText);
       return false;
     }
     return true;
   } catch (error) {
-    console.error('Error saving keywords:', error);
+    console.error(`Error saving ${errorContext}:`, error);
     return false;
   }
+}
+
+async function saveKeywordsJSON(org, repo, keywordsPath, json, token) {
+  return saveJsonFile(org, repo, keywordsPath, json, token, 'keywords');
 }
 
 async function handleGenerate() {
@@ -201,7 +208,8 @@ async function handleGenerate() {
       return;
     }
     const newJSON = buildKeywordsJSON(blocksFound, languages);
-    const keywordsPath = `${path.replace(/\.[^.]+$/, '')}-keywords.json`;
+    const basePath = path.replace(/\.[^.]+$/, '');
+    const keywordsPath = `${basePath}-keywords.json`;
     const existingJSON = await fetchExistingKeywords(org, repo, keywordsPath, token);
     const { json: finalJSON, orphanedBlocks } = mergeKeywordsJSON(newJSON, existingJSON);
     const saved = await saveKeywordsJSON(org, repo, keywordsPath, finalJSON, token);
@@ -210,13 +218,14 @@ async function handleGenerate() {
       button.disabled = false;
       return;
     }
+
     const sheetPath = keywordsPath.replace(/\.json$/, '');
     window.open(`https://da.live/sheet#/${org}/${repo}${sheetPath}`, '_blank');
     hideMessages();
     let statusMsg = 'Opened keyword file in new tab';
     if (orphanedBlocks.length > 0) {
       const blockList = orphanedBlocks.join('<br/>');
-      statusMsg = `Opened keyword file in new tab.<br/> Blocks in keyword file but not on page:<br/>${blockList}`;
+      statusMsg = `${statusMsg}.<br/> Blocks in keyword file but not on page:<br/>${blockList}`;
     }
     displayMessage('status', statusMsg);
     button.disabled = false;

@@ -110,7 +110,23 @@ const miloLibs = setLibs(LIBS);
 
 async function loadPage() {
   const { loadArea, setConfig } = await import(`${miloLibs}/utils/utils.js`);
-  const config = setConfig({ ...CONFIG, miloLibs });
+  const {
+    collectConstantSlugsFromBlocks,
+    passthroughPlaceholdersForSlugs,
+  } = await import('/blocks/aso-app/constants-utils.js');
+  // Milo placeholders.js replaces unknown {{key}} with a humanized label (legal-terms → legal terms).
+  // Register ASO constant slugs as passthrough placeholders so tokens survive until aso-app resolves them.
+  const constantPlaceholders = passthroughPlaceholdersForSlugs(
+    collectConstantSlugsFromBlocks(document),
+  );
+  const config = setConfig({
+    ...CONFIG,
+    miloLibs,
+    placeholders: {
+      ...CONFIG.placeholders,
+      ...constantPlaceholders,
+    },
+  });
   await loadArea();
 }
 

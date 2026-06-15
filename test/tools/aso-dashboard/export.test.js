@@ -1,5 +1,48 @@
 import { expect } from '@esm-bundle/chai';
-import { createSheetData } from '../../../tools/aso-dashboard/export.js';
+import { readFile } from '@web/test-runner-commands';
+import { createSheetData, parseAsoBlocks } from '../../../tools/aso-dashboard/export.js';
+
+describe('export parseAsoBlocks', () => {
+  let listingHtml;
+  const validBlockTypes = ['listing'];
+
+  before(async () => {
+    listingHtml = await readFile({ path: '../../blocks/aso-app/mocks/apple.html' });
+  });
+
+  it('leaves placeholder tokens when no constants values are provided', () => {
+    const blocks = parseAsoBlocks(listingHtml, validBlockTypes);
+    expect(blocks['apple-listing'][0].Description).to.include('{{legal-terms}}');
+  });
+
+  it('merges constants into exported field text', () => {
+    const blocks = parseAsoBlocks(listingHtml, validBlockTypes, {
+      'legal-terms': '[Optional access permissions]\nCamera: Scan pages',
+    });
+    const description = blocks['apple-listing'][0].Description;
+    expect(description).to.include('[Optional access permissions]');
+    expect(description).to.include('Camera: Scan pages');
+    expect(description).to.not.include('{{legal-terms}}');
+  });
+
+  it('merges multiple placeholders and omits unmapped slugs', () => {
+    const html = `
+      <div class="aso-app listing apple">
+        <div>
+          <div><p>Description</p></div>
+          <div><p>{{legal-terms}} {{privacy-note}}</p></div>
+        </div>
+      </div>
+    `;
+    const blocks = parseAsoBlocks(html, validBlockTypes, {
+      'legal-terms': 'LEGAL',
+    });
+    const description = blocks['apple-listing'][0].Description;
+    expect(description).to.include('LEGAL');
+    expect(description).to.not.include('{{legal-terms}}');
+    expect(description).to.not.include('{{privacy-note}}');
+  });
+});
 
 describe('export createSheetData', () => {
   it('adds aggregated Play blob only for google listing release notes', () => {

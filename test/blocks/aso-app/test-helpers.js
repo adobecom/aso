@@ -4,9 +4,20 @@ import sinon from 'sinon';
 export async function setupMockSchema() {
   const mockSchema = await readFile({ path: './mocks/block-schema.json' });
   const fetchStub = sinon.stub(window, 'fetch');
-  fetchStub.withArgs('/.da/block-schema.json').resolves({
-    ok: true,
-    json: async () => JSON.parse(mockSchema),
+  fetchStub.callsFake((url) => {
+    if (url === '/.da/block-schema.json') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => JSON.parse(mockSchema),
+      });
+    }
+    if (url === '/.da/translate.json') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ languages: { data: [{ locales: 'en', name: 'English' }] } }),
+      });
+    }
+    return Promise.resolve({ ok: false, status: 404 });
   });
   return fetchStub;
 }
