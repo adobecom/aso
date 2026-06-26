@@ -1,6 +1,8 @@
+// eslint-disable-next-line import/no-unresolved -- DA SDK is loaded from CDN at runtime
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { authFetch, fetchLanguages } from '../utils.js';
-import { fetchHTML, parseHTML } from './utils.js';
+import { fetchHTML, buildKeywordsJSON, mergeKeywordsJSON, parseHTML } from './utils.js';
+
 const displayMessage = (type, message) => {
   document.getElementById(`${type}-message`).innerHTML = message;
   document.getElementById(`${type}-section`).classList.remove('hidden');
@@ -80,67 +82,6 @@ function findBlocksOnPage(doc, keywordBlocks) {
   return blocksFound;
 }
 
-function buildKeywordsJSON(blocksFound, languages) {
-  const json = {};
-  const names = [];
-  blocksFound.forEach(({ blockIdentifier, fields }) => {
-    names.push(blockIdentifier);
-    const data = languages.map((lang) => {
-      const entry = { language: lang.label };
-      fields.forEach((fieldName) => {
-        entry[fieldName] = '';
-      });
-      return entry;
-    });
-    const total = languages.length;
-    json[blockIdentifier] = {
-      total,
-      offset: 0,
-      limit: total,
-      data,
-    };
-  });
-  json[':names'] = names;
-  json[':type'] = 'multi-sheet';
-  return json;
-}
-function mergeKeywordsJSON(newJSON, existingJSON) {
-  if (!existingJSON) return { json: newJSON, orphanedBlocks: [] };
-  const merged = { ...existingJSON };
-  const allNames = new Set(existingJSON[':names'] || []);
-  const newBlockKeys = new Set(Object.keys(newJSON).filter((k) => !k.startsWith(':')));
-  const orphanedBlocks = [];
-  Object.keys(merged).forEach((key) => {
-    if (key.startsWith(':')) return;
-    if (!newBlockKeys.has(key)) {
-      orphanedBlocks.push(key);
-    }
-  });
-  Object.keys(newJSON).forEach((key) => {
-    if (key.startsWith(':')) return;
-    if (!merged[key]) {
-      merged[key] = newJSON[key];
-      allNames.add(key);
-    } else {
-      const newFields = newJSON[key].data[0];
-      const existingData = merged[key].data;
-      existingData.forEach((row) => {
-        Object.keys(newFields).forEach((fieldName) => {
-          if (!(fieldName in row)) {
-            row[fieldName] = '';
-          }
-        });
-      });
-      merged[key].total = existingData.length;
-      merged[key].offset = 0;
-      merged[key].limit = existingData.length;
-    }
-  });
-  merged[':names'] = Array.from(allNames);
-  merged[':type'] = 'multi-sheet';
-  return { json: merged, orphanedBlocks };
-}
-
 async function saveJsonFile(org, repo, filePath, json, token, errorContext) {
   try {
     const jsonString = JSON.stringify(json);
@@ -154,11 +95,13 @@ async function saveJsonFile(org, repo, filePath, json, token, errorContext) {
     });
     if (!resp.ok) {
       const errorText = await resp.text();
+      // eslint-disable-next-line no-console -- surfaced to plugin UI; log aids admin diagnosis
       console.error(`Failed to save ${errorContext}:`, resp.status, errorText);
       return false;
     }
     return true;
   } catch (error) {
+    // eslint-disable-next-line no-console -- surfaced to plugin UI; log aids admin diagnosis
     console.error(`Error saving ${errorContext}:`, error);
     return false;
   }
@@ -230,6 +173,7 @@ async function handleGenerate() {
     displayMessage('status', statusMsg);
     button.disabled = false;
   } catch (error) {
+    // eslint-disable-next-line no-console -- surfaced to plugin UI; log aids admin diagnosis
     console.error('Error generating keywords:', error);
     displayMessage('error', 'Unexpected error. Contact admin.');
     button.disabled = false;
