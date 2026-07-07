@@ -264,6 +264,16 @@ describe('aso-utils', () => {
       expect(resolveFieldText(dataEl, {}, { addParagraphBreaks: true })).to.include('{{legal-terms}}');
     });
 
+    it('preserves section breaks around a sole-token legal paragraph after substitution', () => {
+      const dataEl = document.createElement('div');
+      dataEl.innerHTML = '<p>Before legal</p> <p>{{legal-terms}}</p> <p>After legal</p>';
+      const values = { 'legal-terms': '<p>[Optional access permissions]</p><p>Camera: Scan pages</p>' };
+
+      const result = resolveFieldText(dataEl, values, { addParagraphBreaks: true });
+      expect(result).to.match(/Before legal\n\n\[Optional access permissions\]/);
+      expect(result).to.match(/Camera: Scan pages\n+After legal/);
+    });
+
     it('merges multiple slugs when all values are mapped', () => {
       const dataEl = document.createElement('div');
       dataEl.innerHTML = '<p>{{legal-terms}} {{privacy-note}}</p>';

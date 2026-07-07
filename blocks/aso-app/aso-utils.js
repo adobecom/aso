@@ -1,4 +1,4 @@
-import { substituteConstantTokens } from './constants-utils.js';
+import { substituteConstantTokensInDom } from '../../utils/aso-constants.js';
 
 const BLOCK_SCHEMA_PATH = '/.da/block-schema.json';
 
@@ -219,8 +219,9 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
 }
 
 export function resolveFieldText(dataEl, constantsValues = {}, options = {}) {
-  const temp = document.createElement('div');
-  temp.innerHTML = substituteConstantTokens(dataEl?.innerHTML ?? '', constantsValues);
+  const temp = dataEl?.cloneNode(true);
+  if (!temp) return '';
+  substituteConstantTokensInDom(temp, constantsValues);
   return convertTags(temp, options);
 }
 

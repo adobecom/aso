@@ -98,6 +98,21 @@ function constantValueForParagraphSubstitution(value) {
   return `<p>${value}</p>`;
 }
 
+function sectionBreakParagraph() {
+  const paragraph = document.createElement('p');
+  paragraph.className = 'aso-constants-break';
+  paragraph.appendChild(document.createElement('br'));
+  return paragraph;
+}
+
+function wrapBlockSubstitution(replacement) {
+  return `<p class="aso-constants-break"><br></p>${replacement}<p class="aso-constants-break"><br></p>`;
+}
+
+function isSoleTokenParagraph(element, slug) {
+  return element?.tagName === 'P' && element.innerHTML.trim() === `{{${slug}}}`;
+}
+
 export function substituteConstantTokens(text, values = {}) {
   if (!text || typeof text !== 'string') return text;
   if (!values || Object.keys(values).length === 0) return text;
@@ -109,13 +124,40 @@ export function substituteConstantTokens(text, values = {}) {
       const value = values[slug];
       if (!value) return;
       const replacement = constantValueForParagraphSubstitution(value);
-      result = result.replace(soleTokenParagraphPattern(slug), () => replacement);
+      result = result.replace(
+        soleTokenParagraphPattern(slug),
+        () => wrapBlockSubstitution(replacement),
+      );
     });
 
   return result.replace(
     new RegExp(CONSTANT_TOKEN_PATTERN.source, CONSTANT_TOKEN_PATTERN.flags),
     (_, slug) => values[slug] ?? '',
   );
+}
+
+export function substituteConstantTokensInDom(root, values = {}) {
+  if (!root?.querySelectorAll || !values || Object.keys(values).length === 0) return;
+
+  Object.keys(values)
+    .sort((a, b) => b.length - a.length)
+    .forEach((slug) => {
+      const value = values[slug];
+      if (!value) return;
+      const blockHtml = constantValueForParagraphSubstitution(value);
+      [...root.querySelectorAll('p')].forEach((paragraph) => {
+        if (!isSoleTokenParagraph(paragraph, slug)) return;
+        const fragment = document.createDocumentFragment();
+        fragment.appendChild(sectionBreakParagraph());
+        fragment.appendChild(document.createRange().createContextualFragment(blockHtml));
+        fragment.appendChild(sectionBreakParagraph());
+        paragraph.replaceWith(fragment);
+      });
+    });
+
+  if (hasConstantTokens(root.innerHTML)) {
+    root.innerHTML = substituteConstantTokens(root.innerHTML, values);
+  }
 }
 
 export function parseConstantsForLanguage(html, { slug, languageLabel } = {}) {

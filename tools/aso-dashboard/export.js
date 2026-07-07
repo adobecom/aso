@@ -133,7 +133,7 @@ function extractListingField(doc, fieldLabel) {
       if (children.length >= 2 && children[0].textContent.trim() === fieldLabel) {
         const fieldEl = children[1];
         const fieldHtml = fieldEl.innerHTML;
-        const exportText = convertTags(fieldEl, { addParagraphBreaks: true });
+        const exportText = resolveFieldText(fieldEl, {}, { addParagraphBreaks: true });
         return {
           fieldHtml,
           exportText,

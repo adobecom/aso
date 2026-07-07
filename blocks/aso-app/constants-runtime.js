@@ -3,8 +3,8 @@ import {
   constantsPathFromPagePath,
   hasConstantTokens,
   parseAllConstantsForLanguage,
-  substituteConstantTokens,
-} from './constants-utils.js';
+  substituteConstantTokensInDom,
+} from '../../utils/aso-constants.js';
 
 const TRANSLATE_PATH = '/.da/translate.json';
 
@@ -165,8 +165,5 @@ export async function loadConstantsValuesForPage({
 export function applyConstantsToDisplay(dataEl, constantsValues = {}, { resolveForDisplay } = {}) {
   const shouldResolve = resolveForDisplay ?? shouldResolveConstantsForDisplay();
   if (!shouldResolve || !dataEl || !hasConstantTokens(dataEl.innerHTML)) return;
-  const resolved = substituteConstantTokens(dataEl.innerHTML, constantsValues);
-  if (resolved !== dataEl.innerHTML) {
-    dataEl.innerHTML = resolved;
-  }
+  substituteConstantTokensInDom(dataEl, constantsValues);
 }

@@ -5,7 +5,7 @@ import {
   loadConstantsValuesForPage,
   shouldResolveConstantsForDisplay,
 } from './constants-runtime.js';
-import { hasConstantTokens } from './constants-utils.js';
+import { hasConstantTokens } from '../../utils/aso-constants.js';
 
 function buildSuccessRow(row, received, expected) {
   const div = document.createElement('div');
@@ -71,9 +71,8 @@ function decorateRow(row, validations, constantsValues) {
   dataEl.classList.add('data');
 
   if (hasConstantTokens(dataEl.innerHTML)) {
-    applyConstantsToDisplay(dataEl, constantsValues, {
-      resolveForDisplay: shouldResolveConstantsForDisplay(),
-    });
+    const displayOptions = { resolveForDisplay: shouldResolveConstantsForDisplay() };
+    applyConstantsToDisplay(dataEl, constantsValues, displayOptions);
   }
 
   setupCopy(row, dataEl, constantsValues);

@@ -14,16 +14,16 @@ import {
   passthroughPlaceholderValue,
   passthroughPlaceholdersForSlugs,
   substituteConstantTokens,
-} from '../../../blocks/aso-app/constants-utils.js';
+} from '../../utils/aso-constants.js';
 
-describe('constants-utils', () => {
+describe('aso-constants', () => {
   let appleListing;
   let appleConstants;
 
   before(async () => {
     [appleListing, appleConstants] = await Promise.all([
-      readFile({ path: './mocks/apple.html' }),
-      readFile({ path: './mocks/apple-constants.html' }),
+      readFile({ path: '../blocks/aso-app/mocks/apple.html' }),
+      readFile({ path: '../blocks/aso-app/mocks/apple-constants.html' }),
     ]);
   });
 
@@ -105,9 +105,7 @@ describe('constants-utils', () => {
         slug: 'legal-terms',
         languageLabel: 'English',
       });
-      const resolved = substituteConstantTokens('Before {{legal-terms}} after', {
-        'legal-terms': english,
-      });
+      const resolved = substituteConstantTokens('Before {{legal-terms}} after', { 'legal-terms': english });
       expect(resolved).to.include('[Optional access permissions]');
       expect(resolved).to.not.include('{{legal-terms}}');
     });
@@ -115,7 +113,9 @@ describe('constants-utils', () => {
     it('replaces every repeated occurrence of the same token in one pass', () => {
       const text = '<p>{{legal-terms}}</p><p>middle</p><p>{{legal-terms}}</p>';
       const merged = substituteConstantTokens(text, { 'legal-terms': 'LEGAL' });
-      expect(merged).to.equal('<p>LEGAL</p><p>middle</p><p>LEGAL</p>');
+      expect(merged).to.equal(
+        '<p class="aso-constants-break"><br></p><p>LEGAL</p><p class="aso-constants-break"><br></p><p>middle</p><p class="aso-constants-break"><br></p><p>LEGAL</p><p class="aso-constants-break"><br></p>',
+      );
       expect(merged).to.not.include('{{legal-terms}}');
     });
 
@@ -125,7 +125,9 @@ describe('constants-utils', () => {
         '<p>Before</p><p>{{legal-terms}}</p><p>After</p>',
         { 'legal-terms': value },
       );
-      expect(merged).to.equal('<p>Before</p><p>Line one</p><p>Line two</p><p>After</p>');
+      expect(merged).to.equal(
+        '<p>Before</p><p class="aso-constants-break"><br></p><p>Line one</p><p>Line two</p><p class="aso-constants-break"><br></p><p>After</p>',
+      );
       expect(merged).not.to.include('<p></p>');
     });
 
@@ -192,9 +194,7 @@ describe('constants-utils', () => {
           </div>
         </main></body>
       `;
-      expect(parseAllConstantsForLanguage(constantsHtml, 'Japanese')).to.deep.equal({
-        'legal-terms': '<p>LEGAL JA</p>',
-      });
+      expect(parseAllConstantsForLanguage(constantsHtml, 'Japanese')).to.deep.equal({ 'legal-terms': '<p>LEGAL JA</p>' });
     });
 
     it('substitutes empty string for tokens with no matching value when values exist', () => {

@@ -26,7 +26,7 @@ export const [setLibs, getLibs] = (() => {
   ];
 })();
 
-function decorateArea(area = document) {
+function decorateArea() {
   const eagerLoad = (parent, selector) => {
     const img = parent.querySelector(selector);
     img?.removeAttribute('loading');
@@ -113,13 +113,14 @@ async function loadPage() {
   const {
     collectConstantSlugsFromBlocks,
     passthroughPlaceholdersForSlugs,
-  } = await import('/blocks/aso-app/constants-utils.js');
-  // Milo placeholders.js replaces unknown {{key}} with a humanized label (legal-terms → legal terms).
-  // Register ASO constant slugs as passthrough placeholders so tokens survive until aso-app resolves them.
+  } = await import('../utils/aso-constants.js');
+  // Milo placeholders.js replaces unknown {{key}} with a humanized label
+  // (legal-terms → legal terms). Register ASO constant slugs as passthrough
+  // placeholders so tokens survive until aso-app resolves them.
   const constantPlaceholders = passthroughPlaceholdersForSlugs(
     collectConstantSlugsFromBlocks(document),
   );
-  const config = setConfig({
+  setConfig({
     ...CONFIG,
     miloLibs,
     placeholders: {
