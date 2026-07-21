@@ -1,3 +1,5 @@
+import { fetchLanguageIndex } from './aso-dashboard/js/lib/translate-paths.js';
+
 export async function authFetch(url, token, errorContext, mimeType = 'json', cacheBust = false) {
   try {
     const fetchUrl = cacheBust ? `${url}${url.includes('?') ? '&' : '?'}cb=${Date.now()}` : url;
@@ -13,20 +15,14 @@ export async function authFetch(url, token, errorContext, mimeType = 'json', cac
   }
 }
 
-let languagesCache = null;
-
-export async function fetchLanguages({ context, token }) {
-  if (languagesCache) return languagesCache;
-  const { org, repo } = context;
-  const data = await authFetch(
-    `https://admin.da.live/source/${org}/${repo}/.da/translate.json`,
-    token,
-    'languages',
-  );
-  if (!data?.languages?.data) return [];
-  languagesCache = data.languages.data.map((lang) => ({
-    code: lang.locales.toLowerCase(),
-    label: lang.name,
+export async function fetchLanguages({ context, token, configFile } = {}) {
+  const index = await fetchLanguageIndex({ context, token, configFile });
+  return index.map((language) => ({
+    code: language.localizedCode,
+    label: language.name,
+    name: language.name,
+    sourcePath: language.sourcePath,
+    localizedPath: language.localizedPath,
+    isManagedLocale: language.isManagedLocale,
   }));
-  return languagesCache;
 }

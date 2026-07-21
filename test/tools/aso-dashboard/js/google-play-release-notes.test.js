@@ -3,7 +3,7 @@ import {
   isReleaseNotesField,
   formatPlayLocaleTag,
   buildGooglePlayReleaseNotesBlob,
-} from '../../../tools/aso-dashboard/google-play-release-notes.js';
+} from '../../../../tools/aso-dashboard/js/google-play-release-notes.js';
 
 describe('google-play-release-notes', () => {
   describe('isReleaseNotesField', () => {
@@ -20,6 +20,13 @@ describe('google-play-release-notes', () => {
   });
 
   describe('formatPlayLocaleTag', () => {
+    it('maps translate location paths to Play tags', () => {
+      expect(formatPlayLocaleTag('/de-de')).to.equal('de-DE');
+      expect(formatPlayLocaleTag('/')).to.equal('en-US');
+      expect(formatPlayLocaleTag({ localizedPath: '/uk' })).to.equal('en-GB');
+      expect(formatPlayLocaleTag({ localizedPath: '/de-de' })).to.equal('de-DE');
+    });
+
     it('maps en-us to en-US', () => {
       expect(formatPlayLocaleTag('en-us')).to.equal('en-US');
     });
@@ -65,6 +72,22 @@ describe('google-play-release-notes', () => {
   });
 
   describe('buildGooglePlayReleaseNotesBlob', () => {
+    it('builds tagged sections using language objects with localizedPath', () => {
+      const languages = [
+        { name: 'English', localizedPath: '/' },
+        { name: 'German', localizedPath: '/de-de' },
+      ];
+      const langData = {
+        English: { 'Release Notes': 'First line.\n\nSecond.' },
+        German: { 'Release Notes': 'Erste.' },
+      };
+      const out = buildGooglePlayReleaseNotesBlob(languages, langData, 'Release Notes');
+      expect(out).to.equal(
+        '<en-US>\n\nFirst line.\n\nSecond.\n\n</en-US>\n\n'
+        + '<de-DE>\n\nErste.\n\n</de-DE>',
+      );
+    });
+
     it('builds tagged sections in language order', () => {
       const languages = ['en-us', 'de-de'];
       const langData = {

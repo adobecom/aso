@@ -98,6 +98,51 @@ describe('constants-runtime', () => {
       expect(constantsPathFromListingPath('/target-preview/fr/products/apple', languages))
         .to.equal('/products/apple-constants');
     });
+
+    it('matches redesign translate.json by location and source paths', () => {
+      const languages = [
+        {
+          name: 'English',
+          location: '/',
+          source: '/',
+        },
+        {
+          name: 'English - British',
+          location: '/uk',
+          source: '/source/en-gb',
+        },
+        {
+          name: 'German',
+          location: '/de-de',
+          source: '/source/en-de',
+        },
+        {
+          name: 'Romanian',
+          location: '/ro',
+          source: '/',
+        },
+      ];
+
+      expect(matchTranslateLanguage('/uk/products-redesign/adobe-express/apple', languages)).to.deep.include({
+        lang: { name: 'English - British', location: '/uk', source: '/source/en-gb' },
+        prefix: '/uk',
+      });
+      expect(matchTranslateLanguage('/source/en-gb/products-redesign/adobe-express/apple', languages)).to.deep.include({
+        lang: { name: 'English - British', location: '/uk', source: '/source/en-gb' },
+        prefix: '/source/en-gb',
+      });
+      expect(matchTranslateLanguage('/de-de/products-redesign/adobe-express/apple', languages).prefix)
+        .to.equal('/de-de');
+      expect(matchTranslateLanguage('/source/en-de/products-redesign/adobe-express/apple', languages).prefix)
+        .to.equal('/source/en-de');
+      expect(matchTranslateLanguage('/ro/products-redesign/adobe-express/apple', languages).lang.name)
+        .to.equal('Romanian');
+      expect(matchTranslateLanguage('/products-redesign/adobe-express/apple', languages)).to.be.null;
+      expect(constantsPathFromListingPath('/source/en-gb/products-redesign/adobe-express/apple', languages))
+        .to.equal('/products-redesign/adobe-express/apple-constants');
+      expect(constantsPathFromListingPath('/products-redesign/adobe-express/apple', languages))
+        .to.equal('/products-redesign/adobe-express/apple-constants');
+    });
   });
 
   describe('loadConstantsValuesForPage', () => {

@@ -6,9 +6,9 @@
   <title>ASO Dashboard</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="https://use.typekit.net/pps7abe.css">
-  <link rel="stylesheet" href="/tools/aso-dashboard/aso-dashboard.css">
+  <link rel="stylesheet" href="/tools/aso-dashboard/css/aso-dashboard.css">
   <script src="https://da.live/nx/utils/sdk.js" type="module"></script>
-  <script src="/tools/aso-dashboard/aso-dashboard.js" type="module"></script>
+  <script src="/tools/aso-dashboard/js/aso-dashboard.js" type="module"></script>
 </head>
 <body>
   <header class="page-header">
@@ -22,12 +22,55 @@
   <main>
     <div class="container">
       <div class="tabs">
-        <button class="tab-button active" data-tab="preview">Preview</button>
+        <button class="tab-button active" data-tab="import">Import</button>
+        <button class="tab-button" data-tab="preview">Preview</button>
         <button class="tab-button" data-tab="export">Export</button>
       </div>
 
-      <!-- Preview Tab Content -->
-      <div class="tab-content active" data-tab-content="preview">
+      <div class="tab-content" data-tab-content="preview">
+        <div class="scope-sections-slot">
+          <div class="scope-sections">
+            <section class="release-period-settings controls" aria-label="Release period">
+              <h2 class="release-period-heading">Release period</h2>
+              <div class="control-group">
+                <label for="release-period-year">Year</label>
+                <select id="release-period-year" class="select-dropdown"></select>
+              </div>
+              <div class="control-group">
+                <label for="release-period-quarter">Quarter</label>
+                <select id="release-period-quarter" class="select-dropdown"></select>
+              </div>
+              <div class="control-group">
+                <label for="release-period-month">Month</label>
+                <select id="release-period-month" class="select-dropdown"></select>
+              </div>
+            </section>
+
+            <section class="store-scope-settings controls" aria-label="Store content">
+              <h2 class="release-period-heading">Store content</h2>
+              <div class="checkbox-group horizontal store-type-group">
+                <div class="checkbox-item">
+                  <input type="radio" name="store-type" id="store-type-updates" value="store-updates" checked>
+                  <label for="store-type-updates">Store updates</label>
+                </div>
+                <div class="checkbox-item">
+                  <input type="radio" name="store-type" id="store-type-tests" value="store-tests">
+                  <label for="store-type-tests">Store tests</label>
+                </div>
+              </div>
+              <div id="store-tests-fields" class="store-tests-fields hidden">
+                <h3 class="export-section-title">
+                  <span>Experiments <span class="selection-count" id="store-tests-count">(0 selected)</span></span>
+                  <button type="button" class="select-all-link" id="store-tests-select-all">Select All</button>
+                </h3>
+                <div class="checkbox-group" id="store-tests-checkboxes">
+                  <p>Select product, device, and release period to load experiments.</p>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
         <div class="controls-section">
           <div class="controls">
             <div class="control-group">
@@ -52,43 +95,49 @@
           </div>
         </div>
         <div class="preview-section">
+          <div class="preview-actions">
+            <button type="button" class="select-all-link" id="preview-expand-all">Expand All</button>
+          </div>
           <div class="preview-container">
             <div id="preview-frame-container" class="preview-frame-container">
-              <p class="preview-placeholder">Select a product, language, and device to view preview</p>
+              <p class="preview-placeholder">Select product, language, device, year, quarter, and month to preview staged content.</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Export Tab Content -->
       <div class="tab-content" data-tab-content="export">
         <div class="export-container">
-          <h2 class="export-title">Export Multiple Products</h2>
-          <p class="export-description">Select products, languages, and devices to export to Excel</p>
-          
-          <!-- Products Section -->
-          <div class="export-section" id="products-section">
-            <h3>
-              <span>Products <span class="selection-count" id="products-count">(0 selected)</span></span>
-              <button class="select-all-link" data-target="products">Select All</button>
-            </h3>
-            <div class="checkbox-group" id="products-checkboxes">
-              <p>Loading products...</p>
-            </div>
+          <h2 class="export-title">Export from DA</h2>
+          <p class="export-description">Download filled import-template workbooks for round-trip editing. One Excel file per product.</p>
+
+          <div class="export-section" id="export-load-from-file-section">
+            <h3>Load fields from a file (optional)</h3>
+            <p class="export-description">Pre-fills which product, languages, devices, and promos to include below — content is always pulled fresh from DA, not from this file.</p>
+            <input type="file" id="export-scope-file" class="hidden" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <button type="button" class="export-button" id="export-scope-file-button">Load Fields From File…</button>
+            <div id="export-scope-file-summary" class="action-summary" aria-live="polite"></div>
           </div>
 
-          <!-- Languages Section -->
+          <div class="scope-sections-slot"></div>
+
+          <div class="export-section" id="products-section">
+            <h3>Product</h3>
+            <select id="export-product" class="select-dropdown">
+              <option value="">Loading products...</option>
+            </select>
+          </div>
+
           <div class="export-section" id="languages-section">
             <h3>
               <span>Languages <span class="selection-count" id="languages-count">(0 selected)</span></span>
-              <button class="select-all-link" data-target="languages">Select All</button>
+              <button type="button" class="select-all-link" data-target="languages">Select All</button>
             </h3>
             <div class="checkbox-group" id="languages-checkboxes">
               <p>Loading languages...</p>
             </div>
           </div>
 
-          <!-- Devices Section -->
           <div class="export-section" id="devices-section">
             <h3>Device</h3>
             <div class="checkbox-group horizontal">
@@ -103,16 +152,84 @@
             </div>
           </div>
 
-          <!-- Export Buttons -->
-          <div class="export-buttons-row">
-            <button class="export-button" id="export-button" disabled>
-              Export to Excel
+          <div class="export-section" id="export-scope-section">
+            <h3>Content to export</h3>
+            <div class="checkbox-group horizontal">
+              <div class="checkbox-item">
+                <input type="checkbox" id="export-scope-listing" checked>
+                <label for="export-scope-listing">Metadata (listing)</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="export-scope-promos" checked>
+                <label for="export-scope-promos">Promos</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="export-scope-images-videos" checked>
+                <label for="export-scope-images-videos">Images &amp; Videos</label>
+              </div>
+            </div>
+            <details id="export-listing-fields" class="field-scope-section" open>
+              <summary>
+                <span>Metadata Fields <span class="field-scope-count" id="export-listing-field-count"></span></span>
+                <button type="button" class="select-all-link field-scope-select-all" data-block-type="listing">Select All</button>
+              </summary>
+              <div class="promo-device-boxes" id="export-listing-field-groups">
+                <p>Select product and device…</p>
+              </div>
+            </details>
+            <details id="export-promo-fields" class="field-scope-section" open>
+              <summary>
+                <span>Promos</span>
+                <span class="field-scope-count" id="export-promo-count"></span>
+              </summary>
+              <div class="promo-device-boxes" id="export-promo-groups">
+                <p>Select product, device, and release period…</p>
+              </div>
+            </details>
+            <details id="export-images-videos-fields" class="field-scope-section" open>
+              <summary>
+                <span>Images &amp; Videos Fields <span class="field-scope-count" id="export-images-videos-field-count"></span></span>
+                <button type="button" class="select-all-link field-scope-select-all" data-block-type="images-videos">Select All</button>
+              </summary>
+              <div class="promo-device-boxes" id="export-images-videos-field-groups">
+                <p>Select product and device…</p>
+              </div>
+            </details>
+            <button type="button" class="export-button" id="export-button" disabled>
+              Export from DA
             </button>
-            <button class="export-button" id="export-images-button" disabled>
+            <div id="export-summary" class="action-summary" aria-live="polite"></div>
+          </div>
+
+          <div class="export-section" id="export-media-assets-section">
+            <h3>Media Assets (for Download Images)</h3>
+            <p class="export-description">Not part of the exported workbook — this only controls what "Download Images" below fetches.</p>
+            <details id="export-media-assets-fields" class="field-scope-section">
+              <summary>
+                <span>Media Assets Fields <span class="field-scope-count" id="export-media-assets-field-count"></span></span>
+                <button type="button" class="select-all-link field-scope-select-all" data-block-type="media-assets">Select All</button>
+              </summary>
+              <div class="promo-device-boxes" id="export-media-assets-field-groups">
+                <p>Select product and device…</p>
+              </div>
+            </details>
+            <button type="button" class="export-button hidden" id="export-images-button" disabled>
               Download Images
             </button>
+            <div id="image-export-summary" class="action-summary" aria-live="polite"></div>
           </div>
-          <div id="image-export-summary" class="export-summary"></div>
+        </div>
+      </div>
+
+      <div class="tab-content active" data-tab-content="import">
+        <div class="export-container">
+          <h2 class="export-title">Import to DA</h2>
+          <p class="export-description">Upload a filled import-template workbook. Product, year, quarter, month, and store type are read from the workbook's Settings sheet — writes go to source and localized paths from Settings + translate.json.</p>
+          <input type="file" id="import-file" class="hidden" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <button type="button" class="export-button" id="import-button">
+            Import to DA
+          </button>
+          <div id="import-summary" class="action-summary" aria-live="polite"></div>
         </div>
       </div>
     </div>

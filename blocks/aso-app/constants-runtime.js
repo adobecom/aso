@@ -59,11 +59,21 @@ export function localeCodesFromTranslateEntry(locales) {
 
 function prefixesForLanguage(lang) {
   const prefixes = [];
-  const locationPrefix = normalizePathPrefix(lang?.location);
-  if (locationPrefix) prefixes.push(locationPrefix);
+  const seen = new Set();
+
+  function addPrefix(raw) {
+    const prefix = normalizePathPrefix(raw);
+    if (!prefix || seen.has(prefix)) return;
+    seen.add(prefix);
+    prefixes.push(prefix);
+  }
+
+  addPrefix(lang?.location);
+  addPrefix(lang?.source);
   localeCodesFromTranslateEntry(lang?.locales).forEach((code) => {
-    prefixes.push(normalizePathPrefix(code));
+    addPrefix(code);
   });
+
   return prefixes;
 }
 

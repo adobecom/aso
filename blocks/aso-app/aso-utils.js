@@ -74,10 +74,42 @@ function clearGapBetweenNodes(prev, next) {
   }
 }
 
-function getDirectChildParagraphs(root) {
+// Exported so callers (e.g. parseFieldFromPage) can check a spacing sidecar's stored
+// paragraphCount against what's actually live before trusting its sectionBreakAfter data —
+// same counting rule this module uses when actually applying the mask, so the check can't
+// disagree with the thing it's guarding.
+export function getDirectChildParagraphs(root) {
   return Array.from(root.childNodes).filter(
     (node) => node.nodeType === Node.ELEMENT_NODE && node.tagName === 'P',
   );
+}
+
+/**
+ * Insert intentional ` ` gaps between direct-child <p> nodes so convertTags
+ * emits blank lines (section breaks) even when DA minified the HTML.
+ */
+export function applySectionBreakMask(dataEl, sectionBreakAfter = []) {
+  if (!dataEl || !Array.isArray(sectionBreakAfter) || sectionBreakAfter.length === 0) {
+    return dataEl;
+  }
+
+  const clone = dataEl.cloneNode(true);
+  const paragraphs = getDirectChildParagraphs(clone);
+  if (paragraphs.length <= 1) return clone;
+
+  const gapCount = Math.min(sectionBreakAfter.length, paragraphs.length - 1);
+  for (let i = 0; i < gapCount; i += 1) {
+    if (sectionBreakAfter[i]) {
+      const prev = paragraphs[i];
+      const next = paragraphs[i + 1];
+      if (prev?.parentNode && prev.parentNode === next?.parentNode) {
+        clearGapBetweenNodes(prev, next);
+        prev.parentNode.insertBefore(document.createTextNode(' '), next);
+      }
+    }
+  }
+
+  return clone;
 }
 
 function resolveParagraphSeparator(prevP, nextP, gapFromHtml, addParagraphBreaks) {
@@ -219,10 +251,14 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
 }
 
 export function resolveFieldText(dataEl, constantsValues = {}, options = {}) {
-  const temp = dataEl?.cloneNode(true);
+  const { sectionBreakAfter, ...convertOptions } = options;
+  let temp = dataEl?.cloneNode(true);
   if (!temp) return '';
+  if (sectionBreakAfter?.length) {
+    temp = applySectionBreakMask(temp, sectionBreakAfter);
+  }
   substituteConstantTokensInDom(temp, constantsValues);
-  return convertTags(temp, options);
+  return convertTags(temp, convertOptions);
 }
 
 const SIZE_RANGE_PATTERN = /^\s*(\d+)\s*,\s*(\d+)\s*$/;
