@@ -76,5 +76,14 @@ describe('aso-html-cleaner-core', () => {
       expect(cleanCellContentForDocument(input))
         .to.equal('<p><h1>Head</h1> and <ul><li>item</li></ul></p>');
     });
+
+    it('leaves an unrelated escaped tag encoded, even in the same cell as a legitimate one', () => {
+      // A cell containing both a legit escaped <b> (triggers the fix) and an unrelated
+      // escaped <script> elsewhere must not have the <script> decoded into real markup —
+      // only the matched whitelisted-tag occurrences should ever be turned back into HTML.
+      const input = '&lt;b&gt;bold&lt;/b&gt; and &lt;script&gt;alert(1)&lt;/script&gt;';
+      expect(cleanCellContentForDocument(input))
+        .to.equal('<b>bold</b> and &lt;script&gt;alert(1)&lt;/script&gt;');
+    });
   });
 });

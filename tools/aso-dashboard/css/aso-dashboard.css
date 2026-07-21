@@ -1,0 +1,863 @@
+:root {
+  --nx-background: rgb(245 245 245);
+  --grid-container-width: 83.4%;
+  --body-font-family: 'Adobe Clean', adobe-clean, 'Trebuchet MS', sans-serif;
+  --s2-font-size-200: 19px;
+  --s2-font-size-800: 39px;
+  --s2-heading-size-900: 44px;
+  --s2-radius-100: 8px;
+  --s2-radius-300: 16px;
+  --spacing-100: 8px;
+  --spacing-150: 10px;
+  --spacing-200: 12px;
+  --spacing-300: 16px;
+  --spacing-400: 24px;
+  --spacing-500: 32px;
+  --spacing-600: 40px;
+  --s2-blue-200: #e5f0fe;
+  --s2-blue-800: #3b63fb;
+  --s2-gray-50: #f7f7f7;
+  --s2-gray-200: #e1e1e1;
+  --s2-gray-700: #505050;
+  --s2-gray-800: #292929;
+  --s2-gray-900: #121212;
+}
+
+body {
+  margin: 0;
+  background-color: var(--nx-background);
+  color: var(--s2-gray-800);
+  font-family: var(--body-font-family);
+  font-size: var(--s2-font-size-200);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.container {
+  max-width: var(--grid-container-width);
+  margin: 0 auto;
+  padding: 0 var(--spacing-300);
+}
+
+/* Header */
+.page-header {
+  position: relative;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--spacing-600);
+}
+
+.header-bg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  background: var(--s2-gray-200);
+}
+
+.header-fg {
+  position: relative;
+  max-width: var(--grid-container-width);
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 var(--spacing-300);
+}
+
+.header-fg-left {
+  color: var(--s2-gray-900);
+}
+
+.detail {
+  text-transform: uppercase;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  margin: 0 0 var(--spacing-200) 0;
+}
+
+.heading {
+  font-size: var(--s2-font-size-800);
+  font-weight: 400;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.release-period-settings,
+.store-scope-settings {
+  margin-bottom: var(--spacing-400);
+}
+
+.release-period-heading {
+  grid-column: 1 / -1;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--s2-gray-700);
+  letter-spacing: 0.5px;
+  margin: 0 0 var(--spacing-100);
+}
+
+.field-scope-section {
+  margin-top: var(--spacing-300);
+}
+
+.field-scope-section summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--s2-gray-700);
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-100);
+}
+
+.field-scope-count {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--s2-gray-500);
+  font-size: 12px;
+}
+
+.field-scope-section .field-scope-select-all {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.field-scope-section .promo-device-boxes {
+  margin-top: var(--spacing-200);
+}
+
+.promo-device-boxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-300);
+}
+
+/* Same reasoning as .checkbox-group > p — the "Select product and device…" placeholder
+   shown before any device box renders is a bare <p> at the full body size otherwise. */
+.promo-device-boxes > p {
+  margin: 0;
+  font-family: var(--body-font-family);
+  font-size: 14px;
+  color: var(--s2-gray-700);
+}
+
+.promo-device-box {
+  padding: var(--spacing-200);
+  background-color: rgb(250 250 250);
+  border: 1px solid rgb(230 230 230);
+  border-radius: var(--s2-radius-100);
+}
+
+.promo-device-heading {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--s2-gray-700);
+  letter-spacing: 0.5px;
+  margin: 0 0 var(--spacing-150);
+}
+
+.promo-group-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.promo-group {
+  padding: var(--spacing-150) 0;
+  border-bottom: 1px solid rgb(230 230 230);
+}
+
+.promo-group:last-child {
+  border-bottom: none;
+}
+
+.checkbox-item.promo-group-header {
+  display: block;
+}
+
+.promo-variant-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-100);
+  margin-top: var(--spacing-100);
+  margin-left: var(--spacing-300);
+}
+
+.promo-variant-loading {
+  margin: var(--spacing-100) 0 0 var(--spacing-300);
+  font-size: 12px;
+  color: var(--s2-gray-700);
+}
+
+.store-tests-fields {
+  margin-top: var(--spacing-300);
+}
+
+.store-type-group {
+  margin-bottom: var(--spacing-200);
+}
+
+.text-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--spacing-200);
+  font-size: 16px;
+  font-family: var(--body-font-family);
+  border: 1px solid var(--s2-gray-200);
+  border-radius: var(--s2-radius-100);
+  box-sizing: border-box;
+}
+
+.action-summary {
+  margin-top: var(--spacing-300);
+  padding: var(--spacing-300);
+  background: var(--s2-gray-50);
+  border-radius: var(--s2-radius-100);
+  font-size: 14px;
+  color: var(--s2-gray-800);
+}
+
+.export-summary-warn {
+  color: #b45309;
+}
+
+.export-summary-warn p {
+  margin: var(--spacing-150) 0 var(--spacing-100);
+}
+
+.export-summary-warn a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.export-summary-more {
+  font-style: italic;
+  font-size: 13px;
+}
+
+.import-copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-100);
+  margin-top: var(--spacing-200);
+}
+
+.import-copy-button {
+  display: inline-block;
+  padding: 4px 10px;
+  font-family: var(--body-font-family);
+  font-size: 13px;
+  font-style: normal;
+  border: 1px solid var(--s2-gray-300);
+  border-radius: var(--s2-radius-100);
+  background: #fff;
+  color: var(--s2-gray-800);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.import-copy-button:hover {
+  background: var(--s2-gray-50);
+}
+
+.import-page-header,
+.import-page-list .inner {
+  display: grid;
+  grid-template-columns: 70px 110px 1fr 90px 110px 140px 1.3fr;
+  gap: var(--spacing-200);
+  align-items: start;
+}
+
+.import-page-header p,
+.import-page-list .inner p {
+  margin: 0;
+}
+
+.import-page-header {
+  margin-top: var(--spacing-200);
+  padding: var(--spacing-100) var(--spacing-200);
+  background: var(--s2-gray-100);
+  border: 1px solid var(--s2-gray-200);
+  border-radius: var(--s2-radius-100) var(--s2-radius-100) 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--s2-gray-700);
+}
+
+.import-page-list {
+  margin: 0 0 var(--spacing-200);
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--s2-gray-200);
+  border-top: none;
+  border-radius: 0 0 var(--s2-radius-100) var(--s2-radius-100);
+  background: #fff;
+}
+
+.import-page-list li {
+  border-top: 1px solid var(--s2-gray-200);
+}
+
+.import-page-list li:first-child {
+  border-top: none;
+}
+
+.import-page-list li:hover {
+  background: var(--s2-gray-50);
+}
+
+.import-page-list .inner {
+  padding: var(--spacing-150) var(--spacing-200);
+  font-size: 13px;
+}
+
+.import-page-link {
+  font-weight: 600;
+}
+
+.import-page-missing {
+  color: var(--s2-gray-500);
+  font-style: italic;
+}
+
+.import-page-keywords {
+  font-size: 12px;
+  color: var(--s2-gray-700);
+}
+
+.import-page-over-limit {
+  font-size: 12px;
+  color: #c9252d;
+}
+
+.import-page-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-100);
+  color: var(--s2-gray-500);
+  font-size: 12px;
+}
+
+.import-page-secondary a {
+  color: var(--s2-gray-600);
+}
+
+/* Kept as its own table (renderMediaAssetsPageTable) rather than rows mixed into the main
+   import-page-list — media assets are a different kind of entry (an automatically-created
+   page to author manually, not a workbook write), and Keywords/Over Limit never apply, so a
+   leaner 4-column layout reads cleaner than reusing the main table's 7-column grid. */
+.import-media-assets-section {
+  margin-top: var(--spacing-400);
+}
+
+.import-media-assets-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--s2-gray-800);
+  margin: 0 0 var(--spacing-100);
+}
+
+.import-media-assets-header,
+.import-media-assets-list .inner {
+  grid-template-columns: 70px 150px 110px 1fr;
+}
+
+/* Controls Section */
+.controls-section {
+  margin-bottom: var(--spacing-600);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--spacing-400);
+  background: #fff;
+  padding: var(--spacing-400);
+  border-radius: var(--s2-radius-300);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-200);
+
+  label {
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    color: var(--s2-gray-700);
+    letter-spacing: 0.5px;
+  }
+}
+
+.select-dropdown {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--spacing-200);
+  font-size: 16px;
+  font-family: var(--body-font-family);
+  border: 1px solid var(--s2-gray-200);
+  border-radius: var(--s2-radius-100);
+  background: white;
+  cursor: pointer;
+  transition: border-color 200ms, box-shadow 200ms;
+
+  &:hover {
+    border-color: var(--s2-blue-800);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--s2-blue-800);
+    box-shadow: 0 0 0 2px var(--s2-blue-200);
+  }
+}
+
+/* Preview Container */
+.preview-section {
+  margin-bottom: var(--spacing-600);
+}
+
+.preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--spacing-200);
+}
+
+.preview-container {
+  background: white;
+  border-radius: var(--s2-radius-300);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+  overflow: hidden;
+}
+
+.preview-frame-container {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-400);
+}
+
+.preview-block {
+  border: 1px solid var(--s2-gray-200);
+  border-radius: var(--s2-radius-200);
+  overflow: hidden;
+}
+
+/* Collapsed by default (see renderPreviewSections) — a stack of always-open iframes each
+   carrying their own page chrome reads as disjointed and is mostly scrolling past blank
+   space, so this is styled to match the Export field-scope accordions instead. */
+.preview-block summary {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-300) var(--spacing-400);
+  background: var(--s2-gray-50);
+  gap: var(--spacing-300);
+  flex-wrap: wrap;
+  font-weight: 600;
+}
+
+/* display:flex on <summary> drops the browser's own disclosure triangle, so this stands in
+   for it — otherwise clicking the row to expand isn't obvious next to a solid button. */
+.preview-block summary::before {
+  content: '▶';
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--s2-gray-700);
+  transition: transform 150ms;
+}
+
+.preview-block[open] summary::before {
+  transform: rotate(90deg);
+}
+
+/* De-emphasized so the row itself (now with a visible expand arrow) reads as the primary
+   way to view a page, and this reads as the secondary shortcut it actually is. */
+.preview-block .open-new-tab {
+  background: none;
+  border: none;
+  color: #1373e6;
+  text-decoration: underline;
+  font-weight: 400;
+  font-size: 14px;
+  height: auto;
+  padding: 0;
+
+  &:hover {
+    color: #0d5dc2;
+    background: none;
+  }
+}
+
+.preview-block[open] summary {
+  border-bottom: 1px solid var(--s2-gray-200);
+}
+
+.preview-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  font-size: 18px;
+  color: var(--s2-gray-700);
+  text-align: center;
+  padding: var(--spacing-600);
+}
+
+.preview-url {
+  font-size: 14px;
+  color: var(--s2-gray-700);
+  flex: 1;
+  min-width: 200px;
+}
+
+/* Buttons (exclude tabs and toggle buttons) */
+button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-tab) {
+  font-family: var(--body-font-family);
+  display: inline-block;
+  border: 2px solid #1373e6;
+  background: #1373e6;
+  color: #fff;
+  height: 40px;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 0 var(--spacing-400);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 200ms, border-color 200ms;
+  line-height: 20px;
+
+  &:focus {
+    outline: 2px solid #1373e6;
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    background: var(--s2-gray-200);
+    border-color: var(--s2-gray-200);
+    color: var(--s2-gray-700);
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    background: #0d5dc2;
+    border-color: #0d5dc2;
+  }
+}
+
+/* Preview iframe */
+/* The preview host is cross-origin, so there's no way to read the real page's content
+   height and no single fixed number fits every field — a one-line App Name and a
+   4000-character Description need very different heights. This is sized for a typical
+   field; anything longer scrolls inside its own card (the iframe's native scrollbar),
+   which is a firm ceiling without the previewed page cooperating (e.g. postMessage-ing its
+   own height back) — a bigger change than this tool touches on its own. */
+.preview-iframe {
+  width: 100%;
+  height: 550px;
+  border: none;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.tab-button {
+  position: relative;
+  display: block;
+  background: none;
+  border: none;
+  padding: 0 0 6px;
+  margin: 0;
+  font-family: var(--body-font-family);
+  font-size: 22px;
+  font-weight: 700;
+  color: rgb(143 143 143);
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: none;
+
+  &::after {
+    display: block;
+    content: "";
+    position: absolute;
+    bottom: 0;
+    height: 3px;
+    width: 100%;
+    opacity: 0;
+    transition: opacity 200ms ease-in-out;
+    background: rgb(19 19 19);
+    border-radius: 3px;
+  }
+
+  &:hover {
+    color: rgb(19 19 19);
+    background: none;
+    box-shadow: none;
+  }
+
+  &:focus {
+    outline: 2px solid var(--s2-blue-800);
+    outline-offset: 2px;
+  }
+
+  &.active {
+    color: rgb(19 19 19);
+
+    &::after {
+      opacity: 1;
+    }
+  }
+}
+
+.tab-content {
+  display: none;
+
+  &.active {
+    display: block;
+  }
+}
+
+/* Export Container */
+.export-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.export-title {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0 0 var(--spacing-200) 0;
+  color: var(--s2-gray-900);
+}
+
+.export-description {
+  color: var(--s2-gray-700);
+  margin: 0 0 var(--spacing-600) 0;
+}
+
+.export-section {
+  background: #fff;
+  border-radius: var(--s2-radius-300);
+  padding: var(--spacing-500);
+  margin-bottom: var(--spacing-400);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+}
+
+.export-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 var(--spacing-300) 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selection-count {
+  font-size: 14px;
+  color: var(--s2-gray-700);
+  font-weight: 400;
+}
+
+.select-all-link {
+  font-size: 14px;
+  font-family: var(--body-font-family);
+  font-weight: 400;
+  color: #1373e6;
+  text-decoration: underline;
+  cursor: pointer;
+  display: inline-block;
+  background: none;
+  border: none;
+  padding: 0;
+  height: auto;
+  line-height: 1;
+
+  &:hover {
+    color: #0d5dc2;
+    background: none;
+  }
+}
+
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-200);
+  max-height: 300px;
+  overflow-y: auto;
+  padding: var(--spacing-300);
+  background-color: rgb(250 250 250);
+  border: 1px solid rgb(230 230 230);
+  border-radius: var(--s2-radius-100);
+}
+
+.checkbox-group.horizontal {
+  max-height: none;
+  overflow-y: visible;
+}
+
+/* Placeholder/empty-state text ("Select product and device…", "No fields found", etc.) has
+   always been a bare unstyled <p> here, rendering at the full 19px body size with default
+   paragraph margins — next to the small, tightly-styled pills in this same container, that
+   reads as an out-of-place default-browser look rather than a deliberate message. */
+.checkbox-group > p {
+  margin: 0;
+  font-family: var(--body-font-family);
+  font-size: 14px;
+  color: var(--s2-gray-700);
+}
+
+.checkbox-item {
+  position: relative;
+  display: inline-block;
+
+  label {
+    display: inline-block;
+    border-radius: var(--s2-radius-100);
+    background: #fff;
+    border: 1px solid rgb(225 225 225);
+    line-height: 1;
+    padding: 6px 8px 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 150ms, border-color 150ms;
+    color: var(--s2-gray-800);
+
+    &:hover {
+      background: rgb(240 240 240);
+      border-color: rgb(200 200 200);
+    }
+  }
+}
+
+.checkbox-item.promo-group-header label {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.checkbox-item.promo-variant-item label {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--s2-gray-700);
+}
+
+.checkbox-item input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+
+  &:checked + label {
+    background: rgb(225 225 225);
+    border-color: rgb(225 225 225);
+  }
+}
+
+.export-button {
+  width: 100%;
+  padding: 12px var(--spacing-400);
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--body-font-family);
+  background: #1373e6;
+  border: 2px solid #1373e6;
+  color: #fff;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 200ms, border-color 200ms;
+  margin-top: var(--spacing-400);
+  line-height: 24px;
+
+  &:disabled {
+    background: var(--s2-gray-200);
+    border-color: var(--s2-gray-200);
+    color: var(--s2-gray-700);
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    background: #0d5dc2;
+    border-color: #0d5dc2;
+  }
+
+  &.loading {
+    position: relative;
+    pointer-events: none;
+
+    &::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #fff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      right: var(--spacing-400);
+      top: 50%;
+      transform: translateY(-50%);
+    }
+  }
+}
+
+.image-export-summary-issues {
+  margin: 0;
+  padding-left: var(--spacing-400);
+  color: #c9302c;
+}
+
+@keyframes spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .page-header {
+    min-height: 150px;
+  }
+
+  .heading {
+    font-size: 28px;
+  }
+
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-block summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .preview-url {
+    min-width: 100%;
+  }
+
+  .checkbox-group {
+    grid-template-columns: 1fr;
+  }
+
+  .tab-button {
+    padding: var(--spacing-200) var(--spacing-400);
+    font-size: 14px;
+  }
+}

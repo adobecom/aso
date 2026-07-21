@@ -1,0 +1,11 @@
+{
+  ":type": "sheet",
+  "data": [
+    { "workbook sheet": "Metadata", "device": "apple", "block key": "aso-app (apple, listing)" },
+    { "workbook sheet": "Metadata", "device": "google", "block key": "aso-app (google, listing)" },
+    { "workbook sheet": "Promos", "device": "apple", "block key": "aso-app (apple, promo)" },
+    { "workbook sheet": "Promos", "device": "google", "block key": "aso-app (google, promo)" },
+    { "workbook sheet": "Images-Videos", "device": "apple", "block key": "aso-app (apple, images-videos)" },
+    { "workbook sheet": "Images-Videos", "device": "google", "block key": "aso-app (google, images-videos)" }
+  ]
+}

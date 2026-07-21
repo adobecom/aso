@@ -1,0 +1,169 @@
+{
+  ":version": 3,
+  ":names": ["aso-app"],
+  ":type": "sheet",
+  "aso-app (apple, listing)": {
+    "data": [
+      {
+        "field name": "App Name",
+        "field key": "name",
+        "page leaf": "metadata/app-name",
+        "character count": "30",
+        "keywords injection": "yes"
+      },
+      {
+        "field name": "Subtitle",
+        "field key": "subtitle",
+        "page leaf": "metadata/subtitle",
+        "character count": "30"
+      },
+      {
+        "field name": "Promotional Text",
+        "field key": "promotionalText",
+        "page leaf": "metadata/promotional-text",
+        "character count": "170"
+      },
+      {
+        "field name": "Description",
+        "field key": "description",
+        "page leaf": "metadata/description",
+        "character count": "4000",
+        "keywords injection": "yes"
+      },
+      {
+        "field name": "What's New",
+        "field key": "releaseNotes",
+        "page leaf": "whats-new",
+        "character count": "4000"
+      }
+    ]
+  },
+  "aso-app (google, listing)": {
+    "data": [
+      {
+        "field name": "App Title",
+        "field key": "title",
+        "page leaf": "metadata/app-title",
+        "character count": "30",
+        "keywords injection": "yes"
+      },
+      {
+        "field name": "Short Description",
+        "field key": "shortDescription",
+        "page leaf": "metadata/short-description",
+        "character count": "80"
+      },
+      {
+        "field name": "Full Description",
+        "field key": "fullDescription",
+        "page leaf": "metadata/full-description",
+        "character count": "4000",
+        "keywords injection": "yes"
+      },
+      {
+        "field name": "Release Notes",
+        "field key": "releaseNotes",
+        "page leaf": "whats-new",
+        "character count": "500"
+      }
+    ]
+  },
+  "aso-app (apple, promo)": {
+    "data": [
+      {
+        "field name": "Name",
+        "field key": "eventName",
+        "page leaf": "promos/{promoName}/{promoVariant}",
+        "character count": "30"
+      },
+      {
+        "field name": "Short Description",
+        "field key": "shortDescription",
+        "page leaf": "promos/{promoName}/{promoVariant}",
+        "character count": "50"
+      },
+      {
+        "field name": "Long Description",
+        "field key": "longDescription",
+        "page leaf": "promos/{promoName}/{promoVariant}",
+        "character count": "120"
+      }
+    ]
+  },
+  "aso-app (google, promo)": {
+    "data": [
+      {
+        "field name": "Tagline",
+        "field key": "tagline",
+        "page leaf": "promos/{promoName}/{promoVariant}",
+        "character count": "80"
+      },
+      {
+        "field name": "Description",
+        "field key": "description",
+        "page leaf": "promos/{promoName}/{promoVariant}",
+        "character count": "500"
+      }
+    ]
+  },
+  "aso-app (apple, images-videos)": {
+    "data": [
+      {
+        "field name": "Screenshot iPhone Copy 1",
+        "field key": "screenshotsiPhoneCopy1",
+        "page leaf": "images/copy",
+        "character count": ""
+      },
+      {
+        "field name": "Video Copy 1",
+        "field key": "videoCopy1",
+        "page leaf": "videos/copy",
+        "character count": "30"
+      }
+    ]
+  },
+  "aso-app (google, images-videos)": {
+    "data": [
+      {
+        "field name": "Tablet Screenshot Copy 8",
+        "field key": "tabletScreenshotCopy8",
+        "page leaf": "images/copy",
+        "character count": ""
+      },
+      {
+        "field name": "Video Copy 1",
+        "field key": "videoCopy1",
+        "page leaf": "videos/copy",
+        "character count": "30"
+      }
+    ]
+  },
+  "aso-app (apple, media-assets)": {
+    "data": [
+      {
+        "field name": "Screenshot iPhone 1",
+        "field key": "screenshotsiPhone1",
+        "character count": ""
+      },
+      {
+        "field name": "Video 1",
+        "field key": "video1",
+        "character count": ""
+      }
+    ]
+  },
+  "aso-app (google, media-assets)": {
+    "data": [
+      {
+        "field name": "Phone Screenshot 1",
+        "field key": "phoneScreenshot1",
+        "character count": ""
+      },
+      {
+        "field name": "Video 1",
+        "field key": "video1",
+        "character count": ""
+      }
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "config": {
+    "data": [
+      {
+        "key": "source.language",
+        "value": "English"
+      }
+    ]
+  },
+  "languages": {
+    "data": [
+      {
+        "name": "English",
+        "code": "en",
+        "location": "/",
+        "source": "/"
+      },
+      {
+        "name": "English - British",
+        "code": "en-GB",
+        "location": "/uk",
+        "source": "/source/en-gb"
+      },
+      {
+        "name": "German",
+        "code": "de",
+        "location": "/de-de",
+        "source": "/source/en-de"
+      },
+      {
+        "name": "Romanian",
+        "code": "ro",
+        "location": "/ro",
+        "source": "/"
+      }
+    ]
+  }
+}
