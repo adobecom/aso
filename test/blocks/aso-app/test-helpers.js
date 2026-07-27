@@ -51,3 +51,11 @@ export function countButtons(text) {
     (btn) => btn.textContent === text,
   ).length;
 }
+
+export function createTestImageDataUrl(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext('2d').fillRect(0, 0, width, height);
+  return canvas.toDataURL('image/png');
+}

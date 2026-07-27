@@ -7,10 +7,10 @@ import {
 } from './constants-runtime.js';
 import { hasConstantTokens } from '../../utils/aso-constants.js';
 
-function buildSuccessRow(row, received, expected) {
+function buildSuccessRow(row, received, expected, type = 'characters') {
   const div = document.createElement('div');
   div.className = 'note success';
-  div.textContent = `The content is valid. ${received}/${expected} characters.`;
+  div.textContent = `The content is valid. ${received}/${expected} ${type}.`;
   row.append(div);
 }
 
@@ -50,10 +50,33 @@ function buildErrorRow(row, key, type, expected, received) {
   row.append(div);
 }
 
-function validateRow(row, key, dataEl, validations, constantsValues) {
-  const rules = validations[key];
-  if (!rules) return;
+function waitForImageLoad(img) {
+  if (img.complete && img.naturalWidth) return Promise.resolve();
+  return new Promise((resolve) => {
+    img.addEventListener('load', resolve, { once: true });
+    img.addEventListener('error', resolve, { once: true });
+  });
+}
 
+async function validateImageSizeRow(row, key, dataEl, rules) {
+  const img = dataEl.querySelector('img');
+  if (!img) return;
+
+  await waitForImageLoad(img);
+  const { naturalWidth, naturalHeight } = img;
+  if (!naturalWidth || !naturalHeight) return;
+
+  const longestSide = Math.max(naturalWidth, naturalHeight);
+  const expected = `${rules.minPx}-${rules.maxPx}`;
+  const type = 'px (longest side)';
+  if (longestSide < rules.minPx || longestSide > rules.maxPx) {
+    buildErrorRow(row, key, type, expected, longestSide);
+  } else {
+    buildSuccessRow(row, longestSide, expected, type);
+  }
+}
+
+function validateTextRow(row, key, dataEl, rules, constantsValues) {
   const content = resolveFieldText(dataEl, constantsValues, { addParagraphBreaks: true });
   if (content.length > rules.length) {
     buildErrorRow(row, key, 'characters', rules.length, content.length);
@@ -62,7 +85,18 @@ function validateRow(row, key, dataEl, validations, constantsValues) {
   }
 }
 
-function decorateRow(row, validations, constantsValues) {
+async function validateRow(row, key, dataEl, validations, constantsValues) {
+  const rules = validations[key];
+  if (!rules) return;
+
+  if (rules.length !== undefined) {
+    validateTextRow(row, key, dataEl, rules, constantsValues);
+  } else if (rules.minPx !== undefined) {
+    await validateImageSizeRow(row, key, dataEl, rules);
+  }
+}
+
+async function decorateRow(row, validations, constantsValues) {
   const { children: cols } = row;
   if (!cols || cols.length < 2) return;
 
@@ -79,12 +113,12 @@ function decorateRow(row, validations, constantsValues) {
 
   const key = labelEl.textContent.trim().toLowerCase();
   if (validations[key]) {
-    validateRow(row, key, dataEl, validations, constantsValues);
+    await validateRow(row, key, dataEl, validations, constantsValues);
   }
 }
 
 function getBlockTitle(el) {
-  const blockTypes = ['listing', 'promo', 'images-videos'];
+  const blockTypes = ['listing', 'promo', 'images-videos', 'media-assets'];
   const classes = Array.from(el.classList);
   const blockType = classes.find((cls) => blockTypes.includes(cls));
   if (!blockType) return 'ASO Block';
@@ -108,10 +142,10 @@ export default async function init(el) {
 
   const rows = el.querySelectorAll(':scope > div');
   if (rows.length === 0) return;
-  rows.forEach((row) => {
+  await Promise.all(Array.from(rows).map((row) => {
     row.classList.add('data-row');
-    if (row.children) decorateRow(row, validations, constantsValues);
-  });
+    return row.children ? decorateRow(row, validations, constantsValues) : null;
+  }));
 
   if (message) {
     const note = document.createElement('div');

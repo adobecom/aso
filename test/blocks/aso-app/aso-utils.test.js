@@ -111,6 +111,20 @@ describe('aso-utils', () => {
       expect(validations.description).to.exist;
       expect(validations.image).to.not.exist;
     });
+
+    it('parses a "min,max" size rule into minPx/maxPx for fields without a character count', async () => {
+      const el = createBlockElement('aso-app google media-assets');
+      const { validations } = await getValidations(el);
+
+      expect(validations['phone screenshot 1']).to.deep.equal({ minPx: 320, maxPx: 3840 });
+    });
+
+    it('skips size validation when the size column is not a numeric "min,max" range', async () => {
+      const el = createBlockElement('aso-app google media-assets');
+      const { validations } = await getValidations(el);
+
+      expect(validations['tablet screenshot 1']).to.not.exist;
+    });
   });
 
   describe('convertTags', () => {
