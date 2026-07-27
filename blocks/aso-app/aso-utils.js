@@ -225,14 +225,26 @@ export function resolveFieldText(dataEl, constantsValues = {}, options = {}) {
   return convertTags(temp, options);
 }
 
+const SIZE_RANGE_PATTERN = /^\s*(\d+)\s*,\s*(\d+)\s*$/;
+
+function parseSizeRule(sizeText) {
+  const match = sizeText && sizeText.match(SIZE_RANGE_PATTERN);
+  if (!match) return null;
+  return { minPx: parseInt(match[1], 10), maxPx: parseInt(match[2], 10) };
+}
+
 function buildValidationsFromSchema(schemaData) {
   const validations = {};
 
   schemaData.data.forEach((field) => {
     const charCount = field['character count'];
+    const sizeRule = parseSizeRule(field.size);
+    const fieldName = field['field name'].toLowerCase();
+
     if (charCount && charCount !== '') {
-      const fieldName = field['field name'].toLowerCase();
       validations[fieldName] = { length: parseInt(charCount, 10) };
+    } else if (sizeRule) {
+      validations[fieldName] = sizeRule;
     }
   });
 

@@ -44,6 +44,32 @@
         "character count": ""
       }
     ]
+  },
+  "aso-app (apple, media-assets)": {
+    "data": [
+      {
+        "field name": "Screenshot iPhone 1",
+        "character count": ""
+      },
+      {
+        "field name": "Video 1",
+        "character count": ""
+      }
+    ]
+  },
+  "aso-app (google, media-assets)": {
+    "data": [
+      {
+        "field name": "Phone Screenshot 1",
+        "character count": "",
+        "size": "320,3840"
+      },
+      {
+        "field name": "Tablet Screenshot 1",
+        "character count": "",
+        "size": ""
+      }
+    ]
   }
 }
 

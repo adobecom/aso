@@ -5,6 +5,7 @@ import {
   setupBlockTest,
   createBlockElement,
   countButtons,
+  createTestImageDataUrl,
 } from './test-helpers.js';
 import { resetConstantsRuntimeCache } from '../../../blocks/aso-app/constants-runtime.js';
 
@@ -74,6 +75,96 @@ describe('aso-app', () => {
     it('does not show info message when validations exist', () => {
       const infoNote = document.querySelector('.note.info');
       expect(infoNote).to.not.exist;
+    });
+  });
+
+  describe('apple media-assets', () => {
+    before(async () => {
+      const html = await loadMockHTML('apple-media-assets.html');
+      await setupBlockTest(html, init);
+    });
+
+    it('renders "Media Assets" as the block header', () => {
+      const header = document.querySelector('.block-header');
+      expect(header.textContent).to.equal('Media Assets');
+    });
+
+    it('decorates rows with data-row class', () => {
+      const rows = document.querySelectorAll('.data-row');
+      expect(rows.length).to.equal(2);
+    });
+
+    it('strips "Copy" from field names', () => {
+      const labels = document.querySelectorAll('.label');
+      expect(labels[0].textContent).to.equal('Screenshot iPhone 1');
+      expect(labels[1].textContent).to.equal('Video 1');
+    });
+
+    it('adds copy button to each row', () => {
+      expect(countButtons('Copy')).to.equal(2);
+    });
+
+    it('does not show validation notes (no character count defined)', () => {
+      const validationNotes = document.querySelectorAll('.note.success, .note.error');
+      expect(validationNotes.length).to.equal(0);
+    });
+  });
+
+  describe('google media-assets (image size validation)', () => {
+    async function initWithScreenshotSize(width, height) {
+      const html = await loadMockHTML('google-media-assets.html');
+      document.body.innerHTML = html;
+      const block = document.querySelector('.aso-app');
+      const rows = block.querySelectorAll(':scope > div');
+
+      const img = document.createElement('img');
+      img.src = createTestImageDataUrl(width, height);
+      rows[0].children[1].append(img);
+
+      await init(block);
+      return block;
+    }
+
+    it('shows success when the longest side is within the min/max px range', async () => {
+      const block = await initWithScreenshotSize(1290, 2796);
+      const row = block.querySelectorAll('.data-row')[0];
+      const successNote = row.querySelector('.note.success');
+      expect(successNote).to.exist;
+      expect(successNote.textContent).to.include('valid');
+    });
+
+    it('shows error when the longest side exceeds the max px', async () => {
+      const block = await initWithScreenshotSize(4000, 2000);
+      const row = block.querySelectorAll('.data-row')[0];
+      const errorNote = row.querySelector('.note.error');
+      expect(errorNote).to.exist;
+      expect(errorNote.textContent).to.include('phone screenshot 1');
+      expect(errorNote.textContent).to.include('320-3840');
+      expect(errorNote.textContent).to.include('4000');
+    });
+
+    it('shows error when the longest side is below the min px', async () => {
+      const block = await initWithScreenshotSize(100, 200);
+      const row = block.querySelectorAll('.data-row')[0];
+      const errorNote = row.querySelector('.note.error');
+      expect(errorNote).to.exist;
+      expect(errorNote.textContent).to.include('200');
+    });
+
+    it('does not validate size for a field without a numeric size rule', async () => {
+      const html = await loadMockHTML('google-media-assets.html');
+      document.body.innerHTML = html;
+      const block = document.querySelector('.aso-app');
+      const rows = block.querySelectorAll(':scope > div');
+
+      const img = document.createElement('img');
+      img.src = createTestImageDataUrl(100, 100);
+      rows[1].children[1].append(img);
+
+      await init(block);
+
+      const tabletRow = block.querySelectorAll('.data-row')[1];
+      expect(tabletRow.querySelector('.note')).to.not.exist;
     });
   });
 
