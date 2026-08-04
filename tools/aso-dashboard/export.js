@@ -6,25 +6,31 @@ import {
   buildGooglePlayReleaseNotesBlob,
 } from './google-play-release-notes.js';
 
-let excelJSLoaded = false;
 const EXCELJS_CDN = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+const JSZIP_CDN = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+
+function loadCdnScript(src, getGlobal) {
+  const existing = getGlobal();
+  if (existing) return Promise.resolve(existing);
+
+  return new Promise((resolve, reject) => {
+    let script = document.querySelector(`head > script[src="${src}"]`);
+    if (!script) {
+      script = document.createElement('script');
+      script.src = src;
+      document.head.append(script);
+    }
+    script.addEventListener('load', () => resolve(getGlobal()), { once: true });
+    script.addEventListener('error', () => reject(new Error(`Failed to load script: ${src}`)), { once: true });
+  });
+}
 
 async function loadExcelJS() {
-  if (excelJSLoaded && window.ExcelJS) return window.ExcelJS;
-  if (window.ExcelJS) {
-    excelJSLoaded = true;
-    return window.ExcelJS;
-  }
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = EXCELJS_CDN;
-    script.onload = () => {
-      excelJSLoaded = true;
-      resolve(window.ExcelJS);
-    };
-    script.onerror = () => reject(new Error('Failed to load ExcelJS library'));
-    document.head.appendChild(script);
-  });
+  return loadCdnScript(EXCELJS_CDN, () => window.ExcelJS);
+}
+
+async function loadJSZip() {
+  return loadCdnScript(JSZIP_CDN, () => window.JSZip);
 }
 
 async function fetchBlockSchema(org, repo, token) {
@@ -86,6 +92,94 @@ function isExportDebugEnabled() {
 
 function parseHtmlDocument(html) {
   return new DOMParser().parseFromString(html, 'text/html');
+}
+
+export function slugifyLabel(label) {
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+export function getExtensionFromUrl(url) {
+  const withoutFragment = url.split('#')[0];
+  const withoutQuery = withoutFragment.split('?')[0];
+  const match = withoutQuery.match(/\.([a-zA-Z0-9]+)$/);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function getHostname(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
+export function isDaAssetUrl(url) {
+  return getHostname(url).endsWith('.da.live');
+}
+
+export function isAemPreviewUrl(url) {
+  const hostname = getHostname(url);
+  return hostname.includes('.aem.page') || hostname.includes('.hlx.page');
+}
+
+export function getCurrentPreviewRef(repo, org, hostname = window.location.hostname) {
+  const suffix = `--${repo}--${org}.preview.da.live`;
+  return hostname.endsWith(suffix) ? hostname.slice(0, -suffix.length) : null;
+}
+
+function parseAemPreviewHostname(hostname) {
+  const match = hostname.match(/^(.+)\.(?:aem|hlx)\.page$/);
+  if (!match) return null;
+  const parts = match[1].split('--');
+  return parts.length === 3 ? { repo: parts[1], org: parts[2] } : null;
+}
+
+export function resolvePreviewProxyUrl(url, currentRef) {
+  if (!isAemPreviewUrl(url) || !currentRef) return null;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const parts = parseAemPreviewHostname(parsed.hostname);
+  if (!parts) return null;
+  return `https://${currentRef}--${parts.repo}--${parts.org}.preview.da.live${parsed.pathname}${parsed.hash}`;
+}
+
+export function resolvePublicMediaUrl(url) {
+  if (!isAemPreviewUrl(url)) return url;
+  return url.replace('.aem.page', '.aem.live').replace('.hlx.page', '.hlx.live');
+}
+
+export function buildImageFetchOptions(url, token) {
+  if (isDaAssetUrl(url)) return { headers: { Authorization: `Bearer ${token}` } };
+  return {};
+}
+
+export function collectMediaAssetEntries(html) {
+  const doc = parseHtmlDocument(html);
+  const entries = [];
+  doc.querySelectorAll('.aso-app.media-assets').forEach((block) => {
+    block.querySelectorAll(':scope > div').forEach((row) => {
+      const children = Array.from(row.children);
+      if (children.length < 2) return;
+      const label = children[0].textContent.trim();
+      const img = children[1].querySelector('img');
+      if (!label || !img?.src) return;
+      entries.push({ label, src: img.src });
+    });
+  });
+  return entries;
+}
+
+export function buildImageZipPath({ product, device, language }, slug, ext) {
+  const langSegment = language.replace(/^\//, '');
+  return `${product}/${device}/${langSegment}/images/${slug}.${ext}`;
 }
 
 function listListingFieldLabels(doc) {
@@ -405,20 +499,44 @@ async function fetchPageContent(org, repo, path, token) {
   return null;
 }
 
+let pagesFetchCache = null;
+
+function buildPagesCacheKey(org, repo, pagePaths) {
+  return JSON.stringify({ org, repo, pagePaths });
+}
+
+async function fetchAllPagesHtml(org, repo, token, pagePaths) {
+  const cacheKey = buildPagesCacheKey(org, repo, pagePaths);
+  if (pagesFetchCache && pagesFetchCache.key === cacheKey) {
+    return pagesFetchCache.pages;
+  }
+  const pages = [];
+  // eslint-disable-next-line no-restricted-syntax
+  for (const pageInfo of pagePaths) {
+    // eslint-disable-next-line no-await-in-loop
+    const html = await fetchPageContent(org, repo, pageInfo.path, token);
+    pages.push({ ...pageInfo, html });
+  }
+  pagesFetchCache = { key: cacheKey, pages };
+  return pages;
+}
+
 function createAdminFetch(org, repo, token) {
   const adminOrigin = `https://admin.da.live/source/${org}/${repo}`;
   return async (input) => {
     const url = typeof input === 'string' ? input : input.url;
     if (url === '/.da/translate.json') {
-      return fetch(`${adminOrigin}/.da/translate.json`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      return fetch(
+        `${adminOrigin}/.da/translate.json`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
     }
     if (url.startsWith('/')) {
       const sourcePath = url.endsWith('.html') ? url : `${url}.html`;
-      return fetch(`${adminOrigin}${sourcePath}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      return fetch(
+        `${adminOrigin}${sourcePath}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
     }
     return fetch(input);
   };
@@ -433,13 +551,18 @@ export function parseAsoBlocks(html, validBlockTypes, constantsValues = {}) {
     const device = classes.find((c) => c === 'apple' || c === 'google');
     const blockType = classes.find((c) => validBlockTypes.includes(c));
     if (!blockType || !device) return;
+    if (blockType === 'media-assets') return;
     const key = `${device}-${blockType}`;
     const fields = {};
     block.querySelectorAll(':scope > div').forEach((row) => {
       const children = Array.from(row.children);
       if (children.length >= 2) {
         const fieldName = children[0].textContent.trim();
-        const fieldValue = resolveFieldText(children[1], constantsValues, { addParagraphBreaks: true });
+        const fieldValue = resolveFieldText(
+          children[1],
+          constantsValues,
+          { addParagraphBreaks: true },
+        );
         if (fieldName) fields[fieldName] = fieldValue;
       }
     });
@@ -586,12 +709,92 @@ async function generateExcel(data, products, languages, devices) {
   window.URL.revokeObjectURL(url);
 }
 
+async function fetchWithProxyFallback(src, currentRef) {
+  const proxyUrl = resolvePreviewProxyUrl(src, currentRef);
+  if (!proxyUrl) return null;
+  try {
+    const response = await fetch(proxyUrl, { credentials: 'include' });
+    return response.ok ? response : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchImageBlob(src, token, currentRef) {
+  const proxyResponse = await fetchWithProxyFallback(src, currentRef);
+  if (proxyResponse) return proxyResponse.blob();
+
+  const url = resolvePublicMediaUrl(src);
+  const response = await fetch(url, buildImageFetchOptions(url, token));
+  if (!response.ok) return null;
+  return response.blob();
+}
+
+async function processMediaAssetEntry(zip, page, entry, token, currentRef) {
+  const slug = slugifyLabel(entry.label);
+  if (!slug) {
+    return { label: entry.label, status: 'skipped', reason: 'Empty or invalid field label' };
+  }
+  const ext = getExtensionFromUrl(entry.src);
+  if (!ext) {
+    return { label: entry.label, status: 'skipped', reason: 'No file extension found in image URL' };
+  }
+  const blob = await fetchImageBlob(entry.src, token, currentRef);
+  if (!blob) {
+    const reason = isAemPreviewUrl(entry.src)
+      ? 'Could not download — no authenticated preview session available for this image'
+      : 'Could not download image (access denied or network error)';
+    return { label: entry.label, status: 'failed', reason };
+  }
+  zip.file(buildImageZipPath(page, slug, ext), blob);
+  return { label: entry.label, status: 'ok' };
+}
+
+async function generateImagesZip(pages, token, currentRef) {
+  const JSZip = await loadJSZip();
+  const zip = new JSZip();
+  let totalCount = 0;
+  let fileCount = 0;
+  const problems = [];
+
+  const pagesWithHtml = pages.filter((page) => page.html);
+  // eslint-disable-next-line no-restricted-syntax
+  for (const page of pagesWithHtml) {
+    const entries = collectMediaAssetEntries(page.html);
+    // eslint-disable-next-line no-restricted-syntax
+    for (const entry of entries) {
+      totalCount += 1;
+      // eslint-disable-next-line no-await-in-loop
+      const result = await processMediaAssetEntry(zip, page, entry, token, currentRef);
+      if (result.status === 'ok') {
+        fileCount += 1;
+      } else {
+        problems.push(result);
+      }
+    }
+  }
+
+  return { zip, fileCount, totalCount, problems };
+}
+
+function downloadImagesZip(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
 function updateExportButtonState() {
   const hasProducts = getSelectedCheckboxes('.product-checkbox').length > 0;
   const hasLanguages = getSelectedCheckboxes('.language-checkbox').length > 0;
   const hasDevices = document.getElementById('device-apple').checked
     || document.getElementById('device-google').checked;
-  document.getElementById('export-button').disabled = !(hasProducts && hasLanguages && hasDevices);
+  const ready = hasProducts && hasLanguages && hasDevices;
+  document.getElementById('export-button').disabled = !ready;
+  const imagesButton = document.getElementById('export-images-button');
+  if (imagesButton) imagesButton.disabled = !ready;
 }
 
 function showExportStatus(message, duration = 2000) {
@@ -602,6 +805,39 @@ function showExportStatus(message, duration = 2000) {
     exportButton.textContent = 'Export to Excel';
     updateExportButtonState();
   }, duration);
+}
+
+function showImageExportStatus(message, duration = 2000) {
+  const imagesButton = document.getElementById('export-images-button');
+  if (!imagesButton) return;
+  imagesButton.textContent = message;
+  imagesButton.classList.remove('loading');
+  setTimeout(() => {
+    imagesButton.textContent = 'Download Images';
+    updateExportButtonState();
+  }, duration);
+}
+
+function renderImageExportSummary(totalCount, fileCount, problems) {
+  const container = document.getElementById('image-export-summary');
+  if (!container) return;
+  container.textContent = '';
+  if (!totalCount) return;
+
+  const summary = document.createElement('p');
+  summary.textContent = `${fileCount} of ${totalCount} image(s) downloaded.`;
+  container.append(summary);
+
+  if (problems.length) {
+    const list = document.createElement('ul');
+    list.className = 'image-export-summary-issues';
+    problems.forEach((problem) => {
+      const item = document.createElement('li');
+      item.textContent = `${problem.label} — ${problem.reason}`;
+      list.append(item);
+    });
+    container.append(list);
+  }
 }
 
 async function handleExport(org, repo, token) {
@@ -625,17 +861,16 @@ async function handleExport(org, repo, token) {
       exportDebug: isExportDebugEnabled(),
       startedAt: new Date().toISOString(),
     });
+    const pages = await fetchAllPagesHtml(org, repo, token, pagePaths);
     // eslint-disable-next-line no-restricted-syntax
-    for (const pageInfo of pagePaths) {
-      // eslint-disable-next-line no-await-in-loop
-      const html = await fetchPageContent(org, repo, pageInfo.path, token);
-      if (html) {
+    for (const pageInfo of pages) {
+      if (pageInfo.html) {
         // eslint-disable-next-line no-await-in-loop
         const constantsValues = await loadConstantsValuesForPage({
           pathname: pageInfo.path,
           fetch: adminFetch,
         });
-        const blocks = parseAsoBlocks(html, validBlockTypes, constantsValues);
+        const blocks = parseAsoBlocks(pageInfo.html, validBlockTypes, constantsValues);
         allData.push({ ...pageInfo, blocks });
       }
     }
@@ -644,6 +879,33 @@ async function handleExport(org, repo, token) {
     showExportStatus('Export Complete!');
   } catch (error) {
     showExportStatus('Export Failed');
+  }
+}
+
+async function handleImageExport(org, repo, token) {
+  const imagesButton = document.getElementById('export-images-button');
+  if (!imagesButton) return;
+  imagesButton.classList.add('loading');
+  imagesButton.textContent = 'Downloading...';
+  imagesButton.disabled = true;
+  try {
+    const { products, languages, devices } = getSelectedItems();
+    const pagePaths = buildPagePaths(products, languages, devices);
+    const pages = await fetchAllPagesHtml(org, repo, token, pagePaths);
+    const currentRef = getCurrentPreviewRef(repo, org);
+    const zipResult = await generateImagesZip(pages, token, currentRef);
+    const { zip, fileCount, totalCount, problems } = zipResult;
+    renderImageExportSummary(totalCount, fileCount, problems);
+    if (fileCount === 0) {
+      showImageExportStatus('No images found');
+      return;
+    }
+    const buffer = await zip.generateAsync({ type: 'blob' });
+    const filename = `ASO-Images-${new Date().toISOString().split('T')[0]}.zip`;
+    downloadImagesZip(buffer, filename);
+    showImageExportStatus('Download Complete!');
+  } catch (error) {
+    showImageExportStatus('Download Failed');
   }
 }
 
@@ -700,6 +962,10 @@ function setupListeners(org, repo, token) {
     button.addEventListener('click', () => handleSelectAll(button.dataset.target));
   });
   document.getElementById('export-button').addEventListener('click', () => handleExport(org, repo, token));
+  const imagesButton = document.getElementById('export-images-button');
+  if (imagesButton) {
+    imagesButton.addEventListener('click', () => handleImageExport(org, repo, token));
+  }
 }
 
 // eslint-disable-next-line import/prefer-default-export
