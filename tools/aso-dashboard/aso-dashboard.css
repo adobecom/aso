@@ -221,11 +221,6 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link),
   transition: background-color 200ms, border-color 200ms;
   line-height: 20px;
 
-  &:hover:not(:disabled) {
-    background: #0d5dc2;
-    border-color: #0d5dc2;
-  }
-
   &:focus {
     outline: 2px solid #1373e6;
     outline-offset: 2px;
@@ -236,6 +231,11 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link),
     border-color: var(--s2-gray-200);
     color: var(--s2-gray-700);
     cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    background: #0d5dc2;
+    border-color: #0d5dc2;
   }
 }
 
@@ -392,18 +392,6 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link),
   position: relative;
   display: inline-block;
 
-  input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-
-    &:checked + label {
-      background: rgb(225 225 225);
-      border-color: rgb(225 225 225);
-    }
-  }
-
   label {
     display: inline-block;
     border-radius: var(--s2-radius-100);
@@ -421,6 +409,24 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link),
       border-color: rgb(200 200 200);
     }
   }
+
+  input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+
+    &:checked + label {
+      background: rgb(225 225 225);
+      border-color: rgb(225 225 225);
+    }
+  }
+}
+
+.export-buttons-row {
+  display: flex;
+  gap: var(--spacing-300);
+  margin-top: var(--spacing-400);
 }
 
 .export-button {
@@ -438,16 +444,16 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link),
   margin-top: var(--spacing-400);
   line-height: 24px;
 
-  &:hover:not(:disabled) {
-    background: #0d5dc2;
-    border-color: #0d5dc2;
-  }
-
   &:disabled {
     background: var(--s2-gray-200);
     border-color: var(--s2-gray-200);
     color: var(--s2-gray-700);
     cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    background: #0d5dc2;
+    border-color: #0d5dc2;
   }
 
   &.loading {
@@ -468,6 +474,28 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link),
       transform: translateY(-50%);
     }
   }
+}
+
+:where(.export-buttons-row) .export-button {
+  flex: 1;
+  width: auto;
+  margin-top: 0;
+}
+
+.export-summary {
+  margin-top: var(--spacing-300);
+  font-size: 14px;
+  color: var(--s2-gray-700);
+
+  p {
+    margin: 0 0 var(--spacing-200) 0;
+  }
+}
+
+.image-export-summary-issues {
+  margin: 0;
+  padding-left: var(--spacing-400);
+  color: #c9302c;
 }
 
 @keyframes spin {
