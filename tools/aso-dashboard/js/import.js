@@ -645,8 +645,6 @@ function renderCopyEnglishButton(groups, repo, org, extraEnglishPaths = []) {
     ...groups.map((group) => group.englishPath).filter(Boolean),
     ...extraEnglishPaths,
   ])];
-  // eslint-disable-next-line no-console
-  console.log('[aso-import-debug] renderCopyEnglishButton extraEnglishPaths param:', extraEnglishPaths, 'final deduped paths:', paths);
   if (!paths.length) return '';
 
   const urls = paths.map((path) => buildAemPreviewUrl(repo, org, path));
@@ -714,8 +712,6 @@ function renderPageLinks(pages, org, repo) {
 }
 
 function renderImportPageList(groups, org, repo) {
-  // eslint-disable-next-line no-console
-  console.log('[aso-import-debug] renderImportPageList received groups:', groups, 'count:', groups.length, 'blockTypes:', groups.map((g) => g.blockType));
   if (!groups.length) return '';
 
   const rows = groups.map((group) => {
@@ -819,8 +815,6 @@ function renderMediaAssetsPageTable(mediaAssetsPages, org, repo) {
 }
 
 function buildImportSummaryHtml(summary, org, repo) {
-  // eslint-disable-next-line no-console
-  console.log('[aso-import-debug] buildImportSummaryHtml received summary.mediaAssetsPages:', summary.mediaAssetsPages);
   const scopeParts = [
     summary.product,
     summary.year,
@@ -854,9 +848,10 @@ function buildImportSummaryHtml(summary, org, repo) {
   const groups = groupImportResultsByPage(summary.results);
   markKeywordPages(groups, summary.keywordResults);
   markOverLimitPages(groups, summary.overLimit);
-  const mediaAssetsPaths = (summary.mediaAssetsPages || []).map((page) => page.pagePath);
-  // eslint-disable-next-line no-console
-  console.log('[aso-import-debug] mediaAssetsPaths (for Loc Project button):', mediaAssetsPaths, 'text groups count:', groups.length);
+  // Only the English root — Loc Project produces the market-review pages itself.
+  const mediaAssetsPaths = (summary.mediaAssetsPages || [])
+    .filter((page) => String(page.language?.sourcePath ?? '').trim() === '/')
+    .map((page) => page.pagePath);
   return `
     <p>${lines.join('<br>')}</p>
     <div class="import-copy-row">
@@ -951,16 +946,12 @@ async function runImport({
     productsPath,
     ...scope,
   });
-  // eslint-disable-next-line no-console
-  console.log('[aso-import-debug] devices:', devices, 'mediaAssetsRequests:', mediaAssetsRequests);
 
   const [results, keywordResults, mediaAssetsPages] = await Promise.all([
     executeImportWrites(org, repo, token, writes, schema),
     executeKeywordWrites(org, repo, token, keywordWrites, languageIndex),
     createMissingMediaAssetsPages(org, repo, token, schema, mediaAssetsRequests),
   ]);
-  // eslint-disable-next-line no-console
-  console.log('[aso-import-debug] mediaAssetsPages result:', mediaAssetsPages);
   const failures = [...results, ...keywordResults].filter((result) => !result.ok);
 
   return {
