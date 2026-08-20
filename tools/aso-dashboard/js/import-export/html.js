@@ -1,5 +1,6 @@
 import { getDirectChildParagraphs, resolveFieldText } from '../../../../blocks/aso-app/aso-utils.js';
 import { buildSpacingSidecarFromText } from '../lib/section-break-template.js';
+import { cleanCellContentForDocument } from '../../../aso-html-cleaner/aso-html-cleaner-core.js';
 
 const SPACING_SIDECAR_VERSION = 1;
 
@@ -171,7 +172,7 @@ function buildPageHtml(fields, schema, device, blockType, existingHtml) {
     const row = ensureFieldRow(block, fieldName);
     const dataEl = getFieldDataElement(row);
     if (!dataEl) return;
-    dataEl.innerHTML = plainTextToFieldHtml(doc, fields[fieldKey]);
+    dataEl.innerHTML = cleanCellContentForDocument(plainTextToFieldHtml(doc, fields[fieldKey]));
   });
 
   return doc.body.innerHTML.trim();
