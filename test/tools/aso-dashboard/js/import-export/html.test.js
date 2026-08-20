@@ -48,6 +48,22 @@ describe('import-export-html', () => {
       expect(fields.description).to.include('Major new update');
     });
 
+    it('decodes literal tag text (e.g. a workbook cell typed as <h1>Title</h1>) into real markup', () => {
+      const html = buildPageHtml(
+        { description: '<h1>Big News</h1>' },
+        schema,
+        'apple',
+        'listing',
+        listingHtml,
+      );
+
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const description = doc.querySelector('.aso-app h1');
+      expect(description).to.exist;
+      expect(description.textContent).to.equal('Big News');
+      expect(html).to.not.include('&lt;h1&gt;');
+    });
+
     it('creates a minimal block shell when no existing html is provided', () => {
       const html = buildPageHtml(
         { name: 'New App Title' },
