@@ -6,6 +6,7 @@ import {
   buildPromoPagePath,
   buildPromosListPath,
   buildPromoVariantsListPath,
+  buildStoreInstanceListPath,
   buildStoreTestsListPath,
   buildStoreUpdatesBasePath,
   formatMonthLabel,
@@ -13,7 +14,9 @@ import {
   getDefaultReleasePeriod,
   getYearOptions,
   populateReleasePeriodDropdowns,
+  storeTypeRequiresInstanceName,
   storeTypeUsesReleasePeriod,
+  STORE_TYPE_CPP,
   STORE_TYPE_TESTS,
   STORE_TYPE_UPDATES,
 } from '../../../../../tools/aso-dashboard/js/lib/content-taxonomy.js';
@@ -111,6 +114,23 @@ describe('content-taxonomy', () => {
         storeType: STORE_TYPE_TESTS,
       })).to.be.null;
     });
+
+    it('builds cpp path with testName, mirroring store-tests', () => {
+      expect(buildContentPath({
+        ...baseSelection,
+        storeType: STORE_TYPE_CPP,
+        testName: 'summer-campaign',
+      })).to.equal(
+        '/en-us/products-redesign/adobe-express/apple/2026/q1/may/cpp/summer-campaign',
+      );
+    });
+
+    it('returns null for cpp without testName', () => {
+      expect(buildContentPath({
+        ...baseSelection,
+        storeType: STORE_TYPE_CPP,
+      })).to.be.null;
+    });
   });
 
   describe('buildMetadataPagePath', () => {
@@ -172,10 +192,33 @@ describe('content-taxonomy', () => {
     });
   });
 
+  describe('buildStoreInstanceListPath', () => {
+    it('defaults to the store-tests folder', () => {
+      expect(buildStoreInstanceListPath(baseSelection)).to.equal(
+        '/en-us/products-redesign/adobe-express/apple/2026/q1/may/store-tests',
+      );
+    });
+
+    it('points at the cpp folder when asked', () => {
+      expect(buildStoreInstanceListPath(baseSelection, STORE_TYPE_CPP)).to.equal(
+        '/en-us/products-redesign/adobe-express/apple/2026/q1/may/cpp',
+      );
+    });
+  });
+
+  describe('storeTypeRequiresInstanceName', () => {
+    it('is true for store-tests and cpp, false for store-updates', () => {
+      expect(storeTypeRequiresInstanceName(STORE_TYPE_TESTS)).to.be.true;
+      expect(storeTypeRequiresInstanceName(STORE_TYPE_CPP)).to.be.true;
+      expect(storeTypeRequiresInstanceName(STORE_TYPE_UPDATES)).to.be.false;
+    });
+  });
+
   describe('storeTypeUsesReleasePeriod', () => {
-    it('returns true for store-updates and store-tests', () => {
+    it('returns true for store-updates, store-tests, and cpp', () => {
       expect(storeTypeUsesReleasePeriod(STORE_TYPE_UPDATES)).to.be.true;
       expect(storeTypeUsesReleasePeriod(STORE_TYPE_TESTS)).to.be.true;
+      expect(storeTypeUsesReleasePeriod(STORE_TYPE_CPP)).to.be.true;
     });
   });
 
@@ -207,6 +250,21 @@ describe('content-taxonomy', () => {
       expect(paths).to.have.lengthOf(2);
       expect(paths[0]).to.deep.include({ testName: 'test-a', device: 'google' });
       expect(paths[0].path).to.include('/store-tests/test-a');
+    });
+
+    it('includes testName in paths for cpp', () => {
+      const paths = buildExportPagePaths({
+        ...baseSelection,
+        products: ['adobe-express'],
+        languages: ['en-us'],
+        devices: ['google'],
+        storeType: STORE_TYPE_CPP,
+        testNames: ['summer-campaign'],
+      });
+
+      expect(paths).to.have.lengthOf(1);
+      expect(paths[0]).to.deep.include({ testName: 'summer-campaign', device: 'google' });
+      expect(paths[0].path).to.include('/cpp/summer-campaign');
     });
 
     it('returns empty array for invalid store type', () => {

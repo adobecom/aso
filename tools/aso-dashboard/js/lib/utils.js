@@ -2,8 +2,9 @@ import { authFetch, fetchLanguages } from '../../../utils.js';
 import {
   buildPromosListPath,
   buildPromoVariantsListPath,
-  buildStoreTestsListPath,
+  buildStoreInstanceListPath,
   STORE_TYPE_TESTS,
+  storeTypeRequiresInstanceName,
 } from './content-taxonomy.js';
 
 const productsCache = {};
@@ -76,7 +77,7 @@ function isStoreTestsSelectionComplete(selection) {
 function isPromoListSelectionComplete(selection) {
   if (!isStoreTestsSelectionComplete(selection)) return false;
   const storeType = String(selection?.storeType ?? '').trim();
-  if (storeType === STORE_TYPE_TESTS && !String(selection?.testName ?? '').trim()) {
+  if (storeTypeRequiresInstanceName(storeType) && !String(selection?.testName ?? '').trim()) {
     return false;
   }
   return true;
@@ -109,7 +110,7 @@ function fetchFileList({ context, token, listPath }) {
 export async function fetchStoreTests({ context, token, selection }) {
   if (!isStoreTestsSelectionComplete(selection)) return [];
 
-  const listPath = buildStoreTestsListPath({
+  const listPath = buildStoreInstanceListPath({
     language: selection.language,
     productsPath: selection.productsPath,
     product: selection.product,
@@ -117,7 +118,7 @@ export async function fetchStoreTests({ context, token, selection }) {
     year: selection.year,
     quarter: selection.quarter,
     month: selection.month,
-  });
+  }, selection.storeType || STORE_TYPE_TESTS);
   return fetchFolderList({ context, token, listPath });
 }
 

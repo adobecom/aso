@@ -144,6 +144,23 @@ describe('export "load scope from file" helpers', () => {
       expect(document.getElementById('store-type-updates').checked).to.be.true;
       expect(document.getElementById('store-tests-fields').classList.contains('hidden')).to.be.true;
     });
+
+    it('checks the cpp radio and reveals the shared instance-name fields', () => {
+      document.body.innerHTML = `
+        <input type="radio" name="store-type" id="store-type-updates" value="store-updates" checked>
+        <input type="radio" name="store-type" id="store-type-tests" value="store-tests">
+        <input type="radio" name="store-type" id="store-type-cpp" value="cpp">
+        <div id="store-tests-fields" class="hidden">
+          <span id="store-tests-label">Experiments</span>
+        </div>
+      `;
+      applyStoreType('cpp');
+      expect(document.getElementById('store-type-cpp').checked).to.be.true;
+      expect(document.getElementById('store-type-updates').checked).to.be.false;
+      expect(document.getElementById('store-type-tests').checked).to.be.false;
+      expect(document.getElementById('store-tests-fields').classList.contains('hidden')).to.be.false;
+      expect(document.getElementById('store-tests-label').textContent).to.equal('CPP campaigns');
+    });
   });
 
   describe('applyTestName', () => {

@@ -11,7 +11,11 @@ import {
   parseVariantFileItems,
   toDaListPath,
 } from '../../../../../tools/aso-dashboard/js/lib/utils.js';
-import { STORE_TYPE_TESTS, STORE_TYPE_UPDATES } from '../../../../../tools/aso-dashboard/js/lib/content-taxonomy.js';
+import {
+  STORE_TYPE_CPP,
+  STORE_TYPE_TESTS,
+  STORE_TYPE_UPDATES,
+} from '../../../../../tools/aso-dashboard/js/lib/content-taxonomy.js';
 
 describe('aso-dashboard utils', () => {
   describe('toDaListPath', () => {
@@ -134,6 +138,42 @@ describe('aso-dashboard utils', () => {
       expect(result).to.deep.equal([
         { value: 'icon-test-a', label: 'Icon test a' },
         { value: 'icon-test-b', label: 'Icon test b' },
+      ]);
+    });
+
+    it('lists folders under cpp when the selection store type is cpp', async () => {
+      fetchStub.resolves({
+        ok: true,
+        json: async () => ([
+          {
+            name: 'summer-campaign',
+            path: '/en-us/products/adobe-express/apple/2024/q2/may/cpp/summer-campaign',
+          },
+        ]),
+      });
+
+      const result = await fetchStoreTests({
+        context: { org: 'adobecom', repo: 'aso' },
+        token: 'token',
+        selection: {
+          language: 'en-us',
+          productsPath: 'products',
+          product: 'adobe-express',
+          device: 'apple',
+          year: '2024',
+          quarter: 'q2',
+          month: 'may',
+          storeType: STORE_TYPE_CPP,
+        },
+      });
+
+      expect(fetchStub.calledOnce).to.be.true;
+      const [url] = fetchStub.firstCall.args;
+      expect(url).to.equal(
+        'https://admin.da.live/list/adobecom/aso/en-us/products/adobe-express/apple/2024/q2/may/cpp',
+      );
+      expect(result).to.deep.equal([
+        { value: 'summer-campaign', label: 'Summer campaign' },
       ]);
     });
 

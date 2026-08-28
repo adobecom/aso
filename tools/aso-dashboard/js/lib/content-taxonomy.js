@@ -1,6 +1,14 @@
 export const STORE_TYPE_UPDATES = 'store-updates';
 export const STORE_TYPE_TESTS = 'store-tests';
-export const STORE_TYPES = Object.freeze([STORE_TYPE_UPDATES, STORE_TYPE_TESTS]);
+export const STORE_TYPE_CPP = 'cpp';
+export const STORE_TYPES = Object.freeze([STORE_TYPE_UPDATES, STORE_TYPE_TESTS, STORE_TYPE_CPP]);
+
+// store-tests and cpp both nest under a named instance (a test name / campaign name) inside
+// the release period, and both require that name before a page path can be built.
+export function storeTypeRequiresInstanceName(storeType) {
+  const type = String(storeType ?? '').trim();
+  return type === STORE_TYPE_TESTS || type === STORE_TYPE_CPP;
+}
 export const DEVICES = Object.freeze(['apple', 'google']);
 export const QUARTERS = Object.freeze(['q1', 'q2', 'q3', 'q4']);
 export const MONTHS = Object.freeze([
@@ -119,10 +127,14 @@ export function buildStoreUpdatesBasePath(params) {
   return `${base}/${STORE_TYPE_UPDATES}`;
 }
 
-export function buildStoreTestsListPath(params) {
+export function buildStoreInstanceListPath(params, storeType = STORE_TYPE_TESTS) {
   const base = buildContentBasePath(params);
   if (!base) return null;
-  return `${base}/${STORE_TYPE_TESTS}`;
+  return `${base}/${normalizeSegment(storeType) || STORE_TYPE_TESTS}`;
+}
+
+export function buildStoreTestsListPath(params) {
+  return buildStoreInstanceListPath(params, STORE_TYPE_TESTS);
 }
 
 function buildStoreBucketBasePath({
@@ -137,7 +149,7 @@ function buildStoreBucketBasePath({
   testName,
 }) {
   const type = normalizeSegment(storeType) || STORE_TYPE_UPDATES;
-  if (type === STORE_TYPE_TESTS) {
+  if (storeTypeRequiresInstanceName(type)) {
     return buildContentPath({
       language,
       productsPath,
@@ -214,7 +226,7 @@ export function buildContentPath({
     if (!base) return null;
     return pageLeaf ? appendPageLeaf(base, pageLeaf) : base;
   }
-  if (type === STORE_TYPE_TESTS) {
+  if (storeTypeRequiresInstanceName(type)) {
     const base = buildContentBasePath({
       language,
       productsPath,
@@ -227,7 +239,7 @@ export function buildContentPath({
     if (!base) return null;
     const test = normalizeSegment(testName);
     if (!test) return null;
-    const testPath = `${base}/${STORE_TYPE_TESTS}/${test}`;
+    const testPath = `${base}/${type}/${test}`;
     return pageLeaf ? appendPageLeaf(testPath, pageLeaf) : testPath;
   }
   return null;
@@ -247,7 +259,7 @@ export function buildExportPagePaths({
   const type = normalizeSegment(storeType);
   if (!STORE_TYPES.includes(type)) return [];
 
-  const tests = type === STORE_TYPE_TESTS ? testNames : [undefined];
+  const tests = storeTypeRequiresInstanceName(type) ? testNames : [undefined];
 
   return cartesianProduct(products, languages, devices, tests)
     .map(([product, language, device, testName]) => {
@@ -305,7 +317,7 @@ export function getDefaultReleasePeriod(date = new Date()) {
 
 export function storeTypeUsesReleasePeriod(storeType) {
   const type = normalizeSegment(storeType);
-  return type === STORE_TYPE_UPDATES || type === STORE_TYPE_TESTS;
+  return type === STORE_TYPE_UPDATES || storeTypeRequiresInstanceName(type);
 }
 
 export function setReleasePeriodGroupVisible(groupId, storeType) {
