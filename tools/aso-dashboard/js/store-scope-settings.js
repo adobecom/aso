@@ -1,6 +1,8 @@
 import {
+  STORE_TYPE_CPP,
   STORE_TYPE_TESTS,
   STORE_TYPE_UPDATES,
+  storeTypeRequiresInstanceName,
 } from './lib/content-taxonomy.js';
 import {
   clearListCache,
@@ -15,6 +17,7 @@ import {
 function normalizeStoreType(value) {
   const key = String(value ?? '').trim().toLowerCase();
   if (key === STORE_TYPE_TESTS || key === 'store tests') return STORE_TYPE_TESTS;
+  if (key === STORE_TYPE_CPP) return STORE_TYPE_CPP;
   return STORE_TYPE_UPDATES;
 }
 
@@ -23,8 +26,24 @@ function readStoreType() {
   return normalizeStoreType(selected?.value || STORE_TYPE_UPDATES);
 }
 
+// Named "tests" for history's sake, but covers every store type that nests under a named
+// instance (currently store-tests and cpp) — see storeTypeRequiresInstanceName.
 function isStoreTestsScope() {
-  return readStoreType() === STORE_TYPE_TESTS;
+  return storeTypeRequiresInstanceName(readStoreType());
+}
+
+// The store-tests/cpp panel is shared (one set of checkboxes/labels for whichever named-instance
+// store type is selected) rather than duplicated, so its copy has to switch with the store type.
+function instanceScopeLabels(storeType) {
+  if (storeType === STORE_TYPE_CPP) {
+    return { heading: 'CPP campaigns', noun: 'CPP campaigns' };
+  }
+  return { heading: 'Experiments', noun: 'experiments' };
+}
+
+function updateInstanceScopeLabel() {
+  const label = document.getElementById('store-tests-label');
+  if (label) label.textContent = instanceScopeLabels(readStoreType()).heading;
 }
 
 function getSelectedTestNames() {
@@ -41,6 +60,7 @@ function isStoreScopeComplete() {
 function toggleStoreTestsFields() {
   const fields = document.getElementById('store-tests-fields');
   if (fields) fields.classList.toggle('hidden', !isStoreTestsScope());
+  updateInstanceScopeLabel();
 }
 
 function updateStoreTestsCount() {
@@ -55,7 +75,8 @@ function renderStoreTestCheckboxes(tests) {
   if (!container) return;
 
   if (!tests.length) {
-    container.innerHTML = '<p>No experiments found for this product, device, and release period.</p>';
+    const { noun } = instanceScopeLabels(readStoreType());
+    container.innerHTML = `<p>No ${noun} found for this product, device, and release period.</p>`;
     updateStoreTestsCount();
     return;
   }
@@ -76,14 +97,15 @@ async function refreshStoreTests(context, token, getListProbe) {
   const container = document.getElementById('store-tests-checkboxes');
   if (!container || !isStoreTestsScope()) return;
 
+  const { noun } = instanceScopeLabels(readStoreType());
   const probe = typeof getListProbe === 'function' ? getListProbe() : null;
   if (!probe) {
-    container.innerHTML = '<p>Select product, device, and release period to load experiments.</p>';
+    container.innerHTML = `<p>Select product, device, and release period to load ${noun}.</p>`;
     updateStoreTestsCount();
     return;
   }
 
-  container.innerHTML = '<p>Loading experiments…</p>';
+  container.innerHTML = `<p>Loading ${noun}…</p>`;
   clearListCache();
   const tests = await fetchStoreTests({ context, token, selection: probe });
   renderStoreTestCheckboxes(tests);
@@ -163,8 +185,10 @@ export {
   normalizeStoreType,
   readStoreType,
   refreshStoreTests,
+  STORE_TYPE_CPP,
   STORE_TYPE_TESTS,
   STORE_TYPE_UPDATES,
+  storeTypeRequiresInstanceName,
   toggleStoreTestsFields,
   updateStoreTestsCount,
 };

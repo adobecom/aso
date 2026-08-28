@@ -122,6 +122,31 @@ describe('preview', () => {
       expect(sections.length).to.be.above(0);
       expect(sections.every((section) => section.contentPath.includes('store-tests/icon-test-a'))).to.be.true;
     });
+
+    it('returns an empty array for cpp scope with no name selected', () => {
+      expect(buildPreviewSections(schema, sheetMap, {
+        product: 'firefly',
+        language: english,
+        device: 'apple',
+        releasePeriod,
+        storeType: 'cpp',
+        testName: undefined,
+      })).to.deep.equal([]);
+    });
+
+    it('includes a cpp page path when a name is given', () => {
+      const sections = buildPreviewSections(schema, sheetMap, {
+        product: 'firefly',
+        language: english,
+        device: 'apple',
+        releasePeriod,
+        storeType: 'cpp',
+        testName: 'summer-campaign',
+      });
+
+      expect(sections.length).to.be.above(0);
+      expect(sections.every((section) => section.contentPath.includes('cpp/summer-campaign'))).to.be.true;
+    });
   });
 
   describe('probeSectionsExistence', () => {

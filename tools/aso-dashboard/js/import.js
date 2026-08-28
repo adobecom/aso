@@ -2,7 +2,7 @@ import { isFileTooLarge, loadExcelJS, MAX_WORKBOOK_FILE_BYTES } from './lib/exce
 import { runWithConcurrency } from './lib/concurrency.js';
 import {
   normalizeStoreType,
-  STORE_TYPE_TESTS,
+  storeTypeRequiresInstanceName,
 } from './store-scope-settings.js';
 import {
   buildBeforeImportVersionLabel,
@@ -101,8 +101,8 @@ function resolveImportScope(settings) {
 
   const storeType = normalizeStoreType(settings?.storeType);
   const testName = settings?.testName?.trim() || '';
-  if (storeType === STORE_TYPE_TESTS && !testName) {
-    throw new Error('Settings sheet must include Test name for store-tests workbooks.');
+  if (storeTypeRequiresInstanceName(storeType) && !testName) {
+    throw new Error(`Settings sheet must include Test name for ${storeType} workbooks.`);
   }
 
   return {
@@ -111,7 +111,7 @@ function resolveImportScope(settings) {
     quarter,
     month,
     storeType,
-    testName: storeType === STORE_TYPE_TESTS ? testName : undefined,
+    testName: storeTypeRequiresInstanceName(storeType) ? testName : undefined,
   };
 }
 
@@ -960,7 +960,7 @@ async function runImport({
     quarter: parsed.settings?.quarter?.trim(),
     month: parsed.settings?.month?.trim(),
     storeType: normalizeStoreType(parsed.settings?.storeType),
-    testName: normalizeStoreType(parsed.settings?.storeType) === STORE_TYPE_TESTS
+    testName: storeTypeRequiresInstanceName(normalizeStoreType(parsed.settings?.storeType))
       ? parsed.settings?.testName?.trim() : undefined,
     writeCount: writes.length,
     keywordWriteCount: keywordWrites.length,

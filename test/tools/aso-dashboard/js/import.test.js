@@ -153,6 +153,41 @@ describe('import buildImportWriteRequests', () => {
     );
   });
 
+  it('creates cpp writes from settings test name, mirroring store-tests', () => {
+    const requests = buildImportWriteRequests({
+      parsed: {
+        settings: {
+          product: 'adobe-express',
+          storeType: 'cpp',
+          testName: 'summer-campaign',
+          year: '2026',
+          quarter: 'q1',
+          month: 'may',
+        },
+        languageNames: ['German'],
+        metadata: {
+          google: [],
+          apple: [{
+            fieldName: 'App Name',
+            englishSource: { German: 'Managed DE source' },
+            localized: { German: 'Localized DE' },
+          }],
+        },
+        promos: [],
+        imagesVideos: { google: [], apple: [] },
+      },
+      schema,
+      sheetMap,
+      languageIndex,
+      productsPath: 'products-redesign',
+    });
+
+    const sourceWrite = requests.find((request) => request.rowRole === ROW_ROLE_ENGLISH_SOURCE);
+    expect(sourceWrite.pagePath).to.include(
+      '/source/en-de/products-redesign/adobe-express/apple/2026/q1/may/cpp/summer-campaign/metadata/app-name',
+    );
+  });
+
   it('dedupes shared source paths for import writes', () => {
     const requests = [
       {

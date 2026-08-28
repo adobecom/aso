@@ -1,9 +1,8 @@
-import { buildContentPath } from './lib/content-taxonomy.js';
+import { buildContentPath, storeTypeRequiresInstanceName } from './lib/content-taxonomy.js';
 import {
   getSelectedTestNames,
   isStoreTestsScope,
   readStoreType,
-  STORE_TYPE_TESTS,
 } from './store-scope-settings.js';
 import {
   isReleasePeriodComplete,
@@ -57,7 +56,7 @@ function buildPreviewSections(schema, sheetMap, {
   if (!schema || !product || !language || !device || !isReleasePeriodComplete(releasePeriod)) {
     return [];
   }
-  if (storeType === STORE_TYPE_TESTS && !testName) return [];
+  if (storeTypeRequiresInstanceName(storeType) && !testName) return [];
 
   const productsPath = getRelativeProductsPath();
   const seenLeaves = new Set();

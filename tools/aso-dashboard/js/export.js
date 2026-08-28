@@ -26,7 +26,10 @@ import {
   normalizeStoreType,
   readStoreType,
   refreshStoreTests,
+  STORE_TYPE_CPP,
   STORE_TYPE_TESTS,
+  STORE_TYPE_UPDATES,
+  storeTypeRequiresInstanceName,
   toggleStoreTestsFields,
   updateStoreTestsCount,
 } from './store-scope-settings.js';
@@ -459,7 +462,8 @@ async function handleExport(org, repo, token) {
 
     const summaries = [];
     const storeType = readStoreType();
-    const testNames = storeType === STORE_TYPE_TESTS ? getSelectedTestNames() : [undefined];
+    const testNames = storeTypeRequiresInstanceName(storeType)
+      ? getSelectedTestNames() : [undefined];
 
     // eslint-disable-next-line no-restricted-syntax
     for (const testName of testNames) {
@@ -564,7 +568,8 @@ async function handleImageExport(org, repo, token) {
     const { product, languages, devices } = getSelectedItems();
     const releasePeriod = readReleasePeriod();
     const storeType = readStoreType();
-    const testNames = storeType === STORE_TYPE_TESTS ? getSelectedTestNames() : [undefined];
+    const testNames = storeTypeRequiresInstanceName(storeType)
+      ? getSelectedTestNames() : [undefined];
     const currentRef = getCurrentPreviewRef(repo, org);
     const productsPath = getRelativeProductsPath();
     const selection = { fieldsByDeviceBlock: getSelectedFieldsByDeviceBlock() };
@@ -714,7 +719,7 @@ function getStoreTestsListProbe() {
   if (!base) return null;
   const [device] = getCheckedDevices();
   if (!device) return null;
-  return { ...base, device };
+  return { ...base, device, storeType: readStoreType() };
 }
 
 // One probe per checked device — promos can differ (or only exist) per device.
@@ -775,11 +780,13 @@ function applyReleasePeriod({ year, quarter, month } = {}) {
 }
 
 function applyStoreType(storeType) {
-  const isTests = normalizeStoreType(storeType) === STORE_TYPE_TESTS;
+  const normalized = normalizeStoreType(storeType);
   const updatesRadio = document.getElementById('store-type-updates');
   const testsRadio = document.getElementById('store-type-tests');
-  if (updatesRadio) updatesRadio.checked = !isTests;
-  if (testsRadio) testsRadio.checked = isTests;
+  const cppRadio = document.getElementById('store-type-cpp');
+  if (updatesRadio) updatesRadio.checked = normalized === STORE_TYPE_UPDATES;
+  if (testsRadio) testsRadio.checked = normalized === STORE_TYPE_TESTS;
+  if (cppRadio) cppRadio.checked = normalized === STORE_TYPE_CPP;
   toggleStoreTestsFields();
 }
 
