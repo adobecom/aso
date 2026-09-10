@@ -9,7 +9,6 @@ import {
   buildWorkbook,
   getRowRole,
   parseWorkbook,
-  propagateEnglishSource,
   shouldImportKeywords,
 } from '../../../../../tools/aso-dashboard/js/import-export/template.js';
 import { ROW_ROLE_ENGLISH_SOURCE, ROW_ROLE_LOCALIZED } from '../../../../../tools/aso-dashboard/js/import-export/paths.js';
@@ -51,25 +50,6 @@ describe('import-export-template', () => {
     expect(shouldImportKeywords(german, keywordField)).to.be.true;
     expect(shouldImportKeywords(german, plainField)).to.be.false;
     expect(shouldImportKeywords(romanian, keywordField)).to.be.false;
-  });
-
-  it('propagateEnglishSource fills empty managed and unmanaged source cells', () => {
-    const fields = [{
-      fieldName: 'App Name',
-      englishSource: {
-        English: 'Express App',
-        German: '',
-        Romanian: '',
-      },
-      localized: {},
-    }];
-
-    propagateEnglishSource(fields, languages, { englishMarketName: 'English' });
-
-    expect(fields[0].englishSource.German).to.equal('Express App');
-    expect(fields[0].englishSource.Romanian).to.equal('Express App');
-    expect(fields[0].propagatedFromEnglish).to.include('German');
-    expect(fields[0].propagatedFromEnglish).to.include('Romanian');
   });
 
   it('buildExportPayload groups cells by field and row role', () => {
@@ -202,6 +182,34 @@ describe('import-export-template', () => {
     expect(parsed.metadata.google[0].fieldName).to.equal('App Title');
     expect(parsed.metadata.google[0].englishSource.German).to.equal('Google title source');
     expect(parsed.metadata.google[0].localized.German).to.equal('Google title loc');
+  });
+
+  it('parseWorkbook skips a Promos block whose name cell is blank (unused template padding)', async () => {
+    const payload = buildExportPayload({
+      settings: { product: 'adobe-express', year: '2026', quarter: 'q1', month: 'may' },
+      languageNames: ['English'],
+      schema,
+      sheetMap,
+      cells: [],
+    });
+
+    const wb = buildWorkbook(ExcelJS, payload);
+    // Mirrors an unused promo slot left over in a template: a "Promo name" row with no
+    // value, followed by a device banner and a field block, none of it ever filled in.
+    const ws = wb.addWorksheet('Promos');
+    ws.getRow(1).getCell(1).value = 'Promo name';
+    ws.getRow(2).getCell(1).value = 'Google Play';
+    ws.getRow(3).getCell(1).value = 'Section';
+    ws.getRow(3).getCell(2).value = 'Languages';
+    ws.getRow(3).getCell(3).value = 'English';
+    ws.getRow(4).getCell(1).value = 'default';
+    ws.getRow(5).getCell(1).value = 'Tagline';
+    ws.getRow(5).getCell(2).value = 'English Source Text + KW';
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const parsed = await parseWorkbook(buffer, ExcelJS);
+
+    expect(parsed.promos).to.have.length(0);
   });
 
   it('buildWorkbook adds Aggregated (Play paste) for Google Release Notes only', async () => {

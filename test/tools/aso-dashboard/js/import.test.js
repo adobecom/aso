@@ -31,6 +31,12 @@ import {
   ROW_ROLE_ENGLISH_SOURCE,
   ROW_ROLE_LOCALIZED,
 } from '../../../../tools/aso-dashboard/js/import-export/paths.js';
+import {
+  buildExportPayload,
+  buildWorkbook,
+  parseWorkbook,
+} from '../../../../tools/aso-dashboard/js/import-export/template.js';
+import { createTestExcelJS } from '../helpers/test-exceljs.js';
 
 describe('import buildImportWriteRequests', () => {
   let schema;
@@ -83,39 +89,6 @@ describe('import buildImportWriteRequests', () => {
     expect(requests).to.have.length(1);
     // App Name's schema character count (30) travels with the request for later validation.
     expect(sourceWrite.charLimit).to.equal(30);
-  });
-
-  it('only propagates English source to languages present in the workbook', () => {
-    const field = {
-      fieldName: 'App Name',
-      englishSource: { English: 'Base English copy' },
-      localized: {},
-    };
-
-    buildImportWriteRequests({
-      parsed: {
-        settings: {
-          product: 'adobe-express',
-          year: '2026',
-          quarter: 'q1',
-          month: 'may',
-        },
-        languageNames: ['English', 'Romanian'],
-        metadata: {
-          google: [],
-          apple: [field],
-        },
-        promos: [],
-        imagesVideos: { google: [], apple: [] },
-      },
-      schema,
-      sheetMap,
-      languageIndex,
-      productsPath: 'products-redesign',
-    });
-
-    expect(field.propagatedFromEnglish).to.deep.equal(['Romanian']);
-    expect(field.propagatedFromEnglish).to.not.include('German');
   });
 
   it('creates store-tests writes from settings test name', () => {
@@ -186,6 +159,43 @@ describe('import buildImportWriteRequests', () => {
     expect(sourceWrite.pagePath).to.include(
       '/source/en-de/products-redesign/adobe-express/apple/2026/q1/may/cpp/summer-campaign/metadata/app-name',
     );
+  });
+
+  it('never writes a promo content page for a workbook whose only promo block has a blank name', async () => {
+    const ExcelJS = createTestExcelJS();
+    const payload = buildExportPayload({
+      settings: { product: 'adobe-express', year: '2026', quarter: 'q1', month: 'may' },
+      languageNames: ['English'],
+      schema,
+      sheetMap,
+      cells: [],
+    });
+    const wb = buildWorkbook(ExcelJS, payload);
+    // Same unused-template-slot shape as the real-world file this regressed on: a "Promo
+    // name" row with no value, followed by a device banner and field block, all blank.
+    const ws = wb.addWorksheet('Promos');
+    ws.getRow(1).getCell(1).value = 'Promo name';
+    ws.getRow(2).getCell(1).value = 'Google Play';
+    ws.getRow(3).getCell(1).value = 'Section';
+    ws.getRow(3).getCell(2).value = 'Languages';
+    ws.getRow(3).getCell(3).value = 'English';
+    ws.getRow(4).getCell(1).value = 'default';
+    ws.getRow(5).getCell(1).value = 'Tagline';
+    ws.getRow(5).getCell(2).value = 'English Source Text + KW';
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const parsed = await parseWorkbook(buffer, ExcelJS);
+    expect(parsed.promos).to.have.length(0);
+
+    const requests = buildImportWriteRequests({
+      parsed,
+      schema,
+      sheetMap,
+      languageIndex,
+      productsPath: 'products-redesign',
+    });
+
+    expect(requests.filter((request) => request.blockType === 'promo')).to.have.length(0);
   });
 
   it('dedupes shared source paths for import writes', () => {
@@ -1003,8 +1013,6 @@ describe('buildImportSummaryHtml', () => {
       writeCount: 3,
       keywordWriteCount: 0,
       skippedEmpty: 1,
-      propagatedManaged: ['German'],
-      propagatedUnmanaged: [],
       overLimit: [],
       failures: [],
       results: [],
@@ -1014,7 +1022,6 @@ describe('buildImportSummaryHtml', () => {
     expect(html).to.be.a('string');
     expect(html).to.include('adobe-express / 2026 / q1 / may / store-updates');
     expect(html).to.include('3 page write(s)');
-    expect(html).to.include('Propagated English source (market-review pages created): German');
   });
 
   it('notes that media assets need manual authoring, and renders them in their own dedicated table, not mixed into the main one', () => {
@@ -1028,8 +1035,6 @@ describe('buildImportSummaryHtml', () => {
       writeCount: 3,
       keywordWriteCount: 0,
       skippedEmpty: 1,
-      propagatedManaged: [],
-      propagatedUnmanaged: [],
       overLimit: [],
       failures: [],
       results: [],
@@ -1058,8 +1063,6 @@ describe('buildImportSummaryHtml', () => {
       writeCount: 3,
       keywordWriteCount: 0,
       skippedEmpty: 1,
-      propagatedManaged: [],
-      propagatedUnmanaged: [],
       overLimit: [],
       failures: [],
       results: [],
