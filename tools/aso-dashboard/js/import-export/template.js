@@ -322,31 +322,6 @@ function buildExportPayload({
   };
 }
 
-function propagateEnglishSource(fieldBlocks, languageIndex, options = {}) {
-  const englishLanguageName = options.englishLanguageName
-    || languageIndex.find((entry) => entry.name === options.sourceLanguageName)?.name
-    || languageIndex.find((entry) => entry.isManagedLocale && entry.sourcePath?.endsWith('/en-us'))?.name
-    || languageIndex[0]?.name;
-
-  if (!englishLanguageName) return fieldBlocks;
-
-  fieldBlocks.forEach((field) => {
-    const englishText = field.englishSource?.[englishLanguageName] ?? '';
-    if (!englishText.trim()) return;
-
-    languageIndex.forEach((language) => {
-      if (language.name === englishLanguageName) return;
-      const current = field.englishSource?.[language.name] ?? '';
-      if (current.trim()) return;
-      field.englishSource[language.name] = englishText;
-      field.propagatedFromEnglish = field.propagatedFromEnglish || [];
-      field.propagatedFromEnglish.push(language.name);
-    });
-  });
-
-  return fieldBlocks;
-}
-
 function applyWorksheetStyles(ws, row, col, styles = {}) {
   const cell = ws.getRow(row).getCell(col);
   if (styles.font) cell.font = styles.font;
@@ -687,11 +662,12 @@ function parseContentSheetRows(ws, languageNames, options = {}) {
     const role = getRowRole(languages);
 
     if (section === 'Promo name') {
-      context.currentPromo = {
-        promoName: normalizeCellText(row.getCell(2).value),
-        devices: {},
-      };
-      promos.push(context.currentPromo);
+      const promoName = normalizeCellText(row.getCell(2).value);
+      // An unnamed promo block is unused template padding, not a real promo — it can never
+      // be matched back to a live DA promo (every match, here and in export.js, keys off
+      // promoName), so skip it rather than surfacing a nameless entry nothing can resolve.
+      context.currentPromo = promoName ? { promoName, devices: {} } : null;
+      if (context.currentPromo) promos.push(context.currentPromo);
       rowNumber += 1;
     } else if (
       section.startsWith(STORE_BANNERS.google) || section.startsWith(STORE_BANNERS.apple)
@@ -794,6 +770,5 @@ export {
   buildWorkbook,
   getRowRole,
   parseWorkbook,
-  propagateEnglishSource,
   shouldImportKeywords,
 };

@@ -741,6 +741,37 @@ function applyProduct(product) {
   if (select) select.value = product;
 }
 
+// Same field shape import's collectWorkbookFieldBlocks walks (metadata, promos, images-videos
+// across both devices) — flattened here since we only need each field's englishSource map,
+// not the device/blockType/promoContext tagging import attaches.
+function collectFieldBlocks(parsed) {
+  const fields = [];
+  ['apple', 'google'].forEach((device) => {
+    fields.push(...(parsed.metadata?.[device] || []));
+    fields.push(...(parsed.imagesVideos?.[device] || []));
+  });
+  (parsed.promos || []).forEach((promo) => {
+    ['apple', 'google'].forEach((device) => {
+      Object.values(promo.devices?.[device]?.variants || {}).forEach((variant) => {
+        fields.push(...(variant.fields || []));
+      });
+    });
+  });
+  return fields;
+}
+
+// A language "had content" if some field's englishSource for it was actually filled in —
+// matches what import would write, not just whether the language exists as a column header.
+function languageNamesWithContent(parsed) {
+  const withContent = new Set();
+  collectFieldBlocks(parsed).forEach((field) => {
+    Object.entries(field.englishSource || {}).forEach(([languageName, text]) => {
+      if (String(text ?? '').trim()) withContent.add(languageName);
+    });
+  });
+  return (parsed.languageNames || []).filter((name) => withContent.has(name));
+}
+
 // Returns language names from the file that don't match any currently known language.
 function applyLanguages(languageNames) {
   const languageCheckboxes = [...document.querySelectorAll('.language-checkbox')];
@@ -879,10 +910,10 @@ function findMissingPromos(promos) {
   return missing;
 }
 
-function renderLoadScopeSummary(container, parsed, missingLanguages, missingPromos) {
+function renderLoadScopeSummary(container, parsed, languageCount, missingLanguages, missingPromos) {
   if (!container) return;
   const lines = [
-    `Loaded from file: ${parsed.settings.product} — ${parsed.languageNames.length} language(s), `
+    `Loaded from file: ${parsed.settings.product} — ${languageCount} language(s), `
       + `${parsed.promos.length} promo(s). Content below is pulled fresh from DA, not from this file.`,
   ];
   if (missingLanguages.length) {
@@ -918,7 +949,8 @@ async function handleLoadScopeFile(org, repo, token, file) {
     applyReleasePeriod(parsed.settings);
     applyStoreType(parsed.settings.storeType);
     applyScope(parsed);
-    const missingLanguages = applyLanguages(parsed.languageNames);
+    const languagesWithContent = languageNamesWithContent(parsed);
+    const missingLanguages = applyLanguages(languagesWithContent);
     applyDevices(devicesFromParsed(parsed));
     refreshFieldScope();
     restrictFieldScopeToFile(parsed, schemaCache, sheetMapCache);
@@ -940,6 +972,7 @@ async function handleLoadScopeFile(org, repo, token, file) {
     renderLoadScopeSummary(
       summaryContainer,
       parsed,
+      languagesWithContent.length,
       missingLanguages,
       findMissingPromos(parsed.promos),
     );
@@ -1069,6 +1102,7 @@ export {
   devicesFromParsed,
   fieldKeysWithContent,
   findMissingPromos,
+  languageNamesWithContent,
   populateProductDropdown,
   refreshMediaAssetsAvailability,
   renderExportSummary,

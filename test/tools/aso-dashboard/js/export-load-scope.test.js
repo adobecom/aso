@@ -12,6 +12,7 @@ import {
   devicesFromParsed,
   fieldKeysWithContent,
   findMissingPromos,
+  languageNamesWithContent,
   populateProductDropdown,
   refreshMediaAssetsAvailability,
   renderExportSummary,
@@ -72,6 +73,50 @@ describe('export "load scope from file" helpers', () => {
       expect(document.querySelector('[value="German"]').checked).to.be.true;
       expect(document.querySelector('[value="French"]').checked).to.be.false;
       expect(missing).to.deep.equal(['Klingon']);
+    });
+  });
+
+  describe('languageNamesWithContent', () => {
+    it('keeps only languages with a non-empty englishSource cell somewhere in the file', () => {
+      const parsed = {
+        languageNames: ['English', 'German', 'Romanian'],
+        metadata: {
+          apple: [{ fieldName: 'App Name', englishSource: { English: 'Firefly', German: '', Romanian: '' } }],
+          google: [],
+        },
+        imagesVideos: { apple: [], google: [] },
+        promos: [],
+      };
+
+      expect(languageNamesWithContent(parsed)).to.deep.equal(['English']);
+    });
+
+    it('picks up content from images-videos and promo fields too, not just metadata', () => {
+      const parsed = {
+        languageNames: ['English', 'German', 'French'],
+        metadata: { apple: [], google: [] },
+        imagesVideos: {
+          apple: [{ fieldName: 'Screenshot iPhone 1', englishSource: { English: '', German: 'DE copy' } }],
+          google: [],
+        },
+        promos: [{
+          promoName: 'summer',
+          devices: { google: { variants: { default: { fields: [{ fieldName: 'Tagline', englishSource: { French: 'Texte' } }] } } } },
+        }],
+      };
+
+      expect(languageNamesWithContent(parsed).sort()).to.deep.equal(['French', 'German']);
+    });
+
+    it('returns an empty array when every column is present but nothing is filled in', () => {
+      const parsed = {
+        languageNames: ['English', 'German'],
+        metadata: { apple: [{ fieldName: 'App Name', englishSource: { English: '', German: '' } }], google: [] },
+        imagesVideos: { apple: [], google: [] },
+        promos: [],
+      };
+
+      expect(languageNamesWithContent(parsed)).to.deep.equal([]);
     });
   });
 

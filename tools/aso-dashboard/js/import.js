@@ -27,7 +27,6 @@ import {
 } from './import-export/paths.js';
 import {
   parseWorkbook,
-  propagateEnglishSource,
   shouldImportKeywords,
 } from './import-export/template.js';
 import { fetchLanguageIndex } from './lib/translate-paths.js';
@@ -133,16 +132,6 @@ function buildImportWriteRequests({
   } = resolveImportScope(parsed.settings);
 
   const entries = collectWorkbookFieldBlocks(parsed);
-  const englishLanguage = languageIndex.find((language) => language.name === 'English')
-    || languageIndex[0];
-  const workbookLanguages = languageIndex.filter(
-    (language) => languageNames.includes(language.name),
-  );
-  propagateEnglishSource(
-    entries.map((entry) => entry.field),
-    workbookLanguages,
-    { englishLanguageName: englishLanguage?.name },
-  );
 
   const requests = [];
   entries.forEach(({ device, blockType, field, promoContext }) => {
@@ -826,12 +815,6 @@ function buildImportSummaryHtml(summary, org, repo) {
     `<strong>${scopeParts.join(' / ')}</strong> — ${summary.writeCount} page write(s)`,
     `${summary.skippedEmpty} empty cell(s) skipped`,
   ];
-  if (summary.propagatedManaged?.length) {
-    lines.push(`Propagated English source (market-review pages created): ${summary.propagatedManaged.join(', ')}`);
-  }
-  if (summary.propagatedUnmanaged?.length) {
-    lines.push(`Propagated English source (unmanaged, no separate page): ${summary.propagatedUnmanaged.join(', ')}`);
-  }
   if (summary.keywordWriteCount) {
     lines.push(`Keyword files updated: ${summary.keywordWriteCount} (see Keywords column below)`);
   }
@@ -927,15 +910,6 @@ async function runImport({
     productsPath,
   });
   const workbookBlocks = collectWorkbookFieldBlocks(parsed);
-  const propagated = workbookBlocks.flatMap((entry) => entry.field.propagatedFromEnglish || []);
-  const uniquePropagated = [...new Set(propagated)];
-  const propagatedManaged = uniquePropagated.filter(
-    (name) => languageIndex.find((language) => language.name === name)?.isManagedLocale,
-  );
-  const propagatedUnmanaged = uniquePropagated.filter(
-    (name) => !propagatedManaged.includes(name),
-  );
-
   const devices = [...new Set(workbookBlocks.map((entry) => entry.device))];
   const scope = resolveImportScope(parsed.settings);
   const mediaAssetsRequests = buildMediaAssetsPageRequests({
@@ -965,8 +939,6 @@ async function runImport({
     writeCount: writes.length,
     keywordWriteCount: keywordWrites.length,
     skippedEmpty: requests.length - writes.length,
-    propagatedManaged,
-    propagatedUnmanaged,
     overLimit,
     failures,
     results,
