@@ -379,7 +379,7 @@ describe('aso-app', () => {
     beforeEach(() => {
       resetConstantsRuntimeCache();
       window.history.pushState({}, '', '/ko/products/apple');
-      fetchStub.withArgs('/.da/translate.json').resolves({
+      fetchStub.withArgs('/.da/translate-redesign.json').resolves({
         ok: true,
         json: async () => ({
           languages: {

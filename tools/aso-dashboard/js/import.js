@@ -14,6 +14,12 @@ import {
 } from './lib/da-source-client.js';
 import { applyKeywordUpdates } from './import-export/keywords.js';
 import {
+  buildConstantsImportWrites,
+  extractConstantsFromText,
+  mergeConstantsUpdates,
+} from './import-export/constants.js';
+import { constantsPathFromPagePath } from '../../../utils/aso-constants.js';
+import {
   buildPageHtml,
   buildSpacingSidecarForField,
 } from './import-export/html.js';
@@ -87,6 +93,20 @@ function collectWorkbookFieldBlocks(parsed) {
   });
 
   return entries;
+}
+
+// A language is "being translated" if some field's englishSource for it was actually filled
+// in — matches what buildImportWriteRequests would write for text, not just whether the
+// language exists as a column header in the template (the template lists every supported
+// language whether or not this particular import touches it).
+function languageNamesWithContent(parsed, workbookBlocks) {
+  const withContent = new Set();
+  workbookBlocks.forEach(({ field }) => {
+    Object.entries(field.englishSource || {}).forEach(([languageName, text]) => {
+      if (String(text ?? '').trim()) withContent.add(languageName);
+    });
+  });
+  return (parsed.languageNames || []).filter((name) => withContent.has(name));
 }
 
 function resolveImportScope(settings) {
@@ -164,6 +184,12 @@ function buildImportWriteRequests({
           testName,
         });
         if (pagePath) {
+          // Extract DNT spans to {{slug}} tokens; literals go to the sibling -constants.html.
+          const { text, constants } = extractConstantsFromText(
+            englishSourceText,
+            language.name,
+            schemaField.fieldKey,
+          );
           requests.push({
             product,
             device,
@@ -174,7 +200,9 @@ function buildImportWriteRequests({
             blockType,
             pageLeaf: schemaField.pageLeaf,
             pagePath,
-            text: englishSourceText,
+            text,
+            constants,
+            constantsPath: constants.length ? constantsPathFromPagePath(pagePath) : undefined,
             charLimit: schemaField.charLimit,
             promoName: promoContext.promoName,
             promoVariant: promoContext.promoVariant,
@@ -264,11 +292,12 @@ function buildKeywordImportWrites({
 // Media assets have no workbook representation (see media-collect.js), so there's nothing
 // to write from the uploaded file — but authors still need a page to drop screenshots/videos
 // into once a release exists, per language, exactly like text: one source page per device per
-// distinct page leaf (typically images/assets and videos/assets) per language present in the
-// workbook — English's own "source" page is the plain root path; every other language gets
-// its own market-review page (e.g. /source/en-de/...), same as buildImportWriteRequests. What
-// authors put in each is still manual (see buildImportSummaryHtml's note) — this only makes
-// sure there's a page for each language to open.
+// distinct page leaf (typically images/assets and videos/assets) per language actually being
+// translated in this import — English's own "source" page is the plain root path; every other
+// language gets its own market-review page (e.g. /source/en-de/...), same as
+// buildImportWriteRequests. What authors put in each is still manual (see
+// buildImportSummaryHtml's note) — this only makes sure there's a page for each language to
+// open.
 function buildMediaAssetsPageRequests({
   devices,
   schema,
@@ -464,6 +493,35 @@ async function executeKeywordWrites(org, repo, token, writes, languageIndex) {
     writes,
     IMPORT_WRITE_CONCURRENCY,
     (write) => executeKeywordWrite(org, repo, token, languageIndex, write),
+  );
+}
+
+async function executeConstantsWrite(org, repo, token, write) {
+  const htmlPath = `${write.constantsPath}.html`;
+  const versionLabel = buildBeforeImportVersionLabel({ pageLeaf: `${write.pageLeaf || 'page'}-constants` });
+
+  const existingHtml = await getSourceText(org, repo, htmlPath, token);
+  const html = mergeConstantsUpdates(existingHtml, write.updates);
+
+  const putResult = await putSourceText(org, repo, htmlPath, html, token, {
+    versionLabel,
+    knownExists: existingHtml !== null,
+  });
+  return {
+    ...write,
+    pagePath: write.constantsPath,
+    rowRole: 'constants',
+    ok: putResult.ok,
+    method: putResult.method,
+  };
+}
+
+async function executeConstantsWrites(org, repo, token, writes) {
+  // Each write targets its own distinct -constants.html, so no chaining needed.
+  return runWithConcurrency(
+    writes,
+    IMPORT_WRITE_CONCURRENCY,
+    (write) => executeConstantsWrite(org, repo, token, write),
   );
 }
 
@@ -818,6 +876,9 @@ function buildImportSummaryHtml(summary, org, repo) {
   if (summary.keywordWriteCount) {
     lines.push(`Keyword files updated: ${summary.keywordWriteCount} (see Keywords column below)`);
   }
+  if (summary.constantsWriteCount) {
+    lines.push(`Constants files updated: ${summary.constantsWriteCount} (non-translatable spans replaced with {{tokens}})`);
+  }
   if (summary.overLimit?.length) {
     lines.push(`<span class="export-summary-warn">Over character limit: ${summary.overLimit.length} (see Over Limit column below)</span>`);
   }
@@ -909,6 +970,8 @@ async function runImport({
     languageIndex,
     productsPath,
   });
+  // Built from requests (pre-dedupe) so every language's constant row reaches its file.
+  const constantsWrites = buildConstantsImportWrites(requests);
   const workbookBlocks = collectWorkbookFieldBlocks(parsed);
   const devices = [...new Set(workbookBlocks.map((entry) => entry.device))];
   const scope = resolveImportScope(parsed.settings);
@@ -916,17 +979,19 @@ async function runImport({
     devices,
     schema,
     languageIndex,
-    languageNames: parsed.languageNames || [],
+    languageNames: languageNamesWithContent(parsed, workbookBlocks),
     productsPath,
     ...scope,
   });
 
-  const [results, keywordResults, mediaAssetsPages] = await Promise.all([
+  const [results, keywordResults, mediaAssetsPages, constantsResults] = await Promise.all([
     executeImportWrites(org, repo, token, writes, schema),
     executeKeywordWrites(org, repo, token, keywordWrites, languageIndex),
     createMissingMediaAssetsPages(org, repo, token, schema, mediaAssetsRequests),
+    executeConstantsWrites(org, repo, token, constantsWrites),
   ]);
-  const failures = [...results, ...keywordResults].filter((result) => !result.ok);
+  const failures = [...results, ...keywordResults, ...constantsResults]
+    .filter((result) => !result.ok);
 
   return {
     product: parsed.settings?.product?.trim() || 'unknown',
@@ -938,11 +1003,13 @@ async function runImport({
       ? parsed.settings?.testName?.trim() : undefined,
     writeCount: writes.length,
     keywordWriteCount: keywordWrites.length,
+    constantsWriteCount: constantsWrites.length,
     skippedEmpty: requests.length - writes.length,
     overLimit,
     failures,
     results,
     keywordResults,
+    constantsResults,
     mediaAssetsPages,
   };
 }
@@ -1036,6 +1103,7 @@ export async function init({ context, token }) {
 export {
   buildAemPreviewUrl,
   buildBulkPreviewUrl,
+  buildConstantsImportWrites,
   buildDaEditUrl,
   buildImportSummaryHtml,
   buildImportWriteRequests,

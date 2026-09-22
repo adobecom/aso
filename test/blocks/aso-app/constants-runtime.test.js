@@ -39,7 +39,7 @@ describe('constants-runtime', () => {
     resetConstantsRuntimeCache();
     fetchStub = sinon.stub(window, 'fetch');
     fetchStub.withArgs('/.da/block-schema.json').resolves({ ok: false });
-    fetchStub.withArgs('/.da/translate.json').resolves({
+    fetchStub.withArgs('/.da/translate-redesign.json').resolves({
       ok: true,
       json: async () => ({ languages: { data: translateLanguages } }),
     });
@@ -138,7 +138,14 @@ describe('constants-runtime', () => {
       expect(matchTranslateLanguage('/ro/products-redesign/adobe-express/apple', languages).lang.name)
         .to.equal('Romanian');
       expect(matchTranslateLanguage('/products-redesign/adobe-express/apple', languages)).to.be.null;
+      // Constants come from the language's OWN source folder, not the root.
       expect(constantsPathFromListingPath('/source/en-gb/products-redesign/adobe-express/apple', languages))
+        .to.equal('/source/en-gb/products-redesign/adobe-express/apple-constants');
+      // The rolled-out /uk page reads its source folder too.
+      expect(constantsPathFromListingPath('/uk/products-redesign/adobe-express/apple', languages))
+        .to.equal('/source/en-gb/products-redesign/adobe-express/apple-constants');
+      // The base language (source '/') and locale-free source listings stay at the root.
+      expect(constantsPathFromListingPath('/ro/products-redesign/adobe-express/apple', languages))
         .to.equal('/products-redesign/adobe-express/apple-constants');
       expect(constantsPathFromListingPath('/products-redesign/adobe-express/apple', languages))
         .to.equal('/products-redesign/adobe-express/apple-constants');
@@ -176,13 +183,10 @@ describe('constants-runtime', () => {
 
     it('loads constants for target-preview listing paths', async () => {
       resetConstantsRuntimeCache();
-      fetchStub.withArgs('/.da/translate.json').resolves({
+      const koLangstore = [{ name: 'Korean', location: '/langstore/ko', locales: 'ko' }];
+      fetchStub.withArgs('/.da/translate-redesign.json').resolves({
         ok: true,
-        json: async () => ({
-          languages: {
-            data: [{ name: 'Korean', location: '/langstore/ko', locales: 'ko' }],
-          },
-        }),
+        json: async () => ({ languages: { data: koLangstore } }),
       });
       fetchStub.withArgs('/products/apple-constants').resolves({
         ok: true,
@@ -191,6 +195,28 @@ describe('constants-runtime', () => {
 
       const values = await loadConstantsValuesForPage({
         pathname: '/target-preview/ko/products/apple',
+        fetch: fetchStub,
+      });
+
+      expect(values['legal-terms']).to.include('[선택적 액세스 권한]');
+    });
+
+    it('loads a redesign locale from its own source folder, not the root', async () => {
+      resetConstantsRuntimeCache();
+      const koRedesign = [{ name: 'Korean', location: '/ko-kr', source: '/source/en-kr' }];
+      fetchStub.withArgs('/.da/translate-redesign.json').resolves({
+        ok: true,
+        json: async () => ({ languages: { data: koRedesign } }),
+      });
+      // Root file must be ignored; only the source-folder file should be read.
+      fetchStub.withArgs('/products/apple-constants').resolves({ ok: false, status: 404 });
+      fetchStub.withArgs('/source/en-kr/products/apple-constants').resolves({
+        ok: true,
+        text: async () => appleConstants,
+      });
+
+      const values = await loadConstantsValuesForPage({
+        pathname: '/ko-kr/products/apple',
         fetch: fetchStub,
       });
 
@@ -237,7 +263,7 @@ describe('constants-runtime', () => {
         loadConstantsValuesForPage({ pathname: '/langstore/ko/products/firefly', fetch: fetchStub }),
       ]);
 
-      expect(fetchStub.withArgs('/.da/translate.json').callCount).to.equal(1);
+      expect(fetchStub.withArgs('/.da/translate-redesign.json').callCount).to.equal(1);
     });
   });
 

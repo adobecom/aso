@@ -11,7 +11,7 @@ export async function setupMockSchema() {
         json: async () => JSON.parse(mockSchema),
       });
     }
-    if (url === '/.da/translate.json') {
+    if (url === '/.da/translate-redesign.json') {
       return Promise.resolve({
         ok: true,
         json: async () => ({ languages: { data: [{ locales: 'en', name: 'English' }] } }),
