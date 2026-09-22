@@ -200,11 +200,9 @@ function createAdminFetch(org, repo, token) {
   const adminOrigin = `https://admin.da.live/source/${org}/${repo}`;
   return async (input) => {
     const url = typeof input === 'string' ? input : input.url;
-    if (url === '/.da/translate.json') {
-      return fetch(`${adminOrigin}/.da/translate.json`, { headers: { Authorization: `Bearer ${token}` } });
-    }
     if (url.startsWith('/')) {
-      const sourcePath = url.endsWith('.html') ? url : `${url}.html`;
+      // .json/.html fetched verbatim; extensionless source paths get .html appended.
+      const sourcePath = url.endsWith('.html') || url.endsWith('.json') ? url : `${url}.html`;
       return fetch(`${adminOrigin}${sourcePath}`, { headers: { Authorization: `Bearer ${token}` } });
     }
     return fetch(input);

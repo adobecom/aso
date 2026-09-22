@@ -9,6 +9,7 @@ import {
   SHEET_PROMOS,
 } from '../lib/sheet-to-block-map.js';
 import { ROW_ROLE_ENGLISH_SOURCE, ROW_ROLE_LOCALIZED } from './paths.js';
+import { MARK_START, MARK_END, escapeHtml } from './constants.js';
 
 const SHEET_SETTINGS = 'Settings';
 
@@ -104,11 +105,57 @@ function readLanguageNamesFromSheet(ws) {
   return [];
 }
 
-function readLanguageColumnValues(row, languageNames, columnStart = 3) {
+// A run is a do-not-translate mark if it has any non-default font colour (not bold, not tags).
+function isMarkedRun(run) {
+  const color = run?.font?.color;
+  if (!color) return false;
+  // Explicit RGB: marked unless it's plain black.
+  if (color.argb) return color.argb.slice(-6).toUpperCase() !== '000000';
+  // Theme palette: 0/1 are the default text/background (dark1/light1); anything else is a colour.
+  if (typeof color.theme === 'number') return color.theme !== 0 && color.theme !== 1;
+  // Legacy indexed: 8 = black, 64 = automatic (system window text).
+  if (typeof color.indexed === 'number') return color.indexed !== 8 && color.indexed !== 64;
+  return false;
+}
+
+// Escaped bold/italic HTML for a marked run, wrapping each line separately so the later
+// paragraph split can't tear a tag.
+function runToMarkedHtml(run) {
+  const wrapLine = (line) => {
+    if (line === '') return '';
+    let html = escapeHtml(line);
+    if (run.font?.italic) html = `<i>${html}</i>`;
+    if (run.font?.bold) html = `<b>${html}</b>`;
+    return html;
+  };
+  return String(run.text ?? '').split('\n').map(wrapLine).join('\n');
+}
+
+// Wrap marked runs in sentinels for the extractor; consecutive marked runs merge into one span.
+function readMarkedCellText(value) {
+  if (value == null) return '';
+  if (typeof value !== 'object' || !Array.isArray(value.richText)) return normalizeCellText(value);
+
+  let out = '';
+  let inMark = false;
+  value.richText.forEach((run) => {
+    const text = run.text ?? '';
+    if (!text) return;
+    const marked = isMarkedRun(run);
+    if (marked && !inMark) { out += MARK_START; inMark = true; }
+    if (!marked && inMark) { out += MARK_END; inMark = false; }
+    out += marked ? runToMarkedHtml(run) : text;
+  });
+  if (inMark) out += MARK_END;
+  return out.trim();
+}
+
+function readLanguageColumnValues(row, languageNames, columnStart = 3, { marked = false } = {}) {
+  const read = marked ? readMarkedCellText : (value) => normalizeCellText(value);
   const values = {};
   languageNames.forEach((languageName, index) => {
     const cell = row.getCell(columnStart + index);
-    values[languageName] = normalizeCellText(cell.value);
+    values[languageName] = read(cell.value);
   });
   return values;
 }
@@ -605,7 +652,7 @@ function parseFieldBlockRows(ws, languageNames, startRow, rowCount, context) {
     device: context.currentStore,
     variantLabel: context.currentVariant,
     acceptsKeywords: role === `${ROW_ROLE_ENGLISH_SOURCE}-kw`,
-    englishSource: readLanguageColumnValues(row, languageNames, columnStart),
+    englishSource: readLanguageColumnValues(row, languageNames, columnStart, { marked: true }),
     localized: {},
     keywords: {},
   };
@@ -770,5 +817,6 @@ export {
   buildWorkbook,
   getRowRole,
   parseWorkbook,
+  readMarkedCellText,
   shouldImportKeywords,
 };

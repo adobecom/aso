@@ -6,7 +6,7 @@ import {
   substituteConstantTokensInDom,
 } from '../../utils/aso-constants.js';
 
-const TRANSLATE_PATH = '/.da/translate.json';
+const TRANSLATE_PATH = '/.da/translate-redesign.json';
 
 let translateLanguagesPromise;
 const constantsValuesByPath = new Map();
@@ -115,13 +115,15 @@ export function languageNameForPath(pathname, languagesData) {
     ?? DEFAULT_SOURCE_LANGUAGE_LABEL;
 }
 
+// Constants live in the page's own source folder (e.g. Korean → /source/en-kr), not the root.
 export function constantsPathFromListingPath(pagePath, languagesData) {
   const normalizedPath = normalizeLocPathForTranslateMatch(pagePath);
   const match = matchTranslateLanguage(normalizedPath, languagesData);
   const contentPath = match
     ? stripLanguagePrefixFromPagePath(normalizedPath, match.prefix)
     : normalizedPath;
-  return constantsPathFromPagePath(contentPath);
+  const sourcePrefix = normalizePathPrefix(match?.lang?.source);
+  return constantsPathFromPagePath(`${sourcePrefix}${contentPath}`);
 }
 
 export function resetConstantsRuntimeCache() {
@@ -138,7 +140,7 @@ function loadTranslateLanguages(fetchImpl = fetch) {
       const data = await resp.json();
       return data.languages?.data || null;
     } catch (error) {
-      console.error('Error fetching translate.json:', error);
+      console.error('Error fetching translate-redesign.json:', error);
       return null;
     }
   })();
