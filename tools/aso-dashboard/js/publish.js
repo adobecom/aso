@@ -1,126 +1,18 @@
-import { loadConstantsValuesForPage } from '../../../blocks/aso-app/constants-runtime.js';
-import {
-  isReleasePeriodComplete,
-  readReleasePeriod,
-} from './release-period-settings.js';
-import {
-  readStoreType,
-  STORE_TYPE_UPDATES,
-} from './store-scope-settings.js';
+import { readStoreType, STORE_TYPE_UPDATES } from './store-scope-settings.js';
 import { collectExportData } from './import-export/collect.js';
-import { buildHtmlSourcePath } from './import-export/paths.js';
 import { buildPromosListPath } from './lib/content-taxonomy.js';
-import {
-  getKeywordsSidecar,
-  getSourceText,
-  getSpacingSidecar,
-  listDirectory,
-  putJsonSource,
-} from './lib/da-source-client.js';
-import {
-  fetchBlockSchema,
-  fetchLanguages,
-  fetchProducts,
-  fetchSheetBlockMap,
-  getConfigFileOverride,
-  getRelativeProductsPath,
-} from './lib/utils.js';
+import { listDirectory, putJsonSource } from './lib/da-source-client.js';
+import { getRelativeProductsPath } from './lib/utils.js';
 
-const PUBLISH_REQUEST_PATH = '/.da/storepublish/request';
+export const PUBLISH_REQUEST_PATH = '/.da/storepublish/request';
 
-let languageIndexByName = new Map();
-let schemaCache = null;
-let sheetMapCache = null;
-
-function getPublishProduct() {
-  return document.getElementById('publish-product')?.value || '';
-}
-
-function getPublishPlatform() {
-  return document.querySelector('input[name="publish-platform"]:checked')?.value || 'apple';
-}
-
-function getPublishLanguages() {
-  return Array.from(document.querySelectorAll('.publish-language-checkbox:checked'))
-    .map((cb) => languageIndexByName.get(cb.value))
-    .filter(Boolean);
-}
-
-function updatePublishButtonState() {
-  const btn = document.getElementById('publish-button');
-  if (!btn) return;
-  btn.disabled = !(getPublishProduct() && getPublishLanguages().length > 0 && isReleasePeriodComplete());
-}
-
-function showPublishStatus(message, duration = 3000) {
-  const btn = document.getElementById('publish-button');
-  if (!btn) return;
-  btn.textContent = message;
-  btn.classList.remove('loading');
-  window.setTimeout(() => {
-    btn.textContent = 'Publish to Store';
-    updatePublishButtonState();
-  }, duration);
-}
-
-function populatePublishProductDropdown(products) {
-  const select = document.getElementById('publish-product');
-  if (!select) return;
-  select.innerHTML = products.length
-    ? ['<option value="">Select a product…</option>', ...products.map((p) => `<option value="${p.value}">${p.label}</option>`)].join('')
-    : '<option value="">No products found</option>';
-}
-
-function populatePublishLanguageCheckboxes(languages) {
-  const container = document.getElementById('publish-languages-checkboxes');
-  if (!container) return;
-  if (!languages.length) {
-    container.innerHTML = '<p>No languages found</p>';
-    return;
-  }
-  container.innerHTML = languages.map((lang) => {
-    const id = `publish-lang-${lang.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    return `<div class="checkbox-item">
-      <input type="checkbox" id="${id}" value="${lang.name}" class="publish-language-checkbox">
-      <label for="${id}">${lang.label}</label>
-    </div>`;
-  }).join('');
-}
-
-function createAdminFetch(org, repo, token) {
-  const adminOrigin = `https://admin.da.live/source/${org}/${repo}`;
-  return async (input) => {
-    const url = typeof input === 'string' ? input : input.url;
-    if (url.startsWith('/')) {
-      const sourcePath = url.endsWith('.html') || url.endsWith('.json') ? url : `${url}.html`;
-      return fetch(`${adminOrigin}${sourcePath}`, { headers: { Authorization: `Bearer ${token}` } });
-    }
-    return fetch(input);
-  };
-}
-
-function createFetchPage(org, repo, token, adminFetch) {
-  return async (_org, _repo, pagePath) => {
-    const htmlPath = buildHtmlSourcePath(pagePath);
-    const [html, spacingSidecar, keywordsSidecar] = await Promise.all([
-      getSourceText(org, repo, htmlPath, token),
-      getSpacingSidecar(org, repo, pagePath, token),
-      getKeywordsSidecar(org, repo, pagePath, token),
-    ]);
-    const constantsValues = html !== null
-      ? await loadConstantsValuesForPage({ pathname: pagePath, fetch: adminFetch })
-      : {};
-    return {
-      html: html ?? '', htmlFound: html !== null, spacingSidecar, keywordsSidecar, constantsValues,
-    };
-  };
-}
-
-async function listPromoNames(org, repo, token, { product, platform, year, quarter, month }) {
-  const english = languageIndexByName.get('English') || [...languageIndexByName.values()][0];
-  if (!english) return [];
+// ponytail: promos auto-listed from DA; CPP/store-tests support can be added when needed
+async function listPromoNames(org, repo, token, {
+  product, platform, year, quarter, month, englishLanguage,
+}) {
+  if (!englishLanguage) return [];
   const promosPath = buildPromosListPath({
-    language: english.localizedPath,
+    language: englishLanguage.localizedPath,
     productsPath: getRelativeProductsPath(),
     product,
     device: platform,
@@ -153,7 +45,7 @@ function buildLocalization(cellIndex, langCode, device, blockType, fieldKeys, pr
   return loc;
 }
 
-function buildPublishPayload(cells, { product, platform, languages, promoNames }) {
+export function buildPublishPayload(cells, { product, platform, languages, promoNames }) {
   const cellIndex = new Map();
   cells.forEach((cell) => {
     const key = `${cell.language.code}|${cell.device}|${cell.blockType}|${cell.fieldKey}|${cell.promoName ?? ''}`;
@@ -166,9 +58,7 @@ function buildPublishPayload(cells, { product, platform, languages, promoNames }
     const listingFields = ['name', 'subtitle', 'description', 'keywords', 'marketingUrl', 'promotionalText', 'supportUrl'];
     const payload = {
       app: product,
-      metadata: {
-        localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)),
-      },
+      metadata: { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)) },
     };
 
     if (promoNames.length) {
@@ -188,118 +78,64 @@ function buildPublishPayload(cells, { product, platform, languages, promoNames }
     app: product,
     platform: 'google',
     track: readStoreType() === STORE_TYPE_UPDATES ? 'production' : readStoreType(),
-    metadata: {
-      localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)),
-    },
+    metadata: { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)) },
   };
 }
 
-async function handlePublish(org, repo, token) {
-  const btn = document.getElementById('publish-button');
-  const summaryEl = document.getElementById('publish-summary');
-  btn.classList.add('loading');
-  btn.textContent = 'Publishing...';
-  btn.disabled = true;
-  if (summaryEl) summaryEl.textContent = '';
-
-  try {
-    const product = getPublishProduct();
-    const platform = getPublishPlatform();
-    const languages = getPublishLanguages();
-    const releasePeriod = readReleasePeriod();
-
-    if (!schemaCache || !sheetMapCache) {
-      showPublishStatus('Config not loaded');
-      return;
-    }
-
-    // ponytail: promos auto-listed from DA; CPP/store-tests support can be added when needed
-    const promoNames = platform === 'apple'
-      ? await listPromoNames(org, repo, token, { product, platform, ...releasePeriod })
-      : [];
-
-    const promoContexts = promoNames.map((promoName) => ({ promoName, promoVariant: 'default', device: platform }));
-    const blockTypes = promoNames.length ? ['listing', 'promo'] : ['listing'];
-
-    const adminFetch = createAdminFetch(org, repo, token);
-    const fetchPage = createFetchPage(org, repo, token, adminFetch);
-
-    const cells = await collectExportData({
+// Builds and writes a publish payload for a single product/platform to the store request
+// queue. Shares the Export tab's product/language/device/release-period selections and DA
+// fetch plumbing — callers (export.js) pass in an already-authenticated fetchPage.
+// eslint-disable-next-line import/prefer-default-export
+export async function publishSelection({
+  org,
+  repo,
+  token,
+  schema,
+  sheetMap,
+  product,
+  platform,
+  languages,
+  releasePeriod,
+  fetchPage,
+  englishLanguage,
+}) {
+  const promoNames = platform === 'apple'
+    ? await listPromoNames(
       org,
       repo,
       token,
-      schema: schemaCache,
-      sheetMap: sheetMapCache,
-      products: [product],
-      languages,
-      devices: [platform],
-      year: releasePeriod.year,
-      quarter: releasePeriod.quarter,
-      month: releasePeriod.month,
-      productsPath: getRelativeProductsPath(),
-      storeType: STORE_TYPE_UPDATES,
-      blockTypes,
-      promoContexts,
-      rowRoles: ['localized'],
-      fetchPage,
-    });
+      { product, platform, ...releasePeriod, englishLanguage },
+    )
+    : [];
 
-    const payload = buildPublishPayload(cells, {
-      product, platform, languages, promoNames,
-    });
+  const promoContexts = promoNames.map((promoName) => ({ promoName, promoVariant: 'default', device: platform }));
+  const blockTypes = promoNames.length ? ['listing', 'promo'] : ['listing'];
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filePath = `${PUBLISH_REQUEST_PATH}/${timestamp}.json`;
-    const result = await putJsonSource(org, repo, filePath, payload, token);
-
-    if (result.ok) {
-      showPublishStatus('Published!');
-      if (summaryEl) summaryEl.innerHTML = `Saved to <code>${filePath}</code>`;
-    } else {
-      showPublishStatus('Publish failed');
-      if (summaryEl) summaryEl.textContent = `Error ${result.status}: ${result.statusText || 'write failed'}`;
-    }
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[aso publish]', error);
-    showPublishStatus('Publish failed');
-    if (summaryEl) summaryEl.textContent = error.message || 'Unknown error';
-  }
-}
-
-function setupPublishListeners(org, repo, token) {
-  document.getElementById('publish-product')?.addEventListener('change', updatePublishButtonState);
-  document.querySelectorAll('#release-period-year, #release-period-quarter, #release-period-month').forEach((el) => {
-    el.addEventListener('change', updatePublishButtonState);
+  const cells = await collectExportData({
+    org,
+    repo,
+    token,
+    schema,
+    sheetMap,
+    products: [product],
+    languages,
+    devices: [platform],
+    year: releasePeriod.year,
+    quarter: releasePeriod.quarter,
+    month: releasePeriod.month,
+    productsPath: getRelativeProductsPath(),
+    storeType: STORE_TYPE_UPDATES,
+    blockTypes,
+    promoContexts,
+    rowRoles: ['localized'],
+    fetchPage,
   });
-  document.getElementById('publish-select-all-languages')?.addEventListener('click', () => {
-    const checkboxes = document.querySelectorAll('.publish-language-checkbox');
-    const allChecked = [...checkboxes].every((cb) => cb.checked);
-    checkboxes.forEach((cb) => { cb.checked = !allChecked; });
-    updatePublishButtonState();
-  });
-  document.getElementById('publish-languages-checkboxes')?.addEventListener('change', updatePublishButtonState);
-  document.getElementById('publish-button')?.addEventListener('click', () => handlePublish(org, repo, token));
-}
 
-// eslint-disable-next-line import/prefer-default-export
-export async function init({ context, token }) {
-  const { org, repo } = context;
+  const payload = buildPublishPayload(cells, { product, platform, languages, promoNames });
 
-  const [products, languages] = await Promise.all([
-    fetchProducts({ context, token }),
-    fetchLanguages({ context, token, configFile: getConfigFileOverride() }),
-  ]);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filePath = `${PUBLISH_REQUEST_PATH}/${timestamp}.json`;
+  const result = await putJsonSource(org, repo, filePath, payload, token);
 
-  languageIndexByName = new Map(languages.map((l) => [l.name, l]));
-  populatePublishProductDropdown(products);
-  populatePublishLanguageCheckboxes(languages);
-
-  [schemaCache, sheetMapCache] = await Promise.all([
-    fetchBlockSchema({ context: { org, repo }, token }),
-    fetchSheetBlockMap({ context: { org, repo }, token }),
-  ]);
-
-  setupPublishListeners(org, repo, token);
-  updatePublishButtonState();
+  return { ok: result.ok, status: result.status, statusText: result.statusText, filePath };
 }

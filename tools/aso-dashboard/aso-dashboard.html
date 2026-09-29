@@ -25,7 +25,6 @@
         <button class="tab-button active" data-tab="import">Import</button>
         <button class="tab-button" data-tab="preview">Preview</button>
         <button class="tab-button" data-tab="export">Export</button>
-        <button class="tab-button" data-tab="publish">Publish</button>
       </div>
 
       <div class="tab-content" data-tab-content="preview">
@@ -113,10 +112,24 @@
 
       <div class="tab-content" data-tab-content="export">
         <div class="export-container">
-          <h2 class="export-title">Export from DA</h2>
-          <p class="export-description">Download filled import-template workbooks for round-trip editing. One Excel file per product.</p>
+          <h2 class="export-title">Export/Publish</h2>
+          <p class="export-description">Download filled import-template workbooks for round-trip editing, or publish current content directly to the store request queue.</p>
 
-          <div class="export-section" id="export-load-from-file-section">
+          <div class="export-section" id="export-mode-section">
+            <h3>Action</h3>
+            <div class="checkbox-group horizontal">
+              <div class="checkbox-item">
+                <input type="radio" name="export-mode" id="export-mode-export" value="export" checked>
+                <label for="export-mode-export">Export</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="radio" name="export-mode" id="export-mode-publish" value="publish">
+                <label for="export-mode-publish">Publish</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="export-section export-only-section" id="export-load-from-file-section">
             <h3>Load fields from a file (optional)</h3>
             <p class="export-description">Pre-fills which product, languages, devices, and promos to include below — content is always pulled fresh from DA, not from this file.</p>
             <input type="file" id="export-scope-file" class="hidden" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
@@ -158,55 +171,57 @@
           </div>
 
           <div class="export-section" id="export-scope-section">
-            <h3>Content to export</h3>
-            <div class="checkbox-group horizontal">
-              <div class="checkbox-item">
-                <input type="checkbox" id="export-scope-listing" checked>
-                <label for="export-scope-listing">Metadata (listing)</label>
+            <div class="export-only-section" id="export-scope-fields">
+              <h3>Content to export</h3>
+              <div class="checkbox-group horizontal">
+                <div class="checkbox-item">
+                  <input type="checkbox" id="export-scope-listing" checked>
+                  <label for="export-scope-listing">Metadata (listing)</label>
+                </div>
+                <div class="checkbox-item">
+                  <input type="checkbox" id="export-scope-promos" checked>
+                  <label for="export-scope-promos">Promos</label>
+                </div>
+                <div class="checkbox-item">
+                  <input type="checkbox" id="export-scope-images-videos" checked>
+                  <label for="export-scope-images-videos">Images &amp; Videos</label>
+                </div>
               </div>
-              <div class="checkbox-item">
-                <input type="checkbox" id="export-scope-promos" checked>
-                <label for="export-scope-promos">Promos</label>
-              </div>
-              <div class="checkbox-item">
-                <input type="checkbox" id="export-scope-images-videos" checked>
-                <label for="export-scope-images-videos">Images &amp; Videos</label>
-              </div>
+              <details id="export-listing-fields" class="field-scope-section" open>
+                <summary>
+                  <span>Metadata Fields <span class="field-scope-count" id="export-listing-field-count"></span></span>
+                  <button type="button" class="select-all-link field-scope-select-all" data-block-type="listing">Select All</button>
+                </summary>
+                <div class="promo-device-boxes" id="export-listing-field-groups">
+                  <p>Select product and device…</p>
+                </div>
+              </details>
+              <details id="export-promo-fields" class="field-scope-section" open>
+                <summary>
+                  <span>Promos</span>
+                  <span class="field-scope-count" id="export-promo-count"></span>
+                </summary>
+                <div class="promo-device-boxes" id="export-promo-groups">
+                  <p>Select product, device, and release period…</p>
+                </div>
+              </details>
+              <details id="export-images-videos-fields" class="field-scope-section" open>
+                <summary>
+                  <span>Images &amp; Videos Fields <span class="field-scope-count" id="export-images-videos-field-count"></span></span>
+                  <button type="button" class="select-all-link field-scope-select-all" data-block-type="images-videos">Select All</button>
+                </summary>
+                <div class="promo-device-boxes" id="export-images-videos-field-groups">
+                  <p>Select product and device…</p>
+                </div>
+              </details>
             </div>
-            <details id="export-listing-fields" class="field-scope-section" open>
-              <summary>
-                <span>Metadata Fields <span class="field-scope-count" id="export-listing-field-count"></span></span>
-                <button type="button" class="select-all-link field-scope-select-all" data-block-type="listing">Select All</button>
-              </summary>
-              <div class="promo-device-boxes" id="export-listing-field-groups">
-                <p>Select product and device…</p>
-              </div>
-            </details>
-            <details id="export-promo-fields" class="field-scope-section" open>
-              <summary>
-                <span>Promos</span>
-                <span class="field-scope-count" id="export-promo-count"></span>
-              </summary>
-              <div class="promo-device-boxes" id="export-promo-groups">
-                <p>Select product, device, and release period…</p>
-              </div>
-            </details>
-            <details id="export-images-videos-fields" class="field-scope-section" open>
-              <summary>
-                <span>Images &amp; Videos Fields <span class="field-scope-count" id="export-images-videos-field-count"></span></span>
-                <button type="button" class="select-all-link field-scope-select-all" data-block-type="images-videos">Select All</button>
-              </summary>
-              <div class="promo-device-boxes" id="export-images-videos-field-groups">
-                <p>Select product and device…</p>
-              </div>
-            </details>
             <button type="button" class="export-button" id="export-button" disabled>
               Export from DA
             </button>
             <div id="export-summary" class="action-summary" aria-live="polite"></div>
           </div>
 
-          <div class="export-section" id="export-media-assets-section">
+          <div class="export-section export-only-section" id="export-media-assets-section">
             <h3>Media Assets (for Download Images)</h3>
             <p class="export-description">Not part of the exported workbook — this only controls what "Download Images" below fetches.</p>
             <details id="export-media-assets-fields" class="field-scope-section">
@@ -222,53 +237,6 @@
               Download Images
             </button>
             <div id="image-export-summary" class="action-summary" aria-live="polite"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="tab-content" data-tab-content="publish">
-        <div class="export-container">
-          <h2 class="export-title">Publish to Store</h2>
-          <p class="export-description">Generate a publish payload from DA content and save it to the store request queue.</p>
-
-          <div class="scope-sections-slot"></div>
-
-          <div class="export-section">
-            <h3>Product</h3>
-            <select id="publish-product" class="select-dropdown">
-              <option value="">Loading products...</option>
-            </select>
-          </div>
-
-          <div class="export-section">
-            <h3>
-              <span>Languages</span>
-              <button type="button" class="select-all-link" id="publish-select-all-languages">Select All</button>
-            </h3>
-            <div class="checkbox-group" id="publish-languages-checkboxes">
-              <p>Loading languages...</p>
-            </div>
-          </div>
-
-          <div class="export-section">
-            <h3>Platform</h3>
-            <div class="checkbox-group horizontal">
-              <div class="checkbox-item">
-                <input type="radio" name="publish-platform" id="publish-platform-apple" value="apple" checked>
-                <label for="publish-platform-apple">Apple</label>
-              </div>
-              <div class="checkbox-item">
-                <input type="radio" name="publish-platform" id="publish-platform-google" value="google">
-                <label for="publish-platform-google">Google</label>
-              </div>
-            </div>
-          </div>
-
-          <div class="export-section">
-            <button type="button" class="export-button" id="publish-button" disabled>
-              Publish to Store
-            </button>
-            <div id="publish-summary" class="action-summary" aria-live="polite"></div>
           </div>
         </div>
       </div>
