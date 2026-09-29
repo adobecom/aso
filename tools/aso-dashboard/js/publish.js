@@ -111,7 +111,7 @@ export async function publishSelection({
   const promoContexts = promoNames.map((promoName) => ({ promoName, promoVariant: 'default', device: platform }));
   const blockTypes = promoNames.length ? ['listing', 'promo'] : ['listing'];
 
-  const cells = await collectExportData({
+  const { cells } = await collectExportData({
     org,
     repo,
     token,
