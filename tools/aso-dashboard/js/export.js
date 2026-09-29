@@ -123,7 +123,9 @@ function enforceSingleDeviceInPublishMode(changedId) {
   if (changed?.checked && other) other.checked = false;
 }
 
-const EXPORT_ONLY_SELECTORS = ['#export-load-from-file-section', '#export-scope-fields', '#export-media-assets-section'];
+// "Load fields from a file" pre-fills product/languages/devices/release-period, which Publish
+// also relies on (via getSelectedItems/readReleasePeriod), so it stays visible in both modes.
+const EXPORT_ONLY_SELECTORS = ['#export-scope-fields', '#export-media-assets-section'];
 
 function refreshFieldScope() {
   if (isPublishMode()) return;
