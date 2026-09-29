@@ -25,6 +25,7 @@
         <button class="tab-button active" data-tab="import">Import</button>
         <button class="tab-button" data-tab="preview">Preview</button>
         <button class="tab-button" data-tab="export">Export</button>
+        <button class="tab-button" data-tab="publish">Publish</button>
       </div>
 
       <div class="tab-content" data-tab-content="preview">
@@ -221,6 +222,53 @@
               Download Images
             </button>
             <div id="image-export-summary" class="action-summary" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" data-tab-content="publish">
+        <div class="export-container">
+          <h2 class="export-title">Publish to Store</h2>
+          <p class="export-description">Generate a publish payload from DA content and save it to the store request queue.</p>
+
+          <div class="scope-sections-slot"></div>
+
+          <div class="export-section">
+            <h3>Product</h3>
+            <select id="publish-product" class="select-dropdown">
+              <option value="">Loading products...</option>
+            </select>
+          </div>
+
+          <div class="export-section">
+            <h3>
+              <span>Languages</span>
+              <button type="button" class="select-all-link" id="publish-select-all-languages">Select All</button>
+            </h3>
+            <div class="checkbox-group" id="publish-languages-checkboxes">
+              <p>Loading languages...</p>
+            </div>
+          </div>
+
+          <div class="export-section">
+            <h3>Platform</h3>
+            <div class="checkbox-group horizontal">
+              <div class="checkbox-item">
+                <input type="radio" name="publish-platform" id="publish-platform-apple" value="apple" checked>
+                <label for="publish-platform-apple">Apple</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="radio" name="publish-platform" id="publish-platform-google" value="google">
+                <label for="publish-platform-google">Google</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="export-section">
+            <button type="button" class="export-button" id="publish-button" disabled>
+              Publish to Store
+            </button>
+            <div id="publish-summary" class="action-summary" aria-live="polite"></div>
           </div>
         </div>
       </div>
