@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import { convertTags, applySectionBreakMask } from '../../../blocks/aso-app/aso-utils.js';
 import {
   buildExportGapMasks,
+  getDefaultPreviewText,
   parseReferenceText,
   resolveReferenceText,
 } from '../../../tools/aso-dashboard/section-break-template.js';
@@ -29,6 +30,32 @@ describe('section-break-template', () => {
     expect(template.paragraphCount).to.equal(28);
     expect(template.sectionBreakCount).to.equal(10);
     expect(template.exportLineCount).to.equal(38);
+  });
+
+  it('does not apply description defaults to release fields', () => {
+    const masks = buildExportGapMasks();
+    expect(masks).not.to.have.property('google:listing:Release Notes');
+    expect(masks).not.to.have.property("apple:listing:What's New");
+    ['google', 'apple'].forEach((device) => {
+      const fieldName = device === 'google' ? 'Release Notes' : "What's New";
+      expect(resolveReferenceText(device, '', fieldName)).to.equal('');
+      expect(getDefaultPreviewText(device, fieldName)).to.include('No reference template');
+    });
+  });
+
+  it('creates independent custom masks for both release fields', () => {
+    const masks = buildExportGapMasks({
+      googleReleaseNotesReference: 'First\n\nSecond\nThird',
+      appleWhatsNewReference: 'First\nSecond\n\nThird',
+    });
+    expect(masks['google:listing:Release Notes'].sectionBreakAfter).to.deep.equal([true, false]);
+    expect(masks["apple:listing:What's New"].sectionBreakAfter).to.deep.equal([false, true]);
+    expect(masks['google:listing:Full Description'].usingDefault).to.equal(true);
+    expect(masks['apple:listing:Description'].usingDefault).to.equal(true);
+    expect(buildExportGapMasks({
+      googleReleaseNotesReference: ' \n ',
+      appleWhatsNewReference: ' \n ',
+    })).to.have.all.keys('google:listing:Full Description', 'apple:listing:Description');
   });
 
   it('applies default template to minified google HTML and yields 34 lines', async () => {

@@ -13,6 +13,7 @@ import {
   parseReferenceText,
   resolveReferenceText,
   saveStoredReference,
+  SECTION_BREAK_REFERENCE_FIELDS,
 } from './section-break-template.js';
 
 let excelJSLoaded = false;
@@ -414,7 +415,7 @@ async function fetchPageContent(org, repo, path, token) {
   return null;
 }
 
-function convertListingFieldValue(fieldEl, device, fieldName, blockType, gapMasks) {
+export function convertListingFieldValue(fieldEl, device, fieldName, blockType, gapMasks) {
   let el = fieldEl;
   if (blockType === 'listing' && gapMasks) {
     const maskKey = gapMaskKey(device, fieldName);
@@ -636,6 +637,8 @@ async function handleExport(org, repo, token) {
     const gapMasks = buildExportGapMasks({
       googleReference: document.getElementById('section-ref-google')?.value ?? '',
       appleReference: document.getElementById('section-ref-apple')?.value ?? '',
+      googleReleaseNotesReference: document.getElementById('section-ref-google-release-notes')?.value ?? '',
+      appleWhatsNewReference: document.getElementById('section-ref-apple-whats-new')?.value ?? '',
     });
     const allData = [];
     setExportCaptureGlobal({
@@ -704,30 +707,30 @@ function handleSelectAll(target) {
   updateExportButtonState();
 }
 
-function updateSectionBreakSummary(device) {
-  const textarea = document.getElementById(`section-ref-${device}`);
-  const summary = document.getElementById(`section-ref-${device}-summary`);
+function updateSectionBreakSummary({ device, fieldName, id }) {
+  const textarea = document.getElementById(`section-ref-${id}`);
+  const summary = document.getElementById(`section-ref-${id}-summary`);
   if (!textarea || !summary) return;
   const authorText = textarea.value;
-  const template = parseReferenceText(resolveReferenceText(device, authorText));
-  summary.textContent = formatTemplateSummary(template, { usingDefault: !authorText.trim() });
+  summary.textContent = authorText.trim()
+    ? formatTemplateSummary(parseReferenceText(resolveReferenceText(device, authorText, fieldName)))
+    : getDefaultPreviewText(device, fieldName);
 }
 
-function setupSectionBreakReferences() {
-  ['google', 'apple'].forEach((device) => {
-    const textarea = document.getElementById(`section-ref-${device}`);
-    const summary = document.getElementById(`section-ref-${device}-summary`);
+export function setupSectionBreakReferences() {
+  SECTION_BREAK_REFERENCE_FIELDS.forEach((field) => {
+    const { id } = field;
+    const textarea = document.getElementById(`section-ref-${id}`);
+    const summary = document.getElementById(`section-ref-${id}-summary`);
     if (!textarea || !summary) return;
 
-    const stored = loadStoredReference(device);
+    const stored = loadStoredReference(id);
     textarea.value = stored;
-    summary.textContent = stored
-      ? formatTemplateSummary(parseReferenceText(stored), { usingDefault: false })
-      : getDefaultPreviewText(device);
+    updateSectionBreakSummary(field);
 
     const persist = () => {
-      saveStoredReference(device, textarea.value);
-      updateSectionBreakSummary(device);
+      saveStoredReference(id, textarea.value);
+      updateSectionBreakSummary(field);
     };
     textarea.addEventListener('input', persist);
     textarea.addEventListener('blur', persist);

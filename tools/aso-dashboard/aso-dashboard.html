@@ -103,12 +103,14 @@
             </div>
           </div>
 
-          <!-- Section break reference (optional; uses Firefly default when empty) -->
+          <!-- Section break references (description fields have Firefly defaults) -->
           <div class="export-section section-break-section">
             <h3>Listing spacing reference</h3>
             <p class="section-break-help">
               Paste the golden store export (plain text with blank lines between sections).
-              Leave empty to use the built-in Firefly template. Applied to Full Description / Description on export.
+              Applied to the matching field on export when its paragraph count matches the reference.
+              Empty description references use the built-in Firefly template.
+              Empty Release Notes / What's New references preserve existing spacing.
             </p>
             <div class="section-break-field">
               <label for="section-ref-google">Google — Full Description</label>
@@ -119,6 +121,16 @@
               <label for="section-ref-apple">Apple — Description</label>
               <textarea id="section-ref-apple" class="section-break-textarea" rows="6" placeholder="Leave empty for default Firefly template (28 paragraphs · 38 export lines)"></textarea>
               <p class="section-break-summary" id="section-ref-apple-summary"></p>
+            </div>
+            <div class="section-break-field">
+              <label for="section-ref-google-release-notes">Google — Release Notes</label>
+              <textarea id="section-ref-google-release-notes" class="section-break-textarea" rows="6" placeholder="Paste a release notes reference; leave empty to preserve existing spacing"></textarea>
+              <p class="section-break-summary" id="section-ref-google-release-notes-summary"></p>
+            </div>
+            <div class="section-break-field">
+              <label for="section-ref-apple-whats-new">Apple — What's New</label>
+              <textarea id="section-ref-apple-whats-new" class="section-break-textarea" rows="6" placeholder="Paste a What's New reference; leave empty to preserve existing spacing"></textarea>
+              <p class="section-break-summary" id="section-ref-apple-whats-new-summary"></p>
             </div>
           </div>
 

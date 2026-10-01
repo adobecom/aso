@@ -5,6 +5,13 @@ export const LISTING_DESCRIPTION_FIELD = {
   apple: 'Description',
 };
 
+export const SECTION_BREAK_REFERENCE_FIELDS = [
+  { device: 'google', fieldName: LISTING_DESCRIPTION_FIELD.google, id: 'google' },
+  { device: 'apple', fieldName: LISTING_DESCRIPTION_FIELD.apple, id: 'apple' },
+  { device: 'google', fieldName: 'Release Notes', id: 'google-release-notes' },
+  { device: 'apple', fieldName: "What's New", id: 'apple-whats-new' },
+];
+
 const STORAGE_PREFIX = 'asoSectionBreakRef:';
 
 function normalizeReferenceText(plainText) {
@@ -56,13 +63,23 @@ export function formatTemplateSummary(template, { usingDefault = false } = {}) {
     + `${template.exportLineCount} export lines (${source})`;
 }
 
-export function resolveReferenceText(device, authorText) {
+export function resolveReferenceText(
+  device,
+  authorText,
+  fieldName = LISTING_DESCRIPTION_FIELD[device],
+) {
   const trimmed = authorText?.trim();
   if (trimmed) return trimmed;
+  if (fieldName !== LISTING_DESCRIPTION_FIELD[device]) return '';
   return device === 'google' ? DEFAULT_GOOGLE_REFERENCE : DEFAULT_APPLE_REFERENCE;
 }
 
-export function buildExportGapMasks({ googleReference = '', appleReference = '' } = {}) {
+export function buildExportGapMasks({
+  googleReference = '',
+  appleReference = '',
+  googleReleaseNotesReference = '',
+  appleWhatsNewReference = '',
+} = {}) {
   const masks = {};
   const googleTemplate = parseReferenceText(resolveReferenceText('google', googleReference));
   const appleTemplate = parseReferenceText(resolveReferenceText('apple', appleReference));
@@ -75,6 +92,17 @@ export function buildExportGapMasks({ googleReference = '', appleReference = '' 
     ...appleTemplate,
     usingDefault: !appleReference?.trim(),
   };
+  [
+    ['google', 'Release Notes', googleReleaseNotesReference],
+    ['apple', "What's New", appleWhatsNewReference],
+  ].forEach(([device, fieldName, reference]) => {
+    if (reference?.trim()) {
+      masks[gapMaskKey(device, fieldName)] = {
+        ...parseReferenceText(reference),
+        usingDefault: false,
+      };
+    }
+  });
   return masks;
 }
 
@@ -99,7 +127,10 @@ export function saveStoredReference(device, text) {
   }
 }
 
-export function getDefaultPreviewText(device) {
+export function getDefaultPreviewText(device, fieldName = LISTING_DESCRIPTION_FIELD[device]) {
+  if (fieldName !== LISTING_DESCRIPTION_FIELD[device]) {
+    return 'No reference template; existing paragraph spacing is preserved.';
+  }
   const template = parseReferenceText(resolveReferenceText(device, ''));
   return formatTemplateSummary(template, { usingDefault: true });
 }
