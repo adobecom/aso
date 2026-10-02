@@ -125,10 +125,18 @@ function enforceSingleDeviceInPublishMode(changedId) {
 
 // "Load fields from a file" pre-fills product/languages/devices/release-period, which Publish
 // also relies on (via getSelectedItems/readReleasePeriod), so it stays visible in both modes.
-const EXPORT_ONLY_SELECTORS = ['#export-scope-fields', '#export-media-assets-section'];
+// "Content to export" (metadata/promos field + promo selection) is shared too, so Publish can
+// filter what goes into the payload — only Images & Videos and Media Assets are export-only,
+// since the store publish payload carries text metadata/promos, not media.
+const EXPORT_ONLY_SELECTORS = [
+  '#export-scope-images-videos-item',
+  '#export-images-videos-fields',
+  '#export-media-assets-section',
+];
+
+const PUBLISH_BLOCK_TYPES = ['listing', 'promo'];
 
 function refreshFieldScope() {
-  if (isPublishMode()) return;
   if (!schemaCache || !sheetMapCache) return;
   const { devices } = getSelectedItems();
   refreshFieldCheckboxes(schemaCache, sheetMapCache, devices);
@@ -216,6 +224,10 @@ function getExportBlockTypes() {
   if (document.getElementById('export-scope-promos')?.checked) blockTypes.push('promo');
   if (document.getElementById('export-scope-images-videos')?.checked) blockTypes.push('images-videos');
   return blockTypes;
+}
+
+function getPublishBlockTypes() {
+  return getExportBlockTypes().filter((blockType) => PUBLISH_BLOCK_TYPES.includes(blockType));
 }
 
 function getPromoContexts() {
@@ -338,7 +350,8 @@ function updateExportButtonState() {
   const imagesButton = document.getElementById('export-images-button');
 
   if (isPublishMode()) {
-    const publishReady = hasProduct && hasLanguages && devices.length === 1 && releasePeriodReady;
+    const publishReady = hasProduct && hasLanguages && devices.length === 1 && releasePeriodReady
+      && getPublishBlockTypes().length > 0 && isPromoScopeComplete();
     if (exportButton) exportButton.disabled = !publishReady;
     if (imagesButton) imagesButton.disabled = true;
     return;
@@ -367,6 +380,8 @@ function applyExportMode() {
   EXPORT_ONLY_SELECTORS.forEach((selector) => {
     document.querySelector(selector)?.classList.toggle('hidden', publish);
   });
+  const scopeHeading = document.getElementById('export-scope-heading');
+  if (scopeHeading) scopeHeading.textContent = publish ? 'Content to publish' : 'Content to export';
   if (publish && !document.getElementById('device-apple')?.checked
     && !document.getElementById('device-google')?.checked) {
     const appleCheckbox = document.getElementById('device-apple');
@@ -594,8 +609,19 @@ async function handlePublishAction(org, repo, token) {
       return;
     }
 
+    const blockTypes = getPublishBlockTypes();
+    if (!blockTypes.length) {
+      showExportStatus('Select content');
+      return;
+    }
+    const promoContexts = getPromoContexts().filter((context) => context.device === platform);
+    if (blockTypes.includes('promo') && !promoContexts.length) {
+      showExportStatus('Select promo');
+      return;
+    }
+    const selection = { fieldsByDeviceBlock: getSelectedFieldsByDeviceBlock() };
+
     const releasePeriod = readReleasePeriod();
-    const englishLanguage = languageIndexByName.get('English') || languages[0];
     const adminFetch = createAdminFetch(org, repo, token);
     const fetchPage = createFetchPage(org, repo, token, adminFetch);
 
@@ -610,7 +636,9 @@ async function handlePublishAction(org, repo, token) {
       languages,
       releasePeriod,
       fetchPage,
-      englishLanguage,
+      blockTypes,
+      promoContexts,
+      selection,
     });
 
     if (result.ok) {

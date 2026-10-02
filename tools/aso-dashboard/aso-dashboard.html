@@ -171,8 +171,8 @@
           </div>
 
           <div class="export-section" id="export-scope-section">
-            <div class="export-only-section" id="export-scope-fields">
-              <h3>Content to export</h3>
+            <div id="export-scope-fields">
+              <h3 id="export-scope-heading">Content to export</h3>
               <div class="checkbox-group horizontal">
                 <div class="checkbox-item">
                   <input type="checkbox" id="export-scope-listing" checked>
@@ -182,7 +182,7 @@
                   <input type="checkbox" id="export-scope-promos" checked>
                   <label for="export-scope-promos">Promos</label>
                 </div>
-                <div class="checkbox-item">
+                <div class="checkbox-item export-only-section" id="export-scope-images-videos-item">
                   <input type="checkbox" id="export-scope-images-videos" checked>
                   <label for="export-scope-images-videos">Images &amp; Videos</label>
                 </div>
@@ -205,7 +205,7 @@
                   <p>Select product, device, and release period…</p>
                 </div>
               </details>
-              <details id="export-images-videos-fields" class="field-scope-section" open>
+              <details id="export-images-videos-fields" class="field-scope-section export-only-section" open>
                 <summary>
                   <span>Images &amp; Videos Fields <span class="field-scope-count" id="export-images-videos-field-count"></span></span>
                   <button type="button" class="select-all-link field-scope-select-all" data-block-type="images-videos">Select All</button>
