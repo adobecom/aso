@@ -382,11 +382,6 @@ function applyExportMode() {
   });
   const scopeHeading = document.getElementById('export-scope-heading');
   if (scopeHeading) scopeHeading.textContent = publish ? 'Content to publish' : 'Content to export';
-  if (publish && !document.getElementById('device-apple')?.checked
-    && !document.getElementById('device-google')?.checked) {
-    const appleCheckbox = document.getElementById('device-apple');
-    if (appleCheckbox) appleCheckbox.checked = true;
-  }
   const exportButton = document.getElementById('export-button');
   if (exportButton && !exportButton.classList.contains('loading')) {
     exportButton.textContent = defaultActionLabel();

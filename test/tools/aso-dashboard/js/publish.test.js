@@ -2,9 +2,9 @@ import { expect } from '@esm-bundle/chai';
 import { formatPublishTimestamp, buildPublishPayload } from '../../../../tools/aso-dashboard/js/publish.js';
 
 describe('publish', () => {
-  it('formats the request filename as YYYY-DD-MM-T-HH-MI-SS-SSS (24h, UTC)', () => {
+  it('formats the request filename as YYYY-MM-DD-t-HH-MI-SS-SSS (24h, UTC)', () => {
     const date = new Date(Date.UTC(2025, 2, 7, 15, 4, 5, 9));
-    expect(formatPublishTimestamp(date)).to.equal('2025-07-03-T-15-04-05-009');
+    expect(formatPublishTimestamp(date)).to.equal('2025-03-07-t-15-04-05-009');
   });
 
   it('omits metadata when listing is not selected', () => {

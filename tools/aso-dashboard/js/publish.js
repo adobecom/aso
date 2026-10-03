@@ -9,13 +9,13 @@ const PUBLISH_BLOCK_TYPES = ['listing', 'promo'];
 
 const pad = (value, length = 2) => String(value).padStart(length, '0');
 
-// Publish request filename: YYYY-DD-MM-T-HH-MI-SS-SSS (24-hour clock, UTC).
+// Publish request filename: YYYY-MM-DD-t-HH-MI-SS-SSS (24-hour clock, UTC).
 export function formatPublishTimestamp(date = new Date()) {
   return [
     date.getUTCFullYear(),
-    pad(date.getUTCDate()),
     pad(date.getUTCMonth() + 1),
-    'T',
+    pad(date.getUTCDate()),
+    't',
     pad(date.getUTCHours()),
     pad(date.getUTCMinutes()),
     pad(date.getUTCSeconds()),
