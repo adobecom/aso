@@ -36,6 +36,20 @@ function buildLocalization(cellIndex, langCode, device, blockType, fieldKeys, pr
   return Object.keys(loc).length > 1 ? loc : null;
 }
 
+function omitEmptyContainers(value) {
+  if (Array.isArray(value)) {
+    const items = value.map(omitEmptyContainers).filter((item) => item !== undefined);
+    return items.length ? items : undefined;
+  }
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value)
+      .map(([key, entry]) => [key, omitEmptyContainers(entry)])
+      .filter(([, entry]) => entry !== undefined);
+    return entries.length ? Object.fromEntries(entries) : undefined;
+  }
+  return value;
+}
+
 export function buildPublishPayload(cells, options) {
   const {
     product,
@@ -67,7 +81,7 @@ export function buildPublishPayload(cells, options) {
       }));
     }
 
-    return payload;
+    return omitEmptyContainers(payload);
   }
 
   // Google
@@ -80,7 +94,7 @@ export function buildPublishPayload(cells, options) {
   if (blockTypes.includes('listing')) {
     payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean) };
   }
-  return payload;
+  return omitEmptyContainers(payload);
 }
 
 // Builds and writes a publish payload for a single product/platform to the store request

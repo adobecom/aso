@@ -39,9 +39,20 @@ describe('publish', () => {
       expect(payload.metadata.localizations).to.deep.equal([{ locale: 'en-US', [fieldKey]: 'App' }]);
     });
 
-    it(`keeps an empty localization array when ${platform} metadata has no content`, () => {
+    it(`omits ${platform} metadata when its localizations are empty`, () => {
       const payload = buildPublishPayload([], { product: 'app', platform, languages: [{ code: 'en' }, { code: 'ja-jp' }], blockTypes: ['listing'] });
-      expect(payload.metadata.localizations).to.deep.equal([]);
+      expect(payload).not.to.have.property('metadata');
+      expect(JSON.parse(JSON.stringify(payload))).not.to.have.property('metadata');
+      expect(payload.app).to.equal('app');
+      if (platform === 'google') {
+        expect(payload.platform).to.equal('google');
+        expect(payload).to.have.property('track');
+      }
+    });
+
+    it(`omits ${platform} metadata when no languages are selected`, () => {
+      const payload = buildPublishPayload([], { product: 'app', platform, languages: [], blockTypes: ['listing'] });
+      expect(payload).not.to.have.property('metadata');
     });
   });
 
@@ -67,7 +78,27 @@ describe('publish', () => {
     expect(payload.promos).to.deep.equal([
       { referenceName: 'p1', localizations: [{ locale: 'en', eventName: 'Event' }] },
       { referenceName: 'p2', localizations: [{ locale: 'ja-jp', shortDescription: 'Description' }] },
-      { referenceName: 'p3', localizations: [] },
+      { referenceName: 'p3' },
     ]);
+  });
+
+  it('omits empty metadata and promo localizations without removing promo reference names', () => {
+    const payload = buildPublishPayload([], {
+      product: 'app',
+      platform: 'apple',
+      languages: [{ code: 'en' }],
+      promoNames: ['p1'],
+    });
+    expect(payload).to.deep.equal({ app: 'app', promos: [{ referenceName: 'p1' }] });
+  });
+
+  it('omits promos when no promo names are selected', () => {
+    const payload = buildPublishPayload([], {
+      product: 'app',
+      platform: 'apple',
+      languages: [{ code: 'en' }],
+      promoNames: [],
+    });
+    expect(payload).to.deep.equal({ app: 'app' });
   });
 });
