@@ -33,7 +33,7 @@ function buildLocalization(cellIndex, langCode, device, blockType, fieldKeys, pr
     const val = fieldValue(cellIndex, langCode, device, blockType, key, promoName);
     if (val) loc[key] = val;
   });
-  return loc;
+  return Object.keys(loc).length > 1 ? loc : null;
 }
 
 export function buildPublishPayload(cells, options) {
@@ -56,14 +56,14 @@ export function buildPublishPayload(cells, options) {
     const listingFields = ['name', 'subtitle', 'description', 'keywords', 'marketingUrl', 'promotionalText', 'supportUrl'];
     const payload = { app: product };
     if (blockTypes.includes('listing')) {
-      payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)) };
+      payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)).filter(Boolean) };
     }
 
     if (blockTypes.includes('promo') && promoNames.length) {
       const promoFields = ['eventName', 'shortDescription', 'longDescription'];
       payload.promos = promoNames.map((promoName) => ({
         referenceName: promoName,
-        localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'promo', promoFields, promoName)),
+        localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'promo', promoFields, promoName)).filter(Boolean),
       }));
     }
 
@@ -78,7 +78,7 @@ export function buildPublishPayload(cells, options) {
     track: readStoreType() === STORE_TYPE_UPDATES ? 'production' : readStoreType(),
   };
   if (blockTypes.includes('listing')) {
-    payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)) };
+    payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean) };
   }
   return payload;
 }
