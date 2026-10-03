@@ -11,6 +11,7 @@ import {
   buildHtmlSourcePath,
   dedupePaths,
   ROW_ROLE_ENGLISH_SOURCE,
+  ROW_ROLE_LOCALIZED,
   ROW_ROLES,
   resolvePagePath,
 } from './paths.js';
@@ -119,6 +120,19 @@ function buildFieldRequests({
                   sheet: field.sheet,
                   pageLeaf: field.pageLeaf,
                   pagePath,
+                  sourcePagePath: resolvePagePath({
+                    language,
+                    rowRole: ROW_ROLE_ENGLISH_SOURCE,
+                    pageLeaf: field.pageLeaf,
+                    productsPath,
+                    product,
+                    device,
+                    year,
+                    quarter,
+                    month,
+                    storeType,
+                    testName,
+                  }),
                   promoName: promoContext.promoName,
                   promoVariant: promoContext.promoVariant,
                 };
@@ -183,6 +197,7 @@ async function defaultFetchPage(org, repo, pagePath, token) {
 function expandFetchedPages(dedupedPages, {
   schema,
   constantsValues,
+  sourceSpacingByPath,
 }) {
   const cells = [];
 
@@ -190,6 +205,11 @@ function expandFetchedPages(dedupedPages, {
     page.refs.forEach((ref) => {
       const blockType = ref.blockType || blockTypeFromBlockKey(ref.blockKey);
       const device = ref.device || deviceFromBlockKey(ref.blockKey);
+      const spacingSidecar = page.spacingSidecar ?? (
+        ref.rowRole === ROW_ROLE_LOCALIZED
+          ? sourceSpacingByPath.get(ref.sourcePagePath)
+          : null
+      );
       const text = page.html
         ? parseFieldFromPage({
           html: page.html,
@@ -199,7 +219,7 @@ function expandFetchedPages(dedupedPages, {
           fieldKey: ref.fieldKey,
           fieldName: ref.fieldName,
           constantsValues: page.constantsValues ?? constantsValues,
-          spacingSidecar: page.spacingSidecar,
+          spacingSidecar,
         })
         : '';
 
@@ -221,7 +241,7 @@ function expandFetchedPages(dedupedPages, {
         text,
         keywordText,
         hasHtml: page.htmlFound !== false,
-        spacingSidecar: page.spacingSidecar,
+        spacingSidecar,
       });
     });
   });
@@ -250,6 +270,7 @@ async function collectExportData({
   testName,
   constantsValues = {},
   fetchPage = defaultFetchPage,
+  fetchSpacingSidecar = getSpacingSidecar,
 }) {
   const requests = buildFieldRequests({
     schema,
@@ -284,7 +305,22 @@ async function collectExportData({
     };
   }));
 
-  const allCells = expandFetchedPages(pages, { schema, constantsValues });
+  const sourceSpacingByPath = new Map(pages.map((page) => [page.pagePath, page.spacingSidecar]));
+  const missingSourcePaths = new Set();
+  pages.forEach((page) => {
+    if (!page.html || page.spacingSidecar != null) return;
+    page.refs.forEach((ref) => {
+      if (ref.rowRole === ROW_ROLE_LOCALIZED && ref.sourcePagePath
+        && !sourceSpacingByPath.has(ref.sourcePagePath)) {
+        missingSourcePaths.add(ref.sourcePagePath);
+      }
+    });
+  });
+  await Promise.all([...missingSourcePaths].map(async (path) => {
+    sourceSpacingByPath.set(path, await fetchSpacingSidecar(org, repo, path, token));
+  }));
+
+  const allCells = expandFetchedPages(pages, { schema, constantsValues, sourceSpacingByPath });
   const cells = allCells.filter((cell) => cell.hasHtml);
   const skipped = buildSkippedEntries(allCells);
   const overLimit = findOverCharLimitCells(cells);

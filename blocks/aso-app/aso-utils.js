@@ -12,10 +12,12 @@ function cleanupDATags(element) {
 
 const LIST_INDENT = 4;
 
-function normalizeWhitespace(text) {
+function normalizeWhitespace(text, { preserveParagraphBreaks = false } = {}) {
+  const beforeNewline = preserveParagraphBreaks ? /[^\S\n]+\n/g : /\s+\n/g;
+  const afterNewline = preserveParagraphBreaks ? /\n[^\S\n]+/g : /\n\s+/g;
   return text
-    .replace(/\s+\n/g, '\n') // Remove whitespace before newlines
-    .replace(/\n\s+/g, '\n') // Remove whitespace after newlines
+    .replace(beforeNewline, '\n')
+    .replace(afterNewline, '\n')
     .replace(/  +/g, ' '); // Collapse multiple spaces to one
 }
 
@@ -33,18 +35,6 @@ function removeWhitespaceOnlyTextNodes(root) {
       node.parentNode.replaceChild(replacement, node);
     }
   });
-}
-
-/** Gaps between consecutive </p> and <p in field HTML (space = section break, empty = minified). */
-function captureParagraphGapsFromHtml(html) {
-  const gaps = [];
-  const re = /<\/p>(\s*)<p\b/gi;
-  let match = re.exec(html);
-  while (match) {
-    gaps.push(match[1]);
-    match = re.exec(html);
-  }
-  return gaps;
 }
 
 function isIntentionalParagraphGap(gapWhitespace) {
@@ -112,9 +102,9 @@ export function applySectionBreakMask(dataEl, sectionBreakAfter = []) {
   return clone;
 }
 
-function resolveParagraphSeparator(prevP, nextP, gapFromHtml, addParagraphBreaks) {
+function resolveParagraphSeparator(prevP, nextP, addParagraphBreaks) {
   if (!addParagraphBreaks) return '';
-  const gap = gapFromHtml ?? captureGapBetweenNodes(prevP, nextP);
+  const gap = captureGapBetweenNodes(prevP, nextP);
   if (isIntentionalParagraphGap(gap)) return '\n\n';
   return '\n';
 }
@@ -153,8 +143,6 @@ function convertListsToText(root) {
 }
 
 export function convertTags(el, { addParagraphBreaks = false } = {}) {
-  const sourceHtml = el.innerHTML;
-  const htmlGaps = captureParagraphGapsFromHtml(sourceHtml);
   const clone = el.cloneNode(true);
   cleanupDATags(clone);
   convertListsToText(clone);
@@ -187,6 +175,7 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
     }
   });
 
+  // Read gaps from surviving nodes: constant expansion adds empty paragraphs that cleanup removes.
   const pList = getDirectChildParagraphs(clone);
   if (!hasOtherTags) {
     pList.forEach((p, index, arr) => {
@@ -199,9 +188,9 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
       const nextP = index < arr.length - 1 ? arr[index + 1] : null;
       let separator = '';
       if (nextP) {
-        separator = resolveParagraphSeparator(p, nextP, htmlGaps[index], addParagraphBreaks);
+        separator = resolveParagraphSeparator(p, nextP, addParagraphBreaks);
         if (!addParagraphBreaks) {
-          const gap = htmlGaps[index] ?? captureGapBetweenNodes(p, nextP);
+          const gap = captureGapBetweenNodes(p, nextP);
           if (/^[ \t]+$/.test(gap)) separator = ' ';
           else if (/^\n[ \t]*$/.test(gap)) separator = '\n';
         }
@@ -230,9 +219,9 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
     const nextP = index < arr.length - 1 ? arr[index + 1] : null;
     let separator = '';
     if (nextP) {
-      separator = resolveParagraphSeparator(p, nextP, htmlGaps[index], addParagraphBreaks);
+      separator = resolveParagraphSeparator(p, nextP, addParagraphBreaks);
       if (!addParagraphBreaks) {
-        const gap = htmlGaps[index] ?? captureGapBetweenNodes(p, nextP);
+        const gap = captureGapBetweenNodes(p, nextP);
         if (/^[ \t]+$/.test(gap)) separator = ' ';
         else if (/^\n[ \t]*$/.test(gap)) separator = '\n';
       }
@@ -244,7 +233,7 @@ export function convertTags(el, { addParagraphBreaks = false } = {}) {
     p.replaceWith(fragment);
   });
   const html = collapseMultipleNewlines(
-    normalizeWhitespace(clone.innerHTML.trim()),
+    normalizeWhitespace(clone.innerHTML.trim(), { preserveParagraphBreaks: addParagraphBreaks }),
     { preserveParagraphBreaks: addParagraphBreaks },
   );
   return html.replace(/&amp;/g, '&');

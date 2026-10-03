@@ -214,6 +214,18 @@ describe('import-export-constants', () => {
       );
     });
 
+    it('preserves blank lines containing spaces or tabs inside a constant', () => {
+      const html = mergeConstantsUpdates(null, [
+        {
+          slug: 'legal',
+          language: 'English',
+          value: 'Terms\nPolicy\n  \n\t\nRights',
+        },
+      ]);
+      const { contentHtml } = parseConstantsDocument(html).blocks.legal.rows[0];
+      expect(contentHtml).to.equal('<p>Terms</p><p>Policy<br><br>Rights</p>');
+    });
+
     it('keeps bold/italic markup in the value', () => {
       const html = mergeConstantsUpdates(null, [
         { slug: 'promo', language: 'German', value: 'Neu <b>Kreativität</b> <i>jetzt</i>' },

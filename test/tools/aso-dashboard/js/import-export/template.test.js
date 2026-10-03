@@ -116,7 +116,13 @@ describe('import-export-template', () => {
 
   it('buildWorkbook writes settings and metadata values', () => {
     const payload = buildExportPayload({
-      settings: { product: 'adobe-express', year: '2026', quarter: 'q1', month: 'may' },
+      settings: {
+        product: 'adobe-express',
+        testName: 'creative-asset',
+        year: '2026',
+        quarter: 'q1',
+        month: 'may',
+      },
       languageNames: ['English', 'German'],
       schema,
       sheetMap,
@@ -139,6 +145,8 @@ describe('import-export-template', () => {
 
     expect(getCellValue(settings, 2, 1)).to.equal('Product');
     expect(getCellValue(settings, 2, 2)).to.equal('adobe-express');
+    expect(getCellValue(settings, 4, 1)).to.equal('Test/CPP Name');
+    expect(getCellValue(settings, 4, 2)).to.equal('creative-asset');
     expect(getCellValue(metadata, 3, 1)).to.equal('App Name');
     expect(getCellValue(metadata, 3, 2)).to.equal('English Source Text + KW');
     expect(getCellValue(metadata, 3, 5)).to.equal('Managed source');
@@ -146,7 +154,13 @@ describe('import-export-template', () => {
 
   it('parseWorkbook reads settings and metadata field values', async () => {
     const payload = buildExportPayload({
-      settings: { product: 'adobe-express', year: '2026', quarter: 'q1', month: 'may' },
+      settings: {
+        product: 'adobe-express',
+        testName: 'creative-asset',
+        year: '2026',
+        quarter: 'q1',
+        month: 'may',
+      },
       languageNames: ['English', 'German'],
       schema,
       sheetMap,
@@ -178,10 +192,83 @@ describe('import-export-template', () => {
     const parsed = await parseWorkbook(buffer, ExcelJS);
 
     expect(parsed.settings.product).to.equal('adobe-express');
+    expect(parsed.settings.testName).to.equal('creative-asset');
     expect(parsed.languageNames).to.deep.equal(['English', 'German']);
     expect(parsed.metadata.google[0].fieldName).to.equal('App Title');
     expect(parsed.metadata.google[0].englishSource.German).to.equal('Google title source');
     expect(parsed.metadata.google[0].localized.German).to.equal('Google title loc');
+  });
+
+  it('parseWorkbook continues reading the legacy Test name settings label', async () => {
+    const wb = new ExcelJS.Workbook();
+    const settings = wb.addWorksheet('Settings');
+    [
+      ['Setting', 'Value'],
+      ['Product', 'adobe-express'],
+      ['Store type', 'cpp'],
+      ['Test name', 'creative-asset'],
+      ['Year', '2026'],
+      ['Quarter', 'q1'],
+      ['Month', 'may'],
+    ].forEach((values, rowIndex) => {
+      values.forEach((value, columnIndex) => {
+        settings.getRow(rowIndex + 1).getCell(columnIndex + 1).value = value;
+      });
+    });
+
+    const parsed = await parseWorkbook(await wb.xlsx.writeBuffer(), ExcelJS);
+    expect(parsed.settings.testName).to.equal('creative-asset');
+  });
+
+  [false, true].forEach((legacyEmptyMetadata) => {
+    it(`round-trips promo-only workbooks${legacyEmptyMetadata ? ' with a legacy empty Metadata sheet' : ''}`, async () => {
+      schema['aso-app (apple, promo)'].data[0]['keywords injection'] = 'yes';
+      const payload = buildExportPayload({
+        settings: { product: 'adobe-express', year: '2026', quarter: 'q1', month: 'may' },
+        languageNames: ['English', 'German'],
+        schema,
+        sheetMap,
+        cells: [{
+          sheet: 'Promos',
+          device: 'apple',
+          blockType: 'promo',
+          fieldKey: 'eventName',
+          fieldName: 'Name',
+          pageLeaf: 'promos/summer/default',
+          promoName: 'summer',
+          promoVariant: 'default',
+          rowRole: ROW_ROLE_ENGLISH_SOURCE,
+          language: { name: 'German' },
+          text: 'Summer promo',
+          keywordText: 'summer, design',
+        }, {
+          sheet: 'Promos',
+          device: 'apple',
+          blockType: 'promo',
+          fieldKey: 'eventName',
+          fieldName: 'Name',
+          pageLeaf: 'promos/summer/default',
+          promoName: 'summer',
+          promoVariant: 'default',
+          rowRole: ROW_ROLE_LOCALIZED,
+          language: { name: 'German' },
+          text: 'Sommer',
+        }],
+      });
+
+      const wb = buildWorkbook(ExcelJS, payload);
+      expect(wb.worksheets.map((ws) => ws.name)).to.deep.equal(['Settings', 'Promos']);
+      if (legacyEmptyMetadata) wb.addWorksheet('Metadata');
+
+      const parsed = await parseWorkbook(await wb.xlsx.writeBuffer(), ExcelJS);
+      expect(parsed.languageNames).to.deep.equal(['English', 'German']);
+      expect(parsed.metadata).to.deep.equal({ google: [], apple: [] });
+      expect(parsed.promos).to.have.length(1);
+      const [field] = parsed.promos[0].devices.apple.variants.default.fields;
+      expect(field.englishSource.German).to.equal('Summer promo');
+      expect(field.localized.German).to.equal('Sommer');
+      expect(field.keywords.German).to.equal('summer, design');
+    });
   });
 
   it('parseWorkbook skips a Promos block whose name cell is blank (unused template padding)', async () => {
@@ -323,19 +410,6 @@ describe('import-export-template', () => {
       schema,
       sheetMap,
       cells: [{
-        // parseWorkbook only derives languageNames from the Metadata sheet's header row —
-        // a workbook with no Metadata content at all would skip Images-Videos parsing
-        // entirely regardless of this fix, so a realistic test needs at least one row here.
-        sheet: 'Metadata',
-        device: 'apple',
-        blockType: 'listing',
-        fieldKey: 'name',
-        fieldName: 'App Name',
-        pageLeaf: 'metadata/app-name',
-        rowRole: ROW_ROLE_ENGLISH_SOURCE,
-        language: { name: 'English' },
-        text: 'Adobe Express',
-      }, {
         sheet: 'Images-Videos',
         device: 'apple',
         blockType: 'images-videos',
@@ -359,6 +433,7 @@ describe('import-export-template', () => {
     });
 
     const wb = buildWorkbook(ExcelJS, payload);
+    expect(wb.worksheets.map((ws) => ws.name)).to.deep.equal(['Settings', 'Images-Videos']);
     const buffer = await wb.xlsx.writeBuffer();
     const parsed = await parseWorkbook(buffer, ExcelJS);
 

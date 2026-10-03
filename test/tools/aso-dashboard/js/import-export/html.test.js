@@ -1,5 +1,12 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
+import { parseAllConstantsForLanguage } from '../../../../../utils/aso-constants.js';
+import {
+  extractConstantsFromText,
+  mergeConstantsUpdates,
+  MARK_START,
+  MARK_END,
+} from '../../../../../tools/aso-dashboard/js/import-export/constants.js';
 import {
   buildPageHtml,
   buildSpacingSidecarForField,
@@ -145,6 +152,42 @@ describe('import-export-html', () => {
       });
 
       expect(result).to.equal(text);
+    });
+
+    it('round-trips section breaks around and inside marked constants', () => {
+      const source = [
+        'Intro',
+        '',
+        'Features',
+        `${MARK_START}Fixed heading${MARK_END}`,
+        'Feature one',
+        '',
+        'Next section',
+        'Feature two',
+        '',
+        `${MARK_START}Terms\nPolicy\n  \nRights${MARK_END}`,
+      ].join('\n');
+      const { text, constants } = extractConstantsFromText(source, 'English', 'description');
+      const html = buildPageHtml({ description: text }, schema, 'apple', 'listing');
+      const spacingSidecar = buildSpacingSidecarForField(text, 'Description', 'description');
+      const constantsValues = parseAllConstantsForLanguage(
+        mergeConstantsUpdates(null, constants),
+        'English',
+      );
+      const result = parseFieldFromPage({
+        html,
+        schema,
+        device: 'apple',
+        blockType: 'listing',
+        fieldKey: 'description',
+        fieldName: 'Description',
+        constantsValues,
+        spacingSidecar,
+      });
+
+      expect(result).to.equal(
+        'Intro\n\nFeatures\nFixed heading\nFeature one\n\nNext section\nFeature two\n\nTerms\nPolicy\n\nRights',
+      );
     });
 
     it('ignores a stale sidecar whose paragraphCount no longer matches the live content, instead of misapplying section breaks', () => {

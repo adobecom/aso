@@ -72,6 +72,7 @@ describe('import-export-collect', () => {
       blockTypes: ['listing'],
       rowRoles: [ROW_ROLE_LOCALIZED],
       fetchPage,
+      fetchSpacingSidecar: sinon.stub().resolves(null),
     });
 
     const nameCell = result.cells.find((cell) => cell.fieldKey === 'name');
@@ -102,6 +103,129 @@ describe('import-export-collect', () => {
     const roles = new Set(result.cells.map((cell) => cell.rowRole));
     expect(roles.has(ROW_ROLE_ENGLISH_SOURCE)).to.be.true;
     expect(roles.has(ROW_ROLE_LOCALIZED)).to.be.true;
+  });
+
+  describe('localized spacing fallback', () => {
+    const sidecar = {
+      version: 1,
+      fieldName: 'Description',
+      fieldKey: 'description',
+      paragraphCount: 3,
+      sectionBreakAfter: [true, false],
+      exportLineCount: 4,
+    };
+
+    async function collect(options = {}) {
+      return collectExportData({
+        org: 'test-org',
+        repo: 'test-repo',
+        token: 'token',
+        schema,
+        sheetMap,
+        products: ['adobe-express'],
+        languages: languages.filter((language) => language.name === 'German'),
+        devices: ['apple'],
+        year: '2026',
+        quarter: 'q1',
+        month: 'may',
+        blockTypes: ['listing'],
+        selection: { fieldsByDeviceBlock: { 'apple:listing': ['description'] } },
+        fetchPage: sinon.stub().callsFake(async (_org, _repo, path) => ({
+          html: '<div class="aso-app listing apple"><div><div>Description</div>'
+            + '<div><p>Intro</p><p>{{heading}}</p><p>Last</p></div></div></div>',
+          htmlFound: true,
+          spacingSidecar: path.startsWith('/source/en-de/') ? sidecar : null,
+          constantsValues: { heading: '<p>Fixed heading</p>' },
+        })),
+        ...options,
+      });
+    }
+
+    it('reuses the matching language source sidecar without extra fetches', async () => {
+      const fetchSpacingSidecar = sinon.stub().rejects(new Error('Unexpected sidecar fetch'));
+      const result = await collect({ fetchSpacingSidecar });
+      const localized = result.cells.find((cell) => cell.rowRole === ROW_ROLE_LOCALIZED);
+      expect(localized.text).to.equal('Intro\n\nFixed heading\nLast');
+      expect(localized.spacingSidecar).to.deep.equal(sidecar);
+      expect(fetchSpacingSidecar.called).to.be.false;
+    });
+
+    it('fetches only source spacing when collecting localized rows alone', async () => {
+      const fetchSpacingSidecar = sinon.stub().resolves(sidecar);
+      const result = await collect({
+        rowRoles: [ROW_ROLE_LOCALIZED],
+        fetchSpacingSidecar,
+      });
+      expect(result.cells[0].text).to.equal('Intro\n\nFixed heading\nLast');
+      expect(fetchSpacingSidecar.calledOnce).to.be.true;
+      expect(fetchSpacingSidecar.firstCall.args[2]).to.equal(
+        '/source/en-de/products-redesign/adobe-express/apple/2026/q1/may/store-updates/metadata/description',
+      );
+    });
+
+    it('prefers an existing localized sidecar', async () => {
+      const fetchSpacingSidecar = sinon.stub().rejects(new Error('Unexpected sidecar fetch'));
+      const result = await collect({
+        rowRoles: [ROW_ROLE_LOCALIZED],
+        fetchSpacingSidecar,
+        fetchPage: sinon.stub().resolves({
+          html: '<div class="aso-app listing apple"><div><div>Description</div>'
+            + '<div><p>Intro</p><p>Heading</p><p>Last</p></div></div></div>',
+          spacingSidecar: { ...sidecar, sectionBreakAfter: [false, true] },
+        }),
+      });
+      expect(result.cells[0].text).to.equal('Intro\nHeading\n\nLast');
+      expect(fetchSpacingSidecar.called).to.be.false;
+    });
+
+    it('keeps each language paired with its own source spacing', async () => {
+      const result = await collect({
+        languages: [
+          { name: 'German', sourcePath: '/source/en-de', localizedPath: '/de-de' },
+          { name: 'Japanese', sourcePath: '/source/en-jp', localizedPath: '/ja-jp' },
+        ],
+        fetchPage: sinon.stub().callsFake(async (_org, _repo, path) => ({
+          html: '<div class="aso-app listing apple"><div><div>Description</div>'
+            + '<div><p>Intro</p><p>Heading</p><p>Last</p></div></div></div>',
+          spacingSidecar: path.startsWith('/source/') ? {
+            ...sidecar,
+            sectionBreakAfter: path.startsWith('/source/en-de/') ? [true, false] : [false, true],
+          } : null,
+        })),
+      });
+      const localized = result.cells.filter((cell) => cell.rowRole === ROW_ROLE_LOCALIZED);
+      expect(localized.find((cell) => cell.language.name === 'German').text)
+        .to.equal('Intro\n\nHeading\nLast');
+      expect(localized.find((cell) => cell.language.name === 'Japanese').text)
+        .to.equal('Intro\nHeading\n\nLast');
+    });
+
+    [
+      ['missing', null],
+      ['stale', { ...sidecar, paragraphCount: 4 }],
+      ['wrong-field', { ...sidecar, fieldKey: 'name' }],
+    ].forEach(([label, sourceSidecar]) => {
+      it(`ignores ${label} source spacing`, async () => {
+        const result = await collect({
+          rowRoles: [ROW_ROLE_LOCALIZED],
+          fetchSpacingSidecar: sinon.stub().resolves(sourceSidecar),
+        });
+        expect(result.cells[0].text).to.equal('Intro\nFixed heading\nLast');
+      });
+    });
+
+    it('surfaces a source-sidecar fetch failure', async () => {
+      let error;
+      try {
+        await collect({
+          rowRoles: [ROW_ROLE_LOCALIZED],
+          fetchSpacingSidecar: sinon.stub().rejects(new Error('GET failed: HTTP 403')),
+        });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error?.message).to.equal('GET failed: HTTP 403');
+    });
   });
 
   it('attaches keyword text from sidecars on english-source cells', async () => {

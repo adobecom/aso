@@ -121,7 +121,7 @@ function resolveImportScope(settings) {
   const storeType = normalizeStoreType(settings?.storeType);
   const testName = settings?.testName?.trim() || '';
   if (storeTypeRequiresInstanceName(storeType) && !testName) {
-    throw new Error(`Settings sheet must include Test name for ${storeType} workbooks.`);
+    throw new Error(`Settings sheet must include Test/CPP Name for ${storeType} workbooks.`);
   }
 
   return {
