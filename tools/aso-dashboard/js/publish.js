@@ -171,7 +171,10 @@ export async function publishSelection({
 
   const response = await fetch(PUBLISH_SERVICE_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({ daPayloadPath: filePath.slice(1) }),
   });
   const responseBody = await response.text();

@@ -59,7 +59,9 @@ Publish mode in the Export section saves the selected product/platform payload t
 `POST` to
 `https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore`
 with `{"daPayloadPath": ".da/storepublish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json"}`.
-The service path does not include a leading slash.
+The service path does not include a leading slash. The service request includes
+the current DA token in the `Authorization: Bearer <token>` header; the token is
+not included in the JSON body or saved request file.
 
 On a successful HTTP response with non-empty string `requestId` and `status`
 fields, those fields are added to the original payload in the same DA file.

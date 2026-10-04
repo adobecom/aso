@@ -164,9 +164,13 @@ describe('publish', () => {
       expect(serviceUrl).to.equal('https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore');
       expect(submission).to.deep.equal({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${options.token}`,
+        },
         body: JSON.stringify({ daPayloadPath: filePath.slice(1) }),
       });
+      expect(submission.headers.Authorization).to.equal(initialWrite.headers.Authorization);
       expect(updateUrl).to.equal(sourceUrl);
       expect(JSON.parse(await updatedWrite.body.get('data').text())).to.deep.equal({ ...initialPayload, ...serviceResult });
       expect(result).to.deep.equal({ ok: true, status: 200, filePath, requestId: serviceResult.requestId, publishStatus: 'queued' });
