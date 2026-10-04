@@ -54,6 +54,11 @@ Tests mirror under `test/tools/aso-dashboard/js/` with shared `mocks/` and `help
 
 ### Publish requests
 
+Google publishing currently supports metadata only: `title`, `shortDescription`,
+and `fullDescription` in `metadata.localizations`, alongside the `app` and
+`platform` identifiers. Release notes, release tracks, promos, and media assets
+are not included in the Google payload. Apple publishing is unchanged.
+
 Publish mode in the Export section saves the selected product/platform payload to
 `/.da/storepublish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json` (UTC), then sends a JSON
 `POST` to

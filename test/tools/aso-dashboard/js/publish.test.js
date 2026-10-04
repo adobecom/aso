@@ -55,7 +55,7 @@ describe('publish', () => {
       expect(payload.app).to.equal('app');
       if (platform === 'google') {
         expect(payload.platform).to.equal('google');
-        expect(payload).to.have.property('track');
+        expect(payload).not.to.have.property('track');
       }
     });
 
@@ -63,6 +63,48 @@ describe('publish', () => {
       const payload = buildPublishPayload([], { product: 'app', platform, languages: [], blockTypes: ['listing'] });
       expect(payload).not.to.have.property('metadata');
     });
+  });
+
+  it('includes only supported metadata in the Google payload', () => {
+    const language = { code: 'en-US' };
+    const cells = [
+      ...['title', 'shortDescription', 'fullDescription', 'releaseNotes'].map((fieldKey) => ({
+        language, device: 'google', blockType: 'listing', fieldKey, text: fieldKey, hasHtml: true,
+      })),
+      {
+        language, device: 'google', blockType: 'promo', fieldKey: 'eventName', promoName: 'p1', text: 'Event', hasHtml: true,
+      },
+    ];
+    const payload = buildPublishPayload(cells, {
+      product: 'app',
+      platform: 'google',
+      languages: [language],
+      promoNames: ['p1'],
+    });
+    expect(payload).to.deep.equal({
+      app: 'app',
+      platform: 'google',
+      metadata: {
+        localizations: [{
+          locale: 'en-US',
+          title: 'title',
+          shortDescription: 'shortDescription',
+          fullDescription: 'fullDescription',
+        }],
+      },
+    });
+  });
+
+  it('omits Google metadata when only unsupported release notes are populated', () => {
+    const language = { code: 'en-US' };
+    const payload = buildPublishPayload([{
+      language, device: 'google', blockType: 'listing', fieldKey: 'releaseNotes', text: 'New release', hasHtml: true,
+    }], {
+      product: 'app',
+      platform: 'google',
+      languages: [language],
+    });
+    expect(payload).to.deep.equal({ app: 'app', platform: 'google' });
   });
 
   it('omits empty Apple promo localizations independently for each promo', () => {

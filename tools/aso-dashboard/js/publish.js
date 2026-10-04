@@ -1,4 +1,4 @@
-import { readStoreType, STORE_TYPE_UPDATES } from './store-scope-settings.js';
+import { STORE_TYPE_UPDATES } from './store-scope-settings.js';
 import { collectExportData } from './import-export/collect.js';
 import { putJsonSource } from './lib/da-source-client.js';
 import { getRelativeProductsPath } from './lib/utils.js';
@@ -90,11 +90,10 @@ export function buildPublishPayload(cells, options) {
   }
 
   // Google
-  const googleFields = ['title', 'shortDescription', 'fullDescription', 'releaseNotes'];
+  const googleFields = ['title', 'shortDescription', 'fullDescription'];
   const payload = {
     app: product,
     platform: 'google',
-    track: readStoreType() === STORE_TYPE_UPDATES ? 'production' : readStoreType(),
   };
   if (blockTypes.includes('listing')) {
     payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean) };
