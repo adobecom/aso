@@ -637,8 +637,10 @@ async function handlePublishAction(org, repo, token) {
     });
 
     if (result.ok) {
-      showExportStatus('Published!', 3000);
-      if (summaryContainer) summaryContainer.innerHTML = `Saved to <code>${result.filePath}</code>`;
+      showExportStatus('Publish submitted!', 3000);
+      if (summaryContainer) {
+        summaryContainer.textContent = `Request ${result.requestId}: ${result.publishStatus}. Saved to ${result.filePath}`;
+      }
     } else {
       showExportStatus('Publish failed');
       if (summaryContainer) summaryContainer.textContent = `Error ${result.status}: ${result.statusText || 'write failed'}`;

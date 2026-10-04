@@ -52,6 +52,25 @@ Tests mirror under `test/tools/aso-dashboard/js/` with shared `mocks/` and `help
 
 ## Final page paths
 
+### Publish requests
+
+Publish mode in the Export section saves the selected product/platform payload to
+`/.da/storepublish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json` (UTC), then sends a JSON
+`POST` to
+`https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore`
+with `{"daPayloadPath": ".da/storepublish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json"}`.
+The service path does not include a leading slash.
+
+On a successful HTTP response with non-empty string `requestId` and `status`
+fields, those fields are added to the original payload in the same DA file.
+The dashboard displays the submitted request ID and status; `queued` does not
+mean publication is complete. Failed saves, service requests, or invalid
+responses are reported as failures. Service failures display the returned
+`error` message and `activationId` when present, along with the HTTP status
+and request file path. If the service accepts the request but
+writing its response fails, the error includes the request ID and status;
+the service request is not automatically retried.
+
 ### Store updates (single versioned page)
 
 `/{lang}/{productsPath}/{product}/{device}/store-updates`

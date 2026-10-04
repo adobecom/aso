@@ -5,6 +5,8 @@ import { getRelativeProductsPath } from './lib/utils.js';
 
 export const PUBLISH_REQUEST_PATH = '/.da/storepublish/request';
 
+const PUBLISH_SERVICE_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore';
+
 const PUBLISH_BLOCK_TYPES = ['listing', 'promo'];
 
 const pad = (value, length = 2) => String(value).padStart(length, '0');
@@ -97,8 +99,8 @@ export function buildPublishPayload(cells, options) {
   return omitEmptyContainers(payload);
 }
 
-// Builds and writes a publish payload for a single product/platform to the store request
-// queue. Shares the Export tab's product/language/device/release-period selections and its
+// Saves and submits a publish payload for a single product/platform, then records the
+// service request ID and status. Shares the Export tab's product/language/device/release-period
 // "Content to publish" filters (block types, selected promos/variants, per-field selection),
 // plus the DA fetch plumbing — callers (export.js) pass in an already-authenticated fetchPage.
 export async function publishSelection({
@@ -163,6 +165,55 @@ export async function publishSelection({
 
   const filePath = `${PUBLISH_REQUEST_PATH}/${formatPublishTimestamp(now)}.json`;
   const result = await putJsonSource(org, repo, filePath, payload, token);
+  if (!result.ok) {
+    return { ok: false, status: result.status, statusText: result.statusText, filePath };
+  }
 
-  return { ok: result.ok, status: result.status, statusText: result.statusText, filePath };
+  const response = await fetch(PUBLISH_SERVICE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ daPayloadPath: filePath.slice(1) }),
+  });
+  const responseBody = await response.text();
+  let serviceResult;
+  try {
+    serviceResult = JSON.parse(responseBody);
+  } catch (error) {
+    const reason = response.ok ? 'returned invalid JSON' : 'failed';
+    throw new Error(`Publish service ${reason} (${response.status} ${response.statusText}): ${responseBody || error.message}. Request file: ${filePath}`);
+  }
+
+  const serviceError = typeof serviceResult?.error === 'string' ? serviceResult.error.trim() : '';
+  if (!response.ok || serviceError) {
+    const activationId = typeof serviceResult?.activationId === 'string'
+      ? serviceResult.activationId.trim() : '';
+    const activation = activationId ? ` Activation ID: ${activationId}.` : '';
+    throw new Error(`Publish service failed (${response.status} ${response.statusText}): ${serviceError || responseBody}.${activation} Request file: ${filePath}`);
+  }
+
+  const requestId = serviceResult?.requestId;
+  const status = serviceResult?.status;
+  if (typeof requestId !== 'string' || !requestId.trim()
+    || typeof status !== 'string' || !status.trim()) {
+    throw new Error(`Publish service response is missing a valid requestId or status. Request file: ${filePath}`);
+  }
+
+  const updatedPayload = { ...payload, requestId, status };
+  let updateResult;
+  try {
+    updateResult = await putJsonSource(org, repo, filePath, updatedPayload, token);
+  } catch (error) {
+    throw new Error(`Publish request ${requestId} was accepted (${status}), but updating ${filePath} failed: ${error.message}`);
+  }
+  if (!updateResult.ok) {
+    throw new Error(`Publish request ${requestId} was accepted (${status}), but updating ${filePath} failed (${updateResult.status} ${updateResult.statusText || 'write failed'}).`);
+  }
+
+  return {
+    ok: true,
+    status: updateResult.status,
+    filePath,
+    requestId,
+    publishStatus: status,
+  };
 }
