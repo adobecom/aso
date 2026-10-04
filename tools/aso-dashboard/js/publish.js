@@ -142,16 +142,22 @@ export function createPublishProgressModal(button) {
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
   closeButton.className = 'publish-progress-close';
-  closeButton.textContent = 'Close';
+  closeButton.textContent = '\u00d7';
+  closeButton.setAttribute('aria-label', 'Close');
+  closeButton.hidden = true;
+  closeButton.disabled = true;
+  let finished = false;
   modal.append(title, message, reference, closeButton);
   const close = () => {
     if (modal.open) modal.close();
     modal.remove();
   };
-  closeButton.addEventListener('click', close);
+  closeButton.addEventListener('click', () => {
+    if (finished) close();
+  });
   modal.addEventListener('cancel', (event) => {
     event.preventDefault();
-    close();
+    if (finished) close();
   });
   modal.addEventListener('close', () => modal.remove());
 
@@ -174,9 +180,12 @@ export function createPublishProgressModal(button) {
       message.textContent = 'Waiting for publish completion...';
     },
     finish(titleText, messageText, isError = false) {
+      finished = true;
       title.textContent = titleText;
       message.setAttribute('role', isError ? 'alert' : 'status');
       message.textContent = messageText;
+      closeButton.hidden = false;
+      closeButton.disabled = false;
       button.disabled = wasDisabled;
     },
   };

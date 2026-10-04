@@ -83,15 +83,16 @@ as the service accepts the request, even if saving its response later fails.
 The modal backdrop masks the dashboard without hiding the publish button.
 The button stays disabled while submission or monitoring is active.
 
-The modal has a Close button and supports Escape. Dismissing it does not cancel
-submission or polling, reopen the modal when the request ID arrives, or enable
-duplicate submissions. Errors, success, and timeout messages are shown in the
-modal if it is still open, and in the dashboard summary even if it was dismissed.
+The top-right X button (accessible label: Close) stays hidden and disabled during submission and polling, and
+Escape cannot dismiss the modal while either is active. Close and Escape become
+available after success or an error. Errors, success, and timeout messages are
+shown in both the modal and the dashboard summary.
 
 Only `overallStatus: "success"` displays `Published`. Terminal failure
 statuses and service errors stop monitoring and display an error. A timeout
 reports that publishing may still finish, includes the last status and request
-ID, and advises against resubmitting. An in-flight log request is aborted at the
+ID, and advises against resubmitting. This monitoring error allows dismissal
+without claiming the publish succeeded or failed. An in-flight log request is aborted at the
 one-minute deadline. The publish button is restored on success, error, or timeout.
 The modal remains open with the result until the user closes it; polling does
 not resubmit the publish request.

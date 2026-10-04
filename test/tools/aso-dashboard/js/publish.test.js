@@ -135,7 +135,10 @@ describe('publish', () => {
       expect(modal.querySelector('h2').textContent).to.equal('Starting to Publish...');
       expect(modal.querySelector('[role="status"]').textContent).to.equal('Preparing publish request...');
       expect(modal.querySelector('.publish-progress-reference').hidden).to.equal(true);
-      expect(modal.querySelector('button').textContent).to.equal('Close');
+      expect(modal.querySelector('button').textContent).to.equal('\u00d7');
+      expect(modal.querySelector('button').getAttribute('aria-label')).to.equal('Close');
+      expect(modal.querySelector('button').hidden).to.equal(true);
+      expect(modal.querySelector('button').disabled).to.equal(true);
       expect(button.disabled).to.equal(true);
       expect(button.classList.contains('hidden')).to.equal(false);
     });
@@ -149,6 +152,8 @@ describe('publish', () => {
       expect(reference.hidden).to.equal(false);
       expect(reference.textContent).to.equal('Request ID: request-123');
       expect(modal.querySelector('[role="status"]').textContent).to.equal('Waiting for publish completion...');
+      expect(modal.querySelector('button').hidden).to.equal(true);
+      expect(modal.querySelector('button').disabled).to.equal(true);
     });
 
     it('keeps a submission error visible until Close is clicked', () => {
@@ -163,6 +168,8 @@ describe('publish', () => {
       expect(modal.querySelector('.publish-progress-reference').hidden).to.equal(true);
       expect(button.disabled).to.equal(false);
       expect(button.classList.contains('hidden')).to.equal(false);
+      expect(modal.querySelector('button').hidden).to.equal(false);
+      expect(modal.querySelector('button').disabled).to.equal(false);
       modal.querySelector('button').click();
       expect(document.querySelector('.publish-progress-modal')).to.equal(null);
     });
@@ -176,17 +183,23 @@ describe('publish', () => {
       expect(modal.querySelector('[role="alert"]').textContent).to.equal('Response could not be saved');
     });
 
-    it('allows Escape to dismiss progress without restoring the active publish CTA', () => {
+    it('blocks Escape while preparing and publishing', () => {
       progress = createPublishProgressModal(button);
       const modal = document.querySelector('.publish-progress-modal');
-      modal.dispatchEvent(new Event('cancel', { cancelable: true }));
-      expect(modal.open).to.equal(false);
-      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+      const preparingCancel = new Event('cancel', { cancelable: true });
+      modal.dispatchEvent(preparingCancel);
+      expect(preparingCancel.defaultPrevented).to.equal(true);
+      expect(modal.open).to.equal(true);
+      progress.setRequestId('request-123');
+      const publishingCancel = new Event('cancel', { cancelable: true });
+      modal.dispatchEvent(publishingCancel);
+      expect(publishingCancel.defaultPrevented).to.equal(true);
+      expect(modal.open).to.equal(true);
       expect(button.disabled).to.equal(true);
       expect(button.classList.contains('hidden')).to.equal(false);
     });
 
-    it('continues polling after Close, without reopening when the request ID arrives', async () => {
+    it('prevents Close during polling and allows it after success', async () => {
       const clock = sinon.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
       const fetchStub = sinon.stub(window, 'fetch').callsFake(async () => ({
         ok: true,
@@ -197,17 +210,24 @@ describe('publish', () => {
         ),
       }));
       progress = createPublishProgressModal(button);
-      document.querySelector('.publish-progress-modal button').click();
+      const modal = document.querySelector('.publish-progress-modal');
+      modal.querySelector('button').click();
+      expect(modal.open).to.equal(true);
       progress.setRequestId('request-123');
+      modal.querySelector('button').click();
       const completion = waitForPublishCompletion({ requestId: 'request-123', token: 'token' });
       await clock.tickAsync(0);
       expect(fetchStub.callCount).to.equal(1);
       expect(button.disabled).to.equal(true);
       expect(button.classList.contains('hidden')).to.equal(false);
-      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+      expect(modal.open).to.equal(true);
       await clock.tickAsync(10000);
       expect(await completion).to.deep.equal({ overallStatus: 'success', timedOut: false });
       progress.finish('Published', 'Published');
+      expect(modal.open).to.equal(true);
+      expect(modal.querySelector('button').hidden).to.equal(false);
+      expect(modal.querySelector('button').disabled).to.equal(false);
+      modal.querySelector('button').click();
       expect(document.querySelector('.publish-progress-modal')).to.equal(null);
       expect(button.disabled).to.equal(false);
       expect(button.classList.contains('hidden')).to.equal(false);
@@ -225,6 +245,27 @@ describe('publish', () => {
       expect(modal.querySelector('[role="status"]').textContent).to.equal('Published');
       expect(button.classList.contains('hidden')).to.equal(true);
       expect(button.disabled).to.equal(true);
+    });
+
+    it('allows Escape after success or failure', () => {
+      [false, true].forEach((isError) => {
+        progress = createPublishProgressModal(button);
+        const modal = document.querySelector('.publish-progress-modal');
+        progress.finish(isError ? 'Publish failed' : 'Published', 'Result', isError);
+        modal.dispatchEvent(new Event('cancel', { cancelable: true }));
+        expect(modal.open).to.equal(false);
+        expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+      });
+    });
+
+    it('allows dismissal after monitoring fails to confirm completion', () => {
+      progress = createPublishProgressModal(button);
+      progress.finish('Publish not yet confirmed', 'Do not resubmit this request.', true);
+      const modal = document.querySelector('.publish-progress-modal');
+      expect(modal.querySelector('[role="alert"]').textContent).to.equal('Do not resubmit this request.');
+      expect(modal.querySelector('button').hidden).to.equal(false);
+      modal.querySelector('button').click();
+      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
     });
 
     it('cleans up if the dialog cannot be shown', () => {

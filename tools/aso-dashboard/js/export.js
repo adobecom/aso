@@ -647,7 +647,7 @@ async function handlePublishAction(org, repo, token) {
       const message = completion.timedOut
         ? 'Publish completion was not confirmed within one minute; it may still finish. Do not resubmit this request.'
         : 'Published';
-      progress.finish(title, message);
+      progress.finish(title, message, completion.timedOut);
       showExportStatus(title, 3000);
       if (summaryContainer) summaryContainer.textContent = `${message} Request ID: ${result.requestId}. Status: ${completion.overallStatus}. Saved to ${result.filePath}`;
     } else {
