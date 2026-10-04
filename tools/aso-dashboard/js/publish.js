@@ -6,6 +6,9 @@ import { getRelativeProductsPath } from './lib/utils.js';
 export const PUBLISH_REQUEST_PATH = '/.da/storepublish/request';
 
 const PUBLISH_SERVICE_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore';
+const PUBLISH_LOG_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/get-publish-log';
+const PUBLISH_POLL_INTERVAL_MS = 10000;
+const PUBLISH_POLL_TIMEOUT_MS = 60000;
 
 const PUBLISH_BLOCK_TYPES = ['listing', 'promo'];
 
@@ -99,6 +102,91 @@ export function buildPublishPayload(cells, options) {
   return omitEmptyContainers(payload);
 }
 
+async function readPublishServiceResponse(response, reference) {
+  const responseBody = await response.text();
+  let serviceResult;
+  try {
+    serviceResult = JSON.parse(responseBody);
+  } catch (error) {
+    const reason = response.ok ? 'returned invalid JSON' : 'failed';
+    throw new Error(`Publish service ${reason} (${response.status} ${response.statusText}): ${responseBody || error.message}. ${reference}`);
+  }
+
+  const serviceError = typeof serviceResult?.error === 'string' ? serviceResult.error.trim() : '';
+  if (!response.ok || serviceError) {
+    const activationId = typeof serviceResult?.activationId === 'string'
+      ? serviceResult.activationId.trim() : '';
+    const activation = activationId ? ` Activation ID: ${activationId}.` : '';
+    throw new Error(`Publish service failed (${response.status} ${response.statusText}): ${serviceError || responseBody}.${activation} ${reference}`);
+  }
+  return serviceResult;
+}
+
+export async function waitForPublishCompletion({ requestId, token, button }) {
+  const modal = document.createElement('dialog');
+  modal.className = 'publish-progress-modal';
+  modal.setAttribute('aria-labelledby', 'publish-progress-title');
+  modal.setAttribute('aria-describedby', 'publish-progress-reference');
+  const title = document.createElement('h2');
+  title.id = 'publish-progress-title';
+  title.textContent = 'Publishing in progress';
+  const reference = document.createElement('p');
+  reference.id = 'publish-progress-reference';
+  reference.className = 'publish-progress-reference';
+  reference.textContent = `Request ID: ${requestId}`;
+  modal.append(title, reference);
+  modal.addEventListener('cancel', (event) => event.preventDefault());
+
+  const wasHidden = button.classList.contains('hidden');
+  const wasDisabled = button.disabled;
+  button.classList.add('hidden');
+  button.disabled = true;
+  document.body.append(modal);
+
+  const controller = new AbortController();
+  const deadline = Date.now() + PUBLISH_POLL_TIMEOUT_MS;
+  const timeout = window.setTimeout(() => controller.abort(), PUBLISH_POLL_TIMEOUT_MS);
+  let overallStatus = 'pending';
+  try {
+    modal.showModal();
+    while (Date.now() < deadline) {
+      // eslint-disable-next-line no-await-in-loop
+      const response = await fetch(`${PUBLISH_LOG_URL}?requestId=${encodeURIComponent(requestId)}`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+      // eslint-disable-next-line no-await-in-loop
+      const log = await readPublishServiceResponse(response, `Request ID: ${requestId}`);
+      if (controller.signal.aborted) break;
+      if (typeof log?.overallStatus !== 'string' || !log.overallStatus.trim()) {
+        throw new Error(`Publish log response is missing a valid overallStatus. Request ID: ${requestId}`);
+      }
+      overallStatus = log.overallStatus.trim().toLowerCase();
+      if (overallStatus === 'success') return { overallStatus, timedOut: false };
+      if (['failed', 'failure', 'error'].includes(overallStatus)) {
+        throw new Error(`Publish failed (${overallStatus}). Request ID: ${requestId}`);
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, Math.min(PUBLISH_POLL_INTERVAL_MS, deadline - Date.now()));
+      });
+    }
+    return { overallStatus, timedOut: true };
+  } catch (error) {
+    if (controller.signal.aborted && error.name === 'AbortError') {
+      return { overallStatus, timedOut: true };
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+    if (modal.open) modal.close();
+    modal.remove();
+    button.classList.toggle('hidden', wasHidden);
+    button.disabled = wasDisabled;
+  }
+}
+
 // Saves and submits a publish payload for a single product/platform, then records the
 // service request ID and status. Shares the Export tab's product/language/device/release-period
 // "Content to publish" filters (block types, selected promos/variants, per-field selection),
@@ -177,23 +265,7 @@ export async function publishSelection({
     },
     body: JSON.stringify({ daPayloadPath: filePath.slice(1) }),
   });
-  const responseBody = await response.text();
-  let serviceResult;
-  try {
-    serviceResult = JSON.parse(responseBody);
-  } catch (error) {
-    const reason = response.ok ? 'returned invalid JSON' : 'failed';
-    throw new Error(`Publish service ${reason} (${response.status} ${response.statusText}): ${responseBody || error.message}. Request file: ${filePath}`);
-  }
-
-  const serviceError = typeof serviceResult?.error === 'string' ? serviceResult.error.trim() : '';
-  if (!response.ok || serviceError) {
-    const activationId = typeof serviceResult?.activationId === 'string'
-      ? serviceResult.activationId.trim() : '';
-    const activation = activationId ? ` Activation ID: ${activationId}.` : '';
-    throw new Error(`Publish service failed (${response.status} ${response.statusText}): ${serviceError || responseBody}.${activation} Request file: ${filePath}`);
-  }
-
+  const serviceResult = await readPublishServiceResponse(response, `Request file: ${filePath}`);
   const requestId = serviceResult?.requestId;
   const status = serviceResult?.status;
   if (typeof requestId !== 'string' || !requestId.trim()

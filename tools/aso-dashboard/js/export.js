@@ -34,7 +34,7 @@ import {
   updateStoreTestsCount,
 } from './store-scope-settings.js';
 import { collectExportData } from './import-export/collect.js';
-import { publishSelection } from './publish.js';
+import { publishSelection, waitForPublishCompletion } from './publish.js';
 import { collectMediaExportData } from './import-export/media-collect.js';
 import { listMediaAssetFields, listSchemaFields } from './import-export/page-map.js';
 import {
@@ -637,9 +637,15 @@ async function handlePublishAction(org, repo, token) {
     });
 
     if (result.ok) {
-      showExportStatus('Publish submitted!', 3000);
+      const completion = await waitForPublishCompletion(
+        { requestId: result.requestId, token, button: exportButton },
+      );
+      showExportStatus(completion.timedOut ? 'Publish not yet confirmed' : 'Publish successful!', 3000);
       if (summaryContainer) {
-        summaryContainer.textContent = `Request ${result.requestId}: ${result.publishStatus}. Saved to ${result.filePath}`;
+        const message = completion.timedOut
+          ? 'Publish completion was not confirmed within one minute; it may still finish. Do not resubmit this request.'
+          : 'Publish successful!';
+        summaryContainer.textContent = `${message} Request ID: ${result.requestId}. Status: ${completion.overallStatus}. Saved to ${result.filePath}`;
       }
     } else {
       showExportStatus('Publish failed');

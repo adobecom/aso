@@ -1,7 +1,12 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import sinon from 'sinon';
-import { formatPublishTimestamp, buildPublishPayload, publishSelection } from '../../../../tools/aso-dashboard/js/publish.js';
+import {
+  formatPublishTimestamp,
+  buildPublishPayload,
+  publishSelection,
+  waitForPublishCompletion,
+} from '../../../../tools/aso-dashboard/js/publish.js';
 import { buildLanguageIndex } from '../../../../tools/aso-dashboard/js/lib/translate-paths.js';
 
 describe('publish', () => {
@@ -103,6 +108,159 @@ describe('publish', () => {
       promoNames: [],
     });
     expect(payload).to.deep.equal({ app: 'app' });
+  });
+
+  describe('waitForPublishCompletion', () => {
+    const requestId = '110ef56b-28d4-4c23-8e18-d9cf3efff4d9';
+    let clock;
+    let button;
+    let fetchStub;
+
+    function logResponse(body, status = 200) {
+      const response = new Response(null, { status });
+      sinon.stub(response, 'text').resolves(JSON.stringify(body));
+      return response;
+    }
+
+    beforeEach(() => {
+      clock = sinon.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      button = document.createElement('button');
+      button.textContent = 'Publish to Store';
+      document.body.append(button);
+      fetchStub = sinon.stub(window, 'fetch').callsFake(async () => (
+        logResponse({ overallStatus: 'queued' })
+      ));
+    });
+
+    afterEach(() => {
+      button.remove();
+      sinon.restore();
+    });
+
+    function monitor() {
+      return waitForPublishCompletion({ requestId, token: 'da-token', button });
+    }
+
+    function expectRestored() {
+      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+      expect(button.classList.contains('hidden')).to.equal(false);
+      expect(button.disabled).to.equal(false);
+      expect(clock.countTimers()).to.equal(0);
+    }
+
+    it('immediately polls with the request ID and DA token while showing a blocking modal', async () => {
+      fetchStub.onCall(1).resolves(logResponse({ overallStatus: 'success' }));
+      const completion = monitor();
+      const modal = document.querySelector('.publish-progress-modal');
+      expect(modal.open).to.equal(true);
+      expect(modal.querySelector('h2').textContent).to.equal('Publishing in progress');
+      expect(modal.querySelector('p').textContent).to.equal(`Request ID: ${requestId}`);
+      expect(button.classList.contains('hidden')).to.equal(true);
+      expect(button.disabled).to.equal(true);
+      const cancel = new Event('cancel', { cancelable: true });
+      modal.dispatchEvent(cancel);
+      expect(cancel.defaultPrevented).to.equal(true);
+      expect(modal.open).to.equal(true);
+      await clock.tickAsync(0);
+      expect(fetchStub.callCount).to.equal(1);
+      const [url, request] = fetchStub.firstCall.args;
+      expect(url).to.equal(`https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/get-publish-log?requestId=${requestId}`);
+      expect(request.method).to.equal('GET');
+      expect(request.headers).to.deep.equal({ Authorization: 'Bearer da-token' });
+      expect(request.signal).to.be.instanceOf(AbortSignal);
+      await clock.tickAsync(9999);
+      expect(fetchStub.callCount).to.equal(1);
+      await clock.tickAsync(1);
+      expect(await completion).to.deep.equal({ overallStatus: 'success', timedOut: false });
+      expect(fetchStub.callCount).to.equal(2);
+      expectRestored();
+    });
+
+    it('stops immediately when the first log reports success', async () => {
+      fetchStub.resolves(logResponse({ overallStatus: 'success' }));
+      expect(await monitor()).to.deep.equal({ overallStatus: 'success', timedOut: false });
+      await clock.tickAsync(60000);
+      expect(fetchStub.callCount).to.equal(1);
+      expectRestored();
+    });
+
+    it('polls six times over one minute and reports a timeout instead of success', async () => {
+      const completion = monitor();
+      await clock.tickAsync(59999);
+      expect(fetchStub.callCount).to.equal(6);
+      expect(document.querySelector('.publish-progress-modal').open).to.equal(true);
+      expect(button.classList.contains('hidden')).to.equal(true);
+      await clock.tickAsync(1);
+      expect(await completion).to.deep.equal({ overallStatus: 'queued', timedOut: true });
+      expect(fetchStub.callCount).to.equal(6);
+      expectRestored();
+      await clock.tickAsync(10000);
+      expect(fetchStub.callCount).to.equal(6);
+    });
+
+    it('recognizes success on the last poll before the deadline', async () => {
+      fetchStub.onCall(5).resolves(logResponse({ overallStatus: 'success' }));
+      const completion = monitor();
+      await clock.tickAsync(50000);
+      expect(await completion).to.deep.equal({ overallStatus: 'success', timedOut: false });
+      expect(fetchStub.callCount).to.equal(6);
+      expectRestored();
+    });
+
+    it('aborts a stalled log request at the one-minute deadline', async () => {
+      fetchStub.callsFake((_url, { signal }) => new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      }));
+      const completion = monitor();
+      await clock.tickAsync(60000);
+      expect(await completion).to.deep.equal({ overallStatus: 'pending', timedOut: true });
+      expect(fetchStub.firstCall.args[1].signal.aborted).to.equal(true);
+      expect(fetchStub.callCount).to.equal(1);
+      expectRestored();
+    });
+
+    [
+      { body: { overallStatus: 'failed' }, status: 200, message: 'Publish failed (failed)' },
+      { body: { error: 'Not authorized', activationId: 'activation-123' }, status: 401, message: 'Not authorized. Activation ID: activation-123.' },
+      { body: {}, status: 200, message: 'missing a valid overallStatus' },
+      { body: null, status: 200, message: 'missing a valid overallStatus' },
+      { body: { overallStatus: '' }, status: 200, message: 'missing a valid overallStatus' },
+    ].forEach(({ body, status, message }) => {
+      it(`restores the UI when monitoring fails: ${message}`, async () => {
+        fetchStub.resolves(logResponse(body, status));
+        const error = await monitor().catch((failure) => failure);
+        expect(error).to.be.instanceOf(Error);
+        expect(error.message).to.include(message);
+        expect(error.message).to.include(requestId);
+        expect(fetchStub.callCount).to.equal(1);
+        expectRestored();
+      });
+    });
+
+    it('restores the UI on a log network failure', async () => {
+      fetchStub.rejects(new Error('Network failed'));
+      const error = await monitor().catch((failure) => failure);
+      expect(error.message).to.equal('Network failed');
+      expectRestored();
+    });
+
+    it('restores the UI on invalid log JSON', async () => {
+      fetchStub.resolves(new Response('not JSON'));
+      const error = await monitor().catch((failure) => failure);
+      expect(error.message).to.include('returned invalid JSON');
+      expectRestored();
+    });
+
+    it('preserves the original hidden and disabled button states', async () => {
+      button.classList.add('hidden');
+      button.disabled = true;
+      fetchStub.resolves(logResponse({ overallStatus: 'success' }));
+      await monitor();
+      expect(button.classList.contains('hidden')).to.equal(true);
+      expect(button.disabled).to.equal(true);
+      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+      expect(clock.countTimers()).to.equal(0);
+    });
   });
 
   describe('publishSelection', () => {

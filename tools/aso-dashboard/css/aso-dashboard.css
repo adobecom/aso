@@ -655,6 +655,30 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   margin: 0 0 var(--spacing-600) 0;
 }
 
+.publish-progress-modal {
+  max-width: min(480px, 90vw);
+  padding: var(--spacing-500);
+  border: none;
+  border-radius: var(--s2-radius-300);
+  background: #fff;
+  color: var(--s2-gray-900);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 20%);
+}
+
+.publish-progress-modal::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+.publish-progress-modal h2 {
+  margin: 0 0 var(--spacing-300);
+  font-size: 20px;
+}
+
+.publish-progress-reference {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .export-section {
   background: #fff;
   border-radius: var(--s2-radius-300);

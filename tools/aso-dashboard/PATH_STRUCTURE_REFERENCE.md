@@ -73,6 +73,20 @@ and request file path. If the service accepts the request but
 writing its response fails, the error includes the request ID and status;
 the service request is not automatically retried.
 
+After saving the service response, the dashboard immediately calls
+`GET https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/get-publish-log?requestId=<requestId>`
+with the same bearer token. It polls at 10-second intervals for up to one minute.
+During monitoring, the publish button is hidden and disabled, and a modal displays
+`Publishing in progress` with the request ID as a reference. The modal cannot be
+dismissed while monitoring.
+
+Only `overallStatus: "success"` displays `Publish successful!`. Terminal failure
+statuses and service errors stop monitoring and display an error. A timeout
+reports that publishing may still finish, includes the last status and request
+ID, and advises against resubmitting. An in-flight log request is aborted at the
+one-minute deadline. The modal closes and the publish button is restored on
+success, error, or timeout; polling does not resubmit the publish request.
+
 ### Store updates (single versioned page)
 
 `/{lang}/{productsPath}/{product}/{device}/store-updates`
