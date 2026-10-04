@@ -674,9 +674,14 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   font-size: 20px;
 }
 
-.publish-progress-reference {
+.publish-progress-reference,
+.publish-progress-message {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.publish-progress-close {
+  margin-top: var(--spacing-300);
 }
 
 .export-section {

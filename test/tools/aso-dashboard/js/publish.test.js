@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import {
   formatPublishTimestamp,
   buildPublishPayload,
+  createPublishProgressModal,
   publishSelection,
   waitForPublishCompletion,
 } from '../../../../tools/aso-dashboard/js/publish.js';
@@ -110,10 +111,134 @@ describe('publish', () => {
     expect(payload).to.deep.equal({ app: 'app' });
   });
 
+  describe('createPublishProgressModal', () => {
+    let button;
+    let progress;
+
+    beforeEach(() => {
+      button = document.createElement('button');
+      button.textContent = 'Publish to Store';
+      document.body.append(button);
+    });
+
+    afterEach(() => {
+      progress?.close();
+      progress = undefined;
+      button.remove();
+      sinon.restore();
+    });
+
+    it('opens immediately with progress text before a request ID is available', () => {
+      progress = createPublishProgressModal(button);
+      const modal = document.querySelector('.publish-progress-modal');
+      expect(modal.open).to.equal(true);
+      expect(modal.querySelector('h2').textContent).to.equal('Starting to Publish...');
+      expect(modal.querySelector('[role="status"]').textContent).to.equal('Preparing publish request...');
+      expect(modal.querySelector('.publish-progress-reference').hidden).to.equal(true);
+      expect(modal.querySelector('button').textContent).to.equal('Close');
+      expect(button.disabled).to.equal(true);
+      expect(button.classList.contains('hidden')).to.equal(false);
+    });
+
+    it('adds the request ID as soon as the request is accepted', () => {
+      progress = createPublishProgressModal(button);
+      progress.setRequestId('request-123');
+      const modal = document.querySelector('.publish-progress-modal');
+      const reference = modal.querySelector('.publish-progress-reference');
+      expect(modal.querySelector('h2').textContent).to.equal('Publishing in progress');
+      expect(reference.hidden).to.equal(false);
+      expect(reference.textContent).to.equal('Request ID: request-123');
+      expect(modal.querySelector('[role="status"]').textContent).to.equal('Waiting for publish completion...');
+    });
+
+    it('keeps a submission error visible until Close is clicked', () => {
+      progress = createPublishProgressModal(button);
+      const modal = document.querySelector('.publish-progress-modal');
+      const error = 'Invalid <path>. Activation ID: activation-123.';
+      progress.finish('Publish failed', error, true);
+      expect(modal.open).to.equal(true);
+      expect(modal.querySelector('h2').textContent).to.equal('Publish failed');
+      expect(modal.querySelector('[role="alert"]').textContent).to.equal(error);
+      expect(modal.querySelector('[role="alert"]').children.length).to.equal(0);
+      expect(modal.querySelector('.publish-progress-reference').hidden).to.equal(true);
+      expect(button.disabled).to.equal(false);
+      expect(button.classList.contains('hidden')).to.equal(false);
+      modal.querySelector('button').click();
+      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+    });
+
+    it('retains the request ID when displaying an error after acceptance', () => {
+      progress = createPublishProgressModal(button);
+      progress.setRequestId('request-123');
+      progress.finish('Publish failed', 'Response could not be saved', true);
+      const modal = document.querySelector('.publish-progress-modal');
+      expect(modal.querySelector('.publish-progress-reference').textContent).to.equal('Request ID: request-123');
+      expect(modal.querySelector('[role="alert"]').textContent).to.equal('Response could not be saved');
+    });
+
+    it('allows Escape to dismiss progress without restoring the active publish CTA', () => {
+      progress = createPublishProgressModal(button);
+      const modal = document.querySelector('.publish-progress-modal');
+      modal.dispatchEvent(new Event('cancel', { cancelable: true }));
+      expect(modal.open).to.equal(false);
+      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+      expect(button.disabled).to.equal(true);
+      expect(button.classList.contains('hidden')).to.equal(false);
+    });
+
+    it('continues polling after Close, without reopening when the request ID arrives', async () => {
+      const clock = sinon.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+      const fetchStub = sinon.stub(window, 'fetch').callsFake(async () => ({
+        ok: true,
+        status: 200,
+        statusText: '',
+        text: async () => JSON.stringify(
+          { overallStatus: fetchStub.callCount === 1 ? 'queued' : 'success' },
+        ),
+      }));
+      progress = createPublishProgressModal(button);
+      document.querySelector('.publish-progress-modal button').click();
+      progress.setRequestId('request-123');
+      const completion = waitForPublishCompletion({ requestId: 'request-123', token: 'token' });
+      await clock.tickAsync(0);
+      expect(fetchStub.callCount).to.equal(1);
+      expect(button.disabled).to.equal(true);
+      expect(button.classList.contains('hidden')).to.equal(false);
+      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+      await clock.tickAsync(10000);
+      expect(await completion).to.deep.equal({ overallStatus: 'success', timedOut: false });
+      progress.finish('Published', 'Published');
+      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+      expect(button.disabled).to.equal(false);
+      expect(button.classList.contains('hidden')).to.equal(false);
+      expect(clock.countTimers()).to.equal(0);
+    });
+
+    it('keeps completion visible until dismissed and preserves original button states', () => {
+      button.classList.add('hidden');
+      button.disabled = true;
+      progress = createPublishProgressModal(button);
+      progress.finish('Published', 'Published');
+      const modal = document.querySelector('.publish-progress-modal');
+      expect(modal.open).to.equal(true);
+      expect(modal.querySelector('h2').textContent).to.equal('Published');
+      expect(modal.querySelector('[role="status"]').textContent).to.equal('Published');
+      expect(button.classList.contains('hidden')).to.equal(true);
+      expect(button.disabled).to.equal(true);
+    });
+
+    it('cleans up if the dialog cannot be shown', () => {
+      sinon.stub(HTMLDialogElement.prototype, 'showModal').throws(new Error('Dialog failed'));
+      expect(() => createPublishProgressModal(button)).to.throw('Dialog failed');
+      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
+      expect(button.disabled).to.equal(false);
+      expect(button.classList.contains('hidden')).to.equal(false);
+    });
+  });
+
   describe('waitForPublishCompletion', () => {
     const requestId = '110ef56b-28d4-4c23-8e18-d9cf3efff4d9';
     let clock;
-    let button;
     let fetchStub;
 
     function logResponse(body, status = 200) {
@@ -124,43 +249,27 @@ describe('publish', () => {
 
     beforeEach(() => {
       clock = sinon.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
-      button = document.createElement('button');
-      button.textContent = 'Publish to Store';
-      document.body.append(button);
       fetchStub = sinon.stub(window, 'fetch').callsFake(async () => (
         logResponse({ overallStatus: 'queued' })
       ));
     });
 
     afterEach(() => {
-      button.remove();
       sinon.restore();
     });
 
     function monitor() {
-      return waitForPublishCompletion({ requestId, token: 'da-token', button });
+      return waitForPublishCompletion({ requestId, token: 'da-token' });
     }
 
     function expectRestored() {
       expect(document.querySelector('.publish-progress-modal')).to.equal(null);
-      expect(button.classList.contains('hidden')).to.equal(false);
-      expect(button.disabled).to.equal(false);
       expect(clock.countTimers()).to.equal(0);
     }
 
-    it('immediately polls with the request ID and DA token while showing a blocking modal', async () => {
+    it('immediately polls with the request ID and DA token at ten-second intervals', async () => {
       fetchStub.onCall(1).resolves(logResponse({ overallStatus: 'success' }));
       const completion = monitor();
-      const modal = document.querySelector('.publish-progress-modal');
-      expect(modal.open).to.equal(true);
-      expect(modal.querySelector('h2').textContent).to.equal('Publishing in progress');
-      expect(modal.querySelector('p').textContent).to.equal(`Request ID: ${requestId}`);
-      expect(button.classList.contains('hidden')).to.equal(true);
-      expect(button.disabled).to.equal(true);
-      const cancel = new Event('cancel', { cancelable: true });
-      modal.dispatchEvent(cancel);
-      expect(cancel.defaultPrevented).to.equal(true);
-      expect(modal.open).to.equal(true);
       await clock.tickAsync(0);
       expect(fetchStub.callCount).to.equal(1);
       const [url, request] = fetchStub.firstCall.args;
@@ -188,8 +297,7 @@ describe('publish', () => {
       const completion = monitor();
       await clock.tickAsync(59999);
       expect(fetchStub.callCount).to.equal(6);
-      expect(document.querySelector('.publish-progress-modal').open).to.equal(true);
-      expect(button.classList.contains('hidden')).to.equal(true);
+      expect(clock.countTimers()).to.equal(2);
       await clock.tickAsync(1);
       expect(await completion).to.deep.equal({ overallStatus: 'queued', timedOut: true });
       expect(fetchStub.callCount).to.equal(6);
@@ -251,15 +359,11 @@ describe('publish', () => {
       expectRestored();
     });
 
-    it('preserves the original hidden and disabled button states', async () => {
-      button.classList.add('hidden');
-      button.disabled = true;
+    it('encodes the request ID in the log URL', async () => {
       fetchStub.resolves(logResponse({ overallStatus: 'success' }));
-      await monitor();
-      expect(button.classList.contains('hidden')).to.equal(true);
-      expect(button.disabled).to.equal(true);
-      expect(document.querySelector('.publish-progress-modal')).to.equal(null);
-      expect(clock.countTimers()).to.equal(0);
+      await waitForPublishCompletion({ requestId: 'request&123', token: 'token' });
+      expect(fetchStub.firstCall.args[0]).to.include('?requestId=request%26123');
+      expectRestored();
     });
   });
 
@@ -288,6 +392,7 @@ describe('publish', () => {
         blockTypes: ['listing'],
         fetchPage: sinon.stub().resolves({ html: listingHtml, htmlFound: true }),
         now: new Date('2026-10-04T06:09:55.062Z'),
+        onRequestAccepted: sinon.spy(),
       };
       fetchStub = sinon.stub(window, 'fetch');
       fetchStub.onCall(0).resolves(new Response(null, { status: 201 }));
@@ -309,7 +414,12 @@ describe('publish', () => {
     }
 
     it('submits the saved path and adds the service fields to the same file', async () => {
+      options.onRequestAccepted = sinon.spy((requestId) => {
+        expect(requestId).to.equal(serviceResult.requestId);
+        expect(fetchStub.callCount).to.equal(2);
+      });
       const result = await publishSelection(options);
+      sinon.assert.calledOnceWithExactly(options.onRequestAccepted, serviceResult.requestId);
       expect(fetchStub.callCount).to.equal(3);
       const [sourceUrl, initialWrite] = fetchStub.firstCall.args;
       const [serviceUrl, submission] = fetchStub.secondCall.args;
@@ -341,12 +451,14 @@ describe('publish', () => {
       expect(result).to.deep.equal({ ok: false, status: 500, statusText: 'Write failed', filePath });
       expect(fetchStub.callCount).to.equal(2);
       expect(fetchStub.secondCall.args[0]).to.equal(fetchStub.firstCall.args[0]);
+      expect(options.onRequestAccepted.called).to.equal(false);
     });
 
     it('does not update the file when the service rejects the request', async () => {
       fetchStub.onCall(1).resolves(new Response(JSON.stringify(serviceResult), { status: 500 }));
       await expectFailure('Publish service failed (500');
       expect(fetchStub.callCount).to.equal(2);
+      expect(options.onRequestAccepted.called).to.equal(false);
     });
 
     [400, 200].forEach((status) => {
@@ -413,6 +525,7 @@ describe('publish', () => {
       fetchStub.onCall(2).resolves(new Response(null, { status: 500 }));
       fetchStub.onCall(3).resolves(new Response(null, { status: 500, statusText: 'Write failed' }));
       await expectFailure(`Publish request ${serviceResult.requestId} was accepted (queued)`);
+      sinon.assert.calledOnceWithExactly(options.onRequestAccepted, serviceResult.requestId);
       expect(fetchStub.callCount).to.equal(4);
       expect(fetchStub.getCall(3).args[0]).to.equal(fetchStub.firstCall.args[0]);
       const initialPayload = JSON.parse(await fetchStub.firstCall.args[1].body.get('data').text());

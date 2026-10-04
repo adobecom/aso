@@ -34,7 +34,7 @@ import {
   updateStoreTestsCount,
 } from './store-scope-settings.js';
 import { collectExportData } from './import-export/collect.js';
-import { publishSelection, waitForPublishCompletion } from './publish.js';
+import { createPublishProgressModal, publishSelection, waitForPublishCompletion } from './publish.js';
 import { collectMediaExportData } from './import-export/media-collect.js';
 import { listMediaAssetFields, listSchemaFields } from './import-export/page-map.js';
 import {
@@ -352,7 +352,9 @@ function updateExportButtonState() {
   if (isPublishMode()) {
     const publishReady = hasProduct && hasLanguages && devices.length === 1 && releasePeriodReady
       && getPublishBlockTypes().length > 0 && isPromoScopeComplete();
-    if (exportButton) exportButton.disabled = !publishReady;
+    if (exportButton) {
+      exportButton.disabled = exportButton.classList.contains('loading') || !publishReady;
+    }
     if (imagesButton) imagesButton.disabled = true;
     return;
   }
@@ -365,7 +367,8 @@ function updateExportButtonState() {
     && !storeTestsNeedSelection;
 
   if (exportButton) {
-    exportButton.disabled = !(baseReady && hasScope && !promosNeedName);
+    exportButton.disabled = exportButton.classList.contains('loading')
+      || !(baseReady && hasScope && !promosNeedName);
   }
 
   if (imagesButton) {
@@ -581,38 +584,37 @@ async function handleExport(org, repo, token) {
 // downloading a workbook.
 async function handlePublishAction(org, repo, token) {
   const exportButton = document.getElementById('export-button');
+  if (exportButton.classList.contains('loading')) return;
   const summaryContainer = document.getElementById('export-summary');
   exportButton.classList.add('loading');
   exportButton.textContent = 'Publishing...';
   exportButton.disabled = true;
   if (summaryContainer) summaryContainer.innerHTML = '';
 
+  let progress;
   try {
+    progress = createPublishProgressModal(exportButton);
     const [schema, sheetMap] = await Promise.all([
       fetchBlockSchema({ context: { org, repo }, token }),
       fetchSheetBlockMap({ context: { org, repo }, token }),
     ]);
     if (!schema || !sheetMap) {
-      showExportStatus('Config fetch failed');
-      return;
+      throw new Error('Config fetch failed');
     }
 
     const { product, languages, devices } = getSelectedItems();
     const [platform] = devices;
     if (!platform) {
-      showExportStatus('Select a platform');
-      return;
+      throw new Error('Select a platform');
     }
 
     const blockTypes = getPublishBlockTypes();
     if (!blockTypes.length) {
-      showExportStatus('Select content');
-      return;
+      throw new Error('Select content');
     }
     const promoContexts = getPromoContexts().filter((context) => context.device === platform);
     if (blockTypes.includes('promo') && !promoContexts.length) {
-      showExportStatus('Select promo');
-      return;
+      throw new Error('Select promo');
     }
     const selection = { fieldsByDeviceBlock: getSelectedFieldsByDeviceBlock() };
 
@@ -634,26 +636,27 @@ async function handlePublishAction(org, repo, token) {
       blockTypes,
       promoContexts,
       selection,
+      onRequestAccepted: progress.setRequestId,
     });
 
     if (result.ok) {
       const completion = await waitForPublishCompletion(
-        { requestId: result.requestId, token, button: exportButton },
+        { requestId: result.requestId, token },
       );
-      showExportStatus(completion.timedOut ? 'Publish not yet confirmed' : 'Publish successful!', 3000);
-      if (summaryContainer) {
-        const message = completion.timedOut
-          ? 'Publish completion was not confirmed within one minute; it may still finish. Do not resubmit this request.'
-          : 'Publish successful!';
-        summaryContainer.textContent = `${message} Request ID: ${result.requestId}. Status: ${completion.overallStatus}. Saved to ${result.filePath}`;
-      }
+      const title = completion.timedOut ? 'Publish not yet confirmed' : 'Published';
+      const message = completion.timedOut
+        ? 'Publish completion was not confirmed within one minute; it may still finish. Do not resubmit this request.'
+        : 'Published';
+      progress.finish(title, message);
+      showExportStatus(title, 3000);
+      if (summaryContainer) summaryContainer.textContent = `${message} Request ID: ${result.requestId}. Status: ${completion.overallStatus}. Saved to ${result.filePath}`;
     } else {
-      showExportStatus('Publish failed');
-      if (summaryContainer) summaryContainer.textContent = `Error ${result.status}: ${result.statusText || 'write failed'}`;
+      throw new Error(`Error ${result.status}: ${result.statusText || 'write failed'}`);
     }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('[aso publish]', error);
+    progress?.finish('Publish failed', error.message || 'Unknown error', true);
     showExportStatus('Publish failed');
     if (summaryContainer) summaryContainer.textContent = error.message || 'Unknown error';
   }

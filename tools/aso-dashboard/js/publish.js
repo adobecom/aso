@@ -122,33 +122,72 @@ async function readPublishServiceResponse(response, reference) {
   return serviceResult;
 }
 
-export async function waitForPublishCompletion({ requestId, token, button }) {
+export function createPublishProgressModal(button) {
   const modal = document.createElement('dialog');
   modal.className = 'publish-progress-modal';
   modal.setAttribute('aria-labelledby', 'publish-progress-title');
-  modal.setAttribute('aria-describedby', 'publish-progress-reference');
+  modal.setAttribute('aria-describedby', 'publish-progress-message publish-progress-reference');
   const title = document.createElement('h2');
   title.id = 'publish-progress-title';
-  title.textContent = 'Publishing in progress';
+  title.textContent = 'Starting to Publish...';
   const reference = document.createElement('p');
   reference.id = 'publish-progress-reference';
   reference.className = 'publish-progress-reference';
-  reference.textContent = `Request ID: ${requestId}`;
-  modal.append(title, reference);
-  modal.addEventListener('cancel', (event) => event.preventDefault());
+  reference.hidden = true;
+  const message = document.createElement('p');
+  message.id = 'publish-progress-message';
+  message.className = 'publish-progress-message';
+  message.setAttribute('role', 'status');
+  message.textContent = 'Preparing publish request...';
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'publish-progress-close';
+  closeButton.textContent = 'Close';
+  modal.append(title, message, reference, closeButton);
+  const close = () => {
+    if (modal.open) modal.close();
+    modal.remove();
+  };
+  closeButton.addEventListener('click', close);
+  modal.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    close();
+  });
+  modal.addEventListener('close', () => modal.remove());
 
-  const wasHidden = button.classList.contains('hidden');
   const wasDisabled = button.disabled;
-  button.classList.add('hidden');
-  button.disabled = true;
   document.body.append(modal);
+  try {
+    modal.showModal();
+  } catch (error) {
+    modal.remove();
+    throw error;
+  }
+  button.disabled = true;
 
+  return {
+    close,
+    setRequestId(requestId) {
+      title.textContent = 'Publishing in progress';
+      reference.textContent = `Request ID: ${requestId}`;
+      reference.hidden = false;
+      message.textContent = 'Waiting for publish completion...';
+    },
+    finish(titleText, messageText, isError = false) {
+      title.textContent = titleText;
+      message.setAttribute('role', isError ? 'alert' : 'status');
+      message.textContent = messageText;
+      button.disabled = wasDisabled;
+    },
+  };
+}
+
+export async function waitForPublishCompletion({ requestId, token }) {
   const controller = new AbortController();
   const deadline = Date.now() + PUBLISH_POLL_TIMEOUT_MS;
   const timeout = window.setTimeout(() => controller.abort(), PUBLISH_POLL_TIMEOUT_MS);
   let overallStatus = 'pending';
   try {
-    modal.showModal();
     while (Date.now() < deadline) {
       // eslint-disable-next-line no-await-in-loop
       const response = await fetch(`${PUBLISH_LOG_URL}?requestId=${encodeURIComponent(requestId)}`, {
@@ -180,10 +219,6 @@ export async function waitForPublishCompletion({ requestId, token, button }) {
     throw error;
   } finally {
     window.clearTimeout(timeout);
-    if (modal.open) modal.close();
-    modal.remove();
-    button.classList.toggle('hidden', wasHidden);
-    button.disabled = wasDisabled;
   }
 }
 
@@ -206,6 +241,7 @@ export async function publishSelection({
   promoContexts = [],
   selection = {},
   now = new Date(),
+  onRequestAccepted,
 }) {
   const platformPromoContexts = promoContexts.filter(
     (context) => !context.device || context.device === platform,
@@ -272,6 +308,7 @@ export async function publishSelection({
     || typeof status !== 'string' || !status.trim()) {
     throw new Error(`Publish service response is missing a valid requestId or status. Request file: ${filePath}`);
   }
+  onRequestAccepted?.(requestId);
 
   const updatedPayload = { ...payload, requestId, status };
   let updateResult;

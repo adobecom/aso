@@ -76,16 +76,25 @@ the service request is not automatically retried.
 After saving the service response, the dashboard immediately calls
 `GET https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/get-publish-log?requestId=<requestId>`
 with the same bearer token. It polls at 10-second intervals for up to one minute.
-During monitoring, the publish button is hidden and disabled, and a modal displays
-`Publishing in progress` with the request ID as a reference. The modal cannot be
-dismissed while monitoring.
+The modal displays `Starting to Publish...` immediately when Publish to Store is
+clicked, before configuration, content, or the service response has loaded.
+The title changes to `Publishing in progress` and the request ID is added as soon
+as the service accepts the request, even if saving its response later fails.
+The modal backdrop masks the dashboard without hiding the publish button.
+The button stays disabled while submission or monitoring is active.
 
-Only `overallStatus: "success"` displays `Publish successful!`. Terminal failure
+The modal has a Close button and supports Escape. Dismissing it does not cancel
+submission or polling, reopen the modal when the request ID arrives, or enable
+duplicate submissions. Errors, success, and timeout messages are shown in the
+modal if it is still open, and in the dashboard summary even if it was dismissed.
+
+Only `overallStatus: "success"` displays `Published`. Terminal failure
 statuses and service errors stop monitoring and display an error. A timeout
 reports that publishing may still finish, includes the last status and request
 ID, and advises against resubmitting. An in-flight log request is aborted at the
-one-minute deadline. The modal closes and the publish button is restored on
-success, error, or timeout; polling does not resubmit the publish request.
+one-minute deadline. The publish button is restored on success, error, or timeout.
+The modal remains open with the result until the user closes it; polling does
+not resubmit the publish request.
 
 ### Store updates (single versioned page)
 
