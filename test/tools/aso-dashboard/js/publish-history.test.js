@@ -101,6 +101,32 @@ describe('publish-history rendering', () => {
     expect(cell.textContent).to.equal('\u2014');
   });
 
+  it('keeps failed chips red and the same compact size as successful chips', async () => {
+    const style = document.createElement('style');
+    style.textContent = await readFile({ path: '../../../../tools/aso-dashboard/css/aso-dashboard.css' });
+    const section = { type: 'metadata', success: ['en'], failure: [{ locale: 'fr' }] };
+    const cell = renderSectionCell(
+      { response: { sections: [section] } },
+      { key: 'metadata', label: 'Metadata' },
+    );
+    const status = renderStatusBadge(PARTIAL);
+    document.body.append(style, cell, status);
+    const successChip = cell.querySelector('.ph-chip-success');
+    const failedChip = cell.querySelector('.ph-chip-failed');
+    const success = getComputedStyle(successChip);
+    const failed = getComputedStyle(failedChip);
+    expect(failed.backgroundColor).to.equal('rgb(253, 220, 217)');
+    expect(failed.color).to.equal('rgb(179, 38, 30)');
+    const successHeight = successChip.getBoundingClientRect().height;
+    expect(failedChip.getBoundingClientRect().height).to.equal(successHeight);
+    ['padding', 'fontSize', 'fontWeight', 'lineHeight', 'display'].forEach((property) => {
+      expect(failed[property], property).to.equal(success[property]);
+    });
+    const info = getComputedStyle(status.querySelector('.ph-info'));
+    expect(info.backgroundColor).to.equal('rgba(0, 0, 0, 0)');
+    expect(info.padding).to.equal('0px 4px');
+  });
+
   it('shows overall error preview on focus and popover on click, closed by Escape / outside click', () => {
     const wrap = renderStatusBadge(PARTIAL);
     document.body.append(wrap);

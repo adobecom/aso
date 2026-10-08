@@ -528,7 +528,7 @@ body {
 }
 
 /* Buttons (exclude tabs and toggle buttons) */
-button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-tab):not(.publish-progress-close) {
+button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-tab):not(.publish-progress-close):not(:where(.ph-chip, .ph-info, .ph-more, .ph-link)) {
   font-family: var(--body-font-family);
   display: inline-block;
   border: 2px solid #1373e6;
@@ -1128,6 +1128,8 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   border-radius: 12px;
   font-family: var(--body-font-family);
   font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 .ph-chip-success { background: #d7f4e0; color: #0b6b2b; }
