@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import sinon from 'sinon';
+import { fetchLanguageIndex } from '../../../../tools/aso-dashboard/js/lib/translate-paths.js';
 import {
   NO_ERROR_DETAILS,
   SOURCE_DISCLAIMER,
@@ -22,6 +23,7 @@ import {
 } from '../../../../tools/aso-dashboard/js/publish-history.js';
 
 const fixture = JSON.parse(await readFile({ path: '../mocks/publish-logs.json' }));
+const translate = JSON.parse(await readFile({ path: '../mocks/translate.json' }));
 const byId = (id) => fixture.items.find((i) => i.requestId.startsWith(id));
 const SUCCESS = byId('2fee');
 const PARTIAL = byId('0d1a');
@@ -180,7 +182,7 @@ describe('publish-history rendering', () => {
     const cell = renderSectionCell({ response: { sections: [{ type: 'cpp', success: ['en'], pending: ['fr'] }] } }, { key: 'cpp', label: 'Custom Pages' });
     const [ok, pending] = cell.querySelectorAll('.ph-chip');
     expect(ok.getAttribute('aria-label')).to.contain('Passed');
-    expect(ok.title).to.equal('Passed');
+    expect(ok.title).to.equal('Passed (en)');
     expect(pending.getAttribute('aria-label')).to.contain('Pending');
     expect(pending.querySelector('[aria-hidden="true"]')).to.not.equal(null);
   });
@@ -195,6 +197,40 @@ describe('publish-history rendering', () => {
     expect(cell.querySelector('.ph-more')).to.equal(null);
   });
 
+  it('shows names in table and mobile chips, including expanded chips and error details', () => {
+    const section = {
+      type: 'metadata',
+      success: ['en', 'en-GB'],
+      failure: [{ locale: 'ja-JP', error: TS_ERR }],
+      pending: ['fr', 'xx'],
+    };
+    const item = { ...SUCCESS, response: { sections: [section] } };
+    const languageNames = new Map([
+      ['en', 'English'],
+      ['en-gb', 'English - British'],
+      ['ja-jp', 'Japanese'],
+      ['fr', 'French'],
+    ]);
+    const root = renderResults([item], { languageNames });
+    document.body.append(root);
+    [root.querySelector('.ph-table'), root.querySelector('.ph-card')].forEach((view) => {
+      expect([...view.querySelectorAll('.ph-chip-locale')].map((chip) => chip.textContent))
+        .to.deep.equal(['English', 'English - British', 'Japanese']);
+      view.querySelector('.ph-more').click();
+      expect([...view.querySelectorAll('.ph-chip-locale')].map((chip) => chip.textContent))
+        .to.include.members(['French', 'xx']);
+      const failed = view.querySelector('.ph-chip-failed');
+      expect(failed.title).to.contain('ja-JP');
+      expect(failed.getAttribute('aria-label')).to.contain('Japanese (ja-JP)');
+      failed.click();
+      expect(document.querySelector('.ph-popover').textContent).to.contain('Locale: Japanese (ja-JP)');
+      expect(document.querySelector('.ph-popover').textContent).to.contain(TS_ERR);
+      closePopover();
+      expect(view.querySelector('.ph-chip-pending').getAttribute('aria-label'))
+        .to.contain('French (fr): Pending');
+    });
+  });
+
   it('shows request details, and "Not retained" without a source path', () => {
     const cell = renderRequestCell(PARTIAL);
     expect(cell.textContent).to.contain(PARTIAL.requestId);
@@ -206,7 +242,7 @@ describe('publish-history rendering', () => {
 
   it('renders table with headers and mobile cards from the same data', () => {
     const root = renderResults(fixture.items, {});
-    expect([...root.querySelectorAll('thead th')].map((t) => t.textContent)).to.include.members(['Overall', 'Metadata', 'Promos', 'Custom Pages']);
+    expect([...root.querySelectorAll('thead th')].map((t) => t.textContent)).to.include.members(['Overall', 'Metadata', 'Promos', 'CPP']);
     expect(root.querySelectorAll('tbody tr')).to.have.length(fixture.items.length);
     expect(root.querySelectorAll('.ph-card')).to.have.length(fixture.items.length);
   });
@@ -259,8 +295,23 @@ describe('publish-history source JSON', () => {
 });
 
 describe('publish-history API and controller', () => {
+  let originalUrl;
+
+  before(async () => {
+    await fetchLanguageIndex({
+      context: { org: 'o', repo: 'r' },
+      token: 't',
+      fetchImpl: async () => translate,
+    });
+  });
+
+  beforeEach(() => {
+    originalUrl = window.location.href;
+  });
+
   afterEach(() => {
     sinon.restore();
+    window.history.replaceState(null, '', originalUrl);
     document.body.innerHTML = '';
   });
 
@@ -299,6 +350,64 @@ describe('publish-history API and controller', () => {
     return init({ context: { org: 'o', repo: 'r' }, token: 't' });
   }
   const q = (s) => document.querySelector(s);
+
+  it('reuses the cached language mapping used by Export', async () => {
+    const section = { type: 'metadata', success: ['en', 'DE-DE', 'uk', 'en-GB'] };
+    const item = { ...SUCCESS, response: { sections: [section] } };
+    const stub = sinon.stub(window, 'fetch').resolves(jsonResponse({ items: [item] }));
+    const controller = await mount();
+    await controller.load();
+    expect(stub.calledOnce).to.equal(true);
+    expect(stub.firstCall.args[0]).to.contain('list-publish-logs');
+    q('.ph-table .ph-more').click();
+    expect([...q('.ph-table').querySelectorAll('.ph-chip-locale')].map((chip) => chip.textContent))
+      .to.deep.equal(['English', 'German', 'English - British', 'en-GB']);
+  });
+
+  it('uses the configured translation file and caches names across refreshes', async () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('configFile', 'translate-redesign.json');
+    window.history.replaceState(null, '', url);
+    const section = { type: 'metadata', success: ['ja-JP', 'uk', 'xx'] };
+    const item = { ...SUCCESS, response: { sections: [section] } };
+    const stub = sinon.stub(window, 'fetch');
+    stub.withArgs(sinon.match('list-publish-logs')).resolves(jsonResponse({ items: [item] }));
+    const configFetch = stub.withArgs(
+      'https://admin.da.live/source/o/r/.da/translate-redesign.json',
+    ).resolves(jsonResponse({
+      ...translate,
+      languages: {
+        data: [
+          ...translate.languages.data,
+          { name: 'Japanese', code: 'ja', location: '/ja-jp', source: '/' },
+          { name: 'Ukrainian', code: 'uk', location: '/uk-ua', source: '/' },
+        ],
+      },
+    }));
+    const controller = await mount();
+    await controller.load();
+    expect([...q('.ph-table').querySelectorAll('.ph-chip-locale')].map((chip) => chip.textContent))
+      .to.deep.equal(['Japanese', 'English - British', 'xx']);
+    expect(configFetch.firstCall.args[1].headers.Authorization).to.equal('Bearer t');
+    await controller.load();
+    expect(configFetch.calledOnce).to.equal(true);
+    expect(q('.ph-chip-locale').textContent).to.equal('Japanese');
+  });
+
+  it('keeps locale codes visible when the language sheet cannot be loaded', async () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('configFile', 'missing-history-languages.json');
+    window.history.replaceState(null, '', url);
+    const stub = sinon.stub(window, 'fetch');
+    stub.withArgs(sinon.match('list-publish-logs')).resolves(jsonResponse({ items: [SUCCESS] }));
+    stub.withArgs(sinon.match('missing-history-languages.json')).resolves(jsonResponse({}, 503));
+    const log = sinon.stub(console, 'error');
+    const controller = await mount();
+    await controller.load();
+    expect(q('.ph-table')).to.not.equal(null);
+    expect(q('.ph-chip-locale').textContent).to.equal('en');
+    expect(log.calledWith('Failed to fetch missing-history-languages.json:', 503)).to.equal(true);
+  });
 
   it('loads on tab click, filters, paginates without duplicates, keeps rows on refresh failure', async () => {
     const stub = sinon.stub(window, 'fetch');

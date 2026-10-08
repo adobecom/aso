@@ -1,4 +1,5 @@
 import { getSourceText } from './lib/da-source-client.js';
+import { fetchLanguages, getConfigFileOverride } from './lib/utils.js';
 
 export const PUBLISH_LOGS_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/list-publish-logs';
 export const NO_ERROR_DETAILS = 'No error details recorded.';
@@ -8,7 +9,7 @@ export const MAX_VISIBLE_CHIPS = 3;
 export const SECTION_COLUMNS = [
   { key: 'metadata', label: 'Metadata' },
   { key: 'promos', label: 'Promos' },
-  { key: 'cpp', label: 'Custom Pages' },
+  { key: 'cpp', label: 'CPP' },
 ];
 
 const SECTION_TYPE_MAP = {
@@ -265,21 +266,24 @@ function attachTooltip(anchor, text) {
 const CHIP_ICONS = { success: '\u2713', failed: '\u2715', pending: '\u23F1' };
 const CHIP_LABELS = { success: 'Passed', failed: 'Failed', pending: 'Pending' };
 
-export function renderChip(chip, sectionLabel) {
-  const label = `${sectionLabel} ${chip.locale}: ${CHIP_LABELS[chip.status]}`;
+export function renderChip(chip, sectionLabel, languageNames = new Map()) {
+  const languageName = languageNames.get(chip.locale.toLowerCase()) || chip.locale;
+  const localeLabel = languageName === chip.locale ? chip.locale : `${languageName} (${chip.locale})`;
+  const label = `${sectionLabel} ${localeLabel}: ${CHIP_LABELS[chip.status]}`;
   const icon = el('span', 'ph-chip-icon', CHIP_ICONS[chip.status]);
   icon.setAttribute('aria-hidden', 'true');
-  const text = el('span', 'ph-chip-locale', chip.locale);
+  const text = el('span', 'ph-chip-locale', languageName);
   if (chip.status === 'failed') {
     const button = el('button', 'ph-chip ph-chip-failed');
     button.type = 'button';
     button.setAttribute('aria-haspopup', 'dialog');
     button.setAttribute('aria-expanded', 'false');
     button.setAttribute('aria-label', `${label}. Show error`);
+    button.title = `${CHIP_LABELS[chip.status]} (${chip.locale})`;
     button.append(icon, text);
-    button.addEventListener('click', () => openPopover(button, `${sectionLabel} \u2013 ${chip.locale}`, [
+    button.addEventListener('click', () => openPopover(button, `${sectionLabel} \u2013 ${localeLabel}`, [
       { label: 'Section', value: sectionLabel },
-      { label: 'Locale', value: chip.locale },
+      { label: 'Locale', value: localeLabel },
       { label: 'Status', value: 'Failed' },
       chip.error || NO_ERROR_DETAILS,
     ]));
@@ -289,12 +293,12 @@ export function renderChip(chip, sectionLabel) {
   span.tabIndex = 0;
   span.setAttribute('role', 'img');
   span.setAttribute('aria-label', label);
-  span.title = CHIP_LABELS[chip.status];
+  span.title = `${CHIP_LABELS[chip.status]} (${chip.locale})`;
   span.append(icon, text);
   return span;
 }
 
-export function renderSectionCell(item, column) {
+export function renderSectionCell(item, column, languageNames) {
   const cell = el('div', 'ph-section-cell');
   const chips = mapSections(item)[column.key];
   if (!chips?.length) {
@@ -305,14 +309,15 @@ export function renderSectionCell(item, column) {
     return cell;
   }
   const list = el('div', 'ph-chips');
-  chips.slice(0, MAX_VISIBLE_CHIPS).forEach((c) => list.append(renderChip(c, column.label)));
+  chips.slice(0, MAX_VISIBLE_CHIPS)
+    .forEach((c) => list.append(renderChip(c, column.label, languageNames)));
   const hidden = chips.slice(MAX_VISIBLE_CHIPS);
   if (hidden.length) {
     const more = el('button', 'ph-more', `+${hidden.length} more`);
     more.type = 'button';
     more.setAttribute('aria-expanded', 'false');
     more.addEventListener('click', () => {
-      hidden.forEach((c) => list.append(renderChip(c, column.label)));
+      hidden.forEach((c) => list.append(renderChip(c, column.label, languageNames)));
       more.remove();
     });
     list.append(more);
@@ -398,7 +403,7 @@ export function renderRow(item, handlers) {
     el('span', '', item.app ?? '\u2014'),
     el('span', 'ph-platform', item.platform ?? '\u2014'),
     renderStatusBadge(item),
-    ...SECTION_COLUMNS.map((c) => renderSectionCell(item, c)),
+    ...SECTION_COLUMNS.map((c) => renderSectionCell(item, c, handlers?.languageNames)),
     renderRequestCell(item, handlers),
   ];
   cells.forEach((c) => {
@@ -417,7 +422,10 @@ export function renderCard(item, handlers) {
   card.append(head, renderTime(item.startedAt));
   SECTION_COLUMNS.forEach((c) => {
     const group = el('div', 'ph-card-group');
-    group.append(el('h4', 'ph-card-label', c.label), renderSectionCell(item, c));
+    group.append(
+      el('h4', 'ph-card-label', c.label),
+      renderSectionCell(item, c, handlers?.languageNames),
+    );
     card.append(group);
   });
   card.append(renderRequestCell(item, handlers));
@@ -506,7 +514,10 @@ export function init({ context, token }) {
   };
   const state = { items: [], nextCursor: null, loading: false, loaded: false, seq: 0 };
   const { org, repo } = context || {};
-  const handlers = { onViewJson: (path) => openSourceModal({ org, repo, token, path }) };
+  const handlers = {
+    languageNames: new Map(),
+    onViewJson: (path) => openSourceModal({ org, repo, token, path }),
+  };
 
   function renderFilters() {
     fillSelect(els.app, 'apps', [...new Set(state.items.map((i) => i.app).filter(Boolean))].sort());
@@ -556,8 +567,17 @@ export function init({ context, token }) {
     els.error.hidden = true;
     render();
     try {
-      const page = await fetchPublishLogs({ token, cursor: append ? state.nextCursor : undefined });
+      const [page, languages] = await Promise.all([
+        fetchPublishLogs({ token, cursor: append ? state.nextCursor : undefined }),
+        fetchLanguages({ context, token, configFile: getConfigFileOverride() }),
+      ]);
       if (seq !== state.seq) return;
+      handlers.languageNames.clear();
+      languages.forEach((language) => {
+        if (language.code) {
+          handlers.languageNames.set(language.code.toLowerCase(), language.label);
+        }
+      });
       state.items = append ? mergeItems(state.items, page.items) : mergeItems([], page.items);
       state.nextCursor = page.nextCursor;
       state.loaded = true;
