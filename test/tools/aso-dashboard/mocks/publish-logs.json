@@ -1,0 +1,108 @@
+{
+  "items": [
+    {
+      "app": "firefly",
+      "daPayloadPath": ".da/storepublish/request/2026-10-08-t-06-04-59-983.json",
+      "endedAt": "2026-10-08T06:05:23.569Z",
+      "localeCounts": { "failed": 0, "pending": 0, "success": 3, "total": 3 },
+      "overallStatus": "success",
+      "platform": "apple",
+      "requestId": "2fee872e-0d8f-46a8-9d84-741d272b648a",
+      "requestor": "raga@adobe.com",
+      "response": { "sections": [{ "success": ["en", "ja-jp", "ko-kr"], "type": "promos" }] },
+      "responseSummary": { "errorMessage": [], "requestId": "2fee872e-0d8f-46a8-9d84-741d272b648a", "sectionErrors": [], "success": true },
+      "startedAt": "2026-10-08T06:05:09.970Z"
+    },
+    {
+      "app": "TEST_APP",
+      "endedAt": "2026-10-07T17:27:41.967Z",
+      "localeCounts": { "failed": 2, "pending": 0, "success": 3, "total": 5 },
+      "overallStatus": "partial",
+      "platform": "apple",
+      "requestId": "0d1a1ed6-e122-409e-8caf-238f35e25ec9",
+      "requestor": "raga@adobe.com",
+      "response": {
+        "sections": [
+          {
+            "failure": [
+              { "error": "TerritorySchedule dates must be in order (publishStart <= eventStart < eventEnd)", "locale": "en" },
+              { "error": "TerritorySchedule dates must be in order (publishStart <= eventStart < eventEnd)", "locale": "fr-fr" }
+            ],
+            "type": "promos"
+          },
+          { "success": ["en"], "type": "cpp" },
+          { "success": ["en", "fr-fr"], "type": "metadata" }
+        ]
+      },
+      "responseSummary": {
+        "errorMessage": ["TerritorySchedule dates must be in order (publishStart <= eventStart < eventEnd)"],
+        "requestId": "0d1a1ed6-e122-409e-8caf-238f35e25ec9",
+        "sectionErrors": [{ "error": "TerritorySchedule dates must be in order (publishStart <= eventStart < eventEnd)", "type": "promos" }],
+        "success": true
+      },
+      "startedAt": "2026-10-07T17:27:28.474Z"
+    },
+    {
+      "app": "TEST_APP",
+      "endedAt": "2026-10-07T15:35:14.720Z",
+      "localeCounts": { "failed": 2, "pending": 0, "success": 2, "total": 4 },
+      "overallStatus": "partial",
+      "platform": "apple",
+      "requestId": "16f653b8-77ea-4f88-a38e-aa9c78c17fe0",
+      "requestor": "raga@adobe.com",
+      "response": {
+        "sections": [
+          { "success": ["en", "fr-fr"], "type": "localizations" },
+          {
+            "failure": [
+              { "error": "Supplied date must be in the future", "locale": "en" },
+              { "error": "Supplied date must be in the future", "locale": "fr-fr" }
+            ],
+            "type": "promos"
+          }
+        ]
+      },
+      "startedAt": "2026-10-07T15:35:01.754Z"
+    },
+    {
+      "app": "TEST_APP",
+      "endedAt": "2026-10-05T15:36:20.743Z",
+      "localeCounts": { "failed": 3, "pending": 0, "success": 0, "total": 3 },
+      "overallStatus": "failed",
+      "platform": "google",
+      "requestId": "7ac6ec5b-9b0b-4f55-84f4-14467f8d285d",
+      "requestor": "raga@adobe.com",
+      "response": {
+        "sections": [
+          {
+            "failure": [
+              { "error": "The requested language is not currently supported: es-MX.", "locale": "en" },
+              { "error": "The requested language is not currently supported: es-MX.", "locale": "es-mx" },
+              { "error": "The requested language is not currently supported: es-MX.", "locale": "hi-in" }
+            ],
+            "type": "metadata"
+          }
+        ]
+      },
+      "startedAt": "2026-10-05T15:36:10.329Z"
+    },
+    {
+      "app": "TEST_APP",
+      "daPayloadPath": ".da/storepublish/request/2026-10-07-t-16-55-58-542.json",
+      "endedAt": "2026-10-07T16:56:17.272Z",
+      "localeCounts": { "failed": 0, "pending": 0, "success": 5, "total": 5 },
+      "overallStatus": "success",
+      "platform": "apple",
+      "requestId": "38a4a447-45ec-4eb3-a40a-d2f2a8d1b835",
+      "requestor": "raga@adobe.com",
+      "response": {
+        "sections": [
+          { "success": ["en", "ko-kr", "hi-in", "fr-fr", "ja-jp"], "type": "metadata" },
+          { "success": ["en", "ko-kr"], "type": "promos" }
+        ]
+      },
+      "responseSummary": { "errorMessage": [], "requestId": "38a4a447-45ec-4eb3-a40a-d2f2a8d1b835", "sectionErrors": [], "success": true },
+      "startedAt": "2026-10-07T16:56:04.539Z"
+    }
+  ]
+}

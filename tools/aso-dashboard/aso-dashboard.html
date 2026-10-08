@@ -25,6 +25,7 @@
         <button class="tab-button active" data-tab="import">Import</button>
         <button class="tab-button" data-tab="preview">Preview</button>
         <button class="tab-button" data-tab="export">Export</button>
+        <button class="tab-button" data-tab="publish-history">Publish History</button>
       </div>
 
       <div class="tab-content" data-tab-content="preview">
@@ -239,6 +240,27 @@
             <div id="image-export-summary" class="action-summary" aria-live="polite"></div>
           </div>
         </div>
+      </div>
+
+      <div class="tab-content" data-tab-content="publish-history">
+        <section class="ph-container" aria-labelledby="ph-title">
+          <div class="ph-heading-row">
+            <h2 class="export-title" id="ph-title">Publish Results</h2>
+            <button type="button" class="ph-button" id="ph-refresh">Refresh</button>
+          </div>
+          <p class="export-description">Results of store publish requests. Filters apply to the records loaded below, not to all history.</p>
+          <form class="ph-filters" id="ph-filters" aria-label="Filter publish results" onsubmit="return false">
+            <div class="control-group"><label for="ph-filter-app">App</label><select id="ph-filter-app" class="select-dropdown"></select></div>
+            <div class="control-group"><label for="ph-filter-platform">Platform</label><select id="ph-filter-platform" class="select-dropdown"></select></div>
+            <div class="control-group"><label for="ph-filter-status">Status</label><select id="ph-filter-status" class="select-dropdown"></select></div>
+            <div class="control-group"><label for="ph-filter-from">Started from</label><input type="date" id="ph-filter-from" class="ph-date"></div>
+            <div class="control-group"><label for="ph-filter-to">Started to</label><input type="date" id="ph-filter-to" class="ph-date"></div>
+          </form>
+          <div id="ph-error" class="ph-error" role="alert" hidden></div>
+          <div id="ph-status" class="ph-scope" role="status" aria-live="polite"></div>
+          <div id="ph-results"></div>
+          <button type="button" class="ph-button ph-load-more" id="ph-load-more" hidden>Load more</button>
+        </section>
       </div>
 
       <div class="tab-content active" data-tab-content="import">

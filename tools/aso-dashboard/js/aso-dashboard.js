@@ -3,6 +3,7 @@ import { initReleasePeriodSettings } from './release-period-settings.js';
 import { init as initPreview } from './preview.js';
 import { init as initExport } from './export.js';
 import { init as initImport } from './import.js';
+import { init as initPublishHistory } from './publish-history.js';
 
 function setupTabs() {
   const scopeSections = document.querySelector('.scope-sections');
@@ -32,6 +33,7 @@ function setupTabs() {
     const { context, token } = await DA_SDK;
     setupTabs();
     initReleasePeriodSettings();
+    initPublishHistory({ context, token });
     await Promise.all([
       initPreview({ context, token }),
       initExport({ context, token }),
