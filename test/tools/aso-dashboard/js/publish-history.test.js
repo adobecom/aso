@@ -270,10 +270,10 @@ describe('publish-history rendering', () => {
       hour: 'numeric',
       minute: '2-digit',
       second: '2-digit',
-      timeZoneName: 'short',
     }).format(new Date(value));
     const time = renderTime(value);
     expect(time.textContent).to.equal(expected);
+    expect(time.textContent).to.not.match(/GMT|UTC/);
     expect(time.dateTime).to.equal(value);
     expect(time.title).to.contain('your local time');
     expect(time.title).to.contain(value);
@@ -282,7 +282,7 @@ describe('publish-history rendering', () => {
   it('groups each request into three section rows with shared cells and matching mobile labels', () => {
     const root = renderResults(fixture.items, {});
     expect([...root.querySelectorAll('thead th')].map((t) => t.textContent))
-      .to.deep.equal(['Started', 'App', 'Platform', 'Overall', 'Request', 'Section', 'Languages']);
+      .to.deep.equal(['Requested on', 'App', 'Platform', 'Overall', 'Request', 'Section', 'Languages']);
     expect(root.querySelector('thead th:nth-child(5) .ph-sr-only').textContent).to.equal('Request');
     expect(root.querySelectorAll('tbody')).to.have.length(fixture.items.length);
     expect(root.querySelectorAll('tbody tr')).to.have.length(fixture.items.length * 3);
@@ -512,7 +512,7 @@ describe('publish-history API and controller', () => {
         <button id="ph-refresh"></button>
         <select id="ph-filter-app"></select><select id="ph-filter-platform"></select>
         <select id="ph-filter-status"></select>
-        <input id="ph-filter-from" type="date"><input id="ph-filter-to" type="date">
+        <input id="ph-filter-from" type="date">
         <input id="ph-filter-by-me" type="radio" name="ph-requestor" checked>
         <input id="ph-filter-all" type="radio" name="ph-requestor">
         <div id="ph-error" hidden></div><div id="ph-status"></div>
@@ -623,8 +623,7 @@ describe('publish-history API and controller', () => {
     q('#ph-filter-app').value = FAILED.app;
     q('#ph-filter-platform').value = FAILED.platform;
     q('#ph-filter-status').value = 'failed';
-    q('#ph-filter-from').value = '2026-10-01';
-    q('#ph-filter-to').value = '2026-10-09';
+    q('#ph-filter-from').value = '2026-10-09';
     q('#ph-filter-from').dispatchEvent(new Event('change'));
     expect(controller.state.nextCursor).to.equal(null);
     await tick();
@@ -633,7 +632,7 @@ describe('publish-history API and controller', () => {
       app: FAILED.app,
       platform: FAILED.platform,
       status: 'failed',
-      dateFrom: '2026-10-01T00:00:00.000Z',
+      dateFrom: '2026-10-09T00:00:00.000Z',
       dateTo: '2026-10-09T23:59:59.999Z',
     };
     expect(Object.fromEntries(new URL(stub.secondCall.args[0]).searchParams))

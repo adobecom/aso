@@ -89,7 +89,6 @@ const TIMESTAMP_FORMAT = {
   hour: 'numeric',
   minute: '2-digit',
   second: '2-digit',
-  timeZoneName: 'short',
 };
 
 export function formatTimestamp(value, locale) {
@@ -474,7 +473,7 @@ export function renderResults(items, handlers) {
   const caption = el('caption', 'ph-sr-only', 'Publish requests');
   const thead = el('thead');
   const headRow = el('tr');
-  ['Started', 'App', 'Platform', 'Overall', 'Request', 'Section', 'Languages'].forEach((h) => {
+  ['Requested on', 'App', 'Platform', 'Overall', 'Request', 'Section', 'Languages'].forEach((h) => {
     const th = el('th');
     if (h === 'Request') th.append(el('span', 'ph-sr-only', h));
     else th.textContent = h;
@@ -552,7 +551,6 @@ export function init({ context, token }) {
     platform: $('ph-filter-platform'),
     statusFilter: $('ph-filter-status'),
     from: $('ph-filter-from'),
-    to: $('ph-filter-to'),
     byMe: $('ph-filter-by-me'),
     all: $('ph-filter-all'),
   };
@@ -584,7 +582,7 @@ export function init({ context, token }) {
       platform: els.platform.value,
       status: els.statusFilter.value,
       from: els.from.value,
-      to: els.to.value,
+      to: els.from.value,
     };
   }
 
@@ -654,7 +652,7 @@ export function init({ context, token }) {
 
   els.refresh.addEventListener('click', () => load());
   els.more.addEventListener('click', () => load({ append: true }));
-  [els.app, els.platform, els.statusFilter, els.from, els.to, els.byMe, els.all]
+  [els.app, els.platform, els.statusFilter, els.from, els.byMe, els.all]
     .forEach((control) => control.addEventListener('change', () => {
       state.items = [];
       state.nextCursor = null;
