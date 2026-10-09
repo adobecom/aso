@@ -82,6 +82,9 @@ export function isValidSourcePath(path) {
     && !path.includes('..');
 }
 
+const DATE_FORMAT = { year: 'numeric', month: 'short', day: 'numeric' };
+const TIME_FORMAT = { hour: 'numeric', minute: '2-digit', second: '2-digit' };
+
 const TIMESTAMP_FORMAT = {
   year: 'numeric',
   month: 'short',
@@ -90,6 +93,15 @@ const TIMESTAMP_FORMAT = {
   minute: '2-digit',
   second: '2-digit',
 };
+
+export function formatTimestampParts(value, locale) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return { date: String(value ?? '\u2014'), time: '' };
+  return {
+    date: new Intl.DateTimeFormat(locale, DATE_FORMAT).format(date),
+    time: new Intl.DateTimeFormat(locale, TIME_FORMAT).format(date),
+  };
+}
 
 export function formatTimestamp(value, locale) {
   const date = new Date(value);
@@ -359,7 +371,10 @@ export function renderStatusBadge(item) {
 }
 
 export function renderTime(value) {
-  const time = el('time', 'ph-time', formatTimestamp(value));
+  const parts = formatTimestampParts(value);
+  const time = el('time', 'ph-time');
+  time.append(el('span', 'ph-time-date', parts.date));
+  if (parts.time) time.append(el('span', 'ph-time-clock', parts.time));
   time.dateTime = String(value ?? '');
   time.title = `Shown in your local time. Original: ${value ?? '\u2014'}`;
   return time;

@@ -1082,12 +1082,22 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
 
 .ph-time {
   display: block;
-  max-width: 180px;
   line-height: 1.6;
+}
+
+.ph-time-date,
+.ph-time-clock {
+  display: block;
+  white-space: nowrap;
 }
 
 .ph-app {
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.ph-table td:has(> .ph-app) {
+  overflow-wrap: normal;
 }
 
 .ph-request-group > .ph-row > [rowspan] {

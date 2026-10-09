@@ -263,16 +263,14 @@ describe('publish-history rendering', () => {
 
   it('formats Started in the viewer local time while preserving the original timestamp', () => {
     const value = '2026-10-09T09:35:40.000Z';
-    const expected = new Intl.DateTimeFormat(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-    }).format(new Date(value));
+    const date = new Date(value);
     const time = renderTime(value);
-    expect(time.textContent).to.equal(expected);
+    expect(time.querySelector('.ph-time-date').textContent).to.equal(
+      new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(date),
+    );
+    expect(time.querySelector('.ph-time-clock').textContent).to.equal(
+      new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' }).format(date),
+    );
     expect(time.textContent).to.not.match(/GMT|UTC/);
     expect(time.dateTime).to.equal(value);
     expect(time.title).to.contain('your local time');
@@ -336,6 +334,8 @@ describe('publish-history rendering', () => {
     expect(getComputedStyle(root.querySelector('thead th')).backgroundColor)
       .to.equal('rgb(243, 243, 243)');
     expect(getComputedStyle(root.querySelector('.ph-app')).fontWeight).to.equal('600');
+    expect(getComputedStyle(root.querySelector('.ph-app')).whiteSpace).to.equal('nowrap');
+    expect(getComputedStyle(root.querySelector('.ph-time-clock')).display).to.equal('block');
     expect(getComputedStyle(group.querySelector('[rowspan]')).verticalAlign).to.equal('middle');
     expect(getComputedStyle(group.querySelector('[rowspan]')).paddingTop).to.equal('24px');
     expect(getComputedStyle(group.rows[0].querySelector('.ph-section-label')).paddingTop)
