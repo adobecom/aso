@@ -8,8 +8,8 @@ export const MAX_VISIBLE_CHIPS = 3;
 
 export const SECTION_COLUMNS = [
   { key: 'metadata', label: 'Metadata' },
-  { key: 'promos', label: 'Promos' },
-  { key: 'cpp', label: 'CPP' },
+  { key: 'promos', label: 'Promos/In-App Events' },
+  { key: 'cpp', label: 'Custom Product Pages' },
 ];
 
 const SECTION_TYPE_MAP = {
@@ -130,8 +130,16 @@ export function applyFilters(items, filters = {}) {
   });
 }
 
-export async function fetchPublishLogs({ token, cursor, signal } = {}) {
+export async function fetchPublishLogs({
+  token, cursor, signal, byMe = true, app, platform, status, from, to,
+} = {}) {
   const url = new URL(PUBLISH_LOGS_URL);
+  url.searchParams.set('byMe', String(byMe));
+  Object.entries({ app, platform, status }).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+  });
+  if (from) url.searchParams.set('dateFrom', new Date(`${from}T00:00:00.000Z`).toISOString());
+  if (to) url.searchParams.set('dateTo', new Date(`${to}T23:59:59.999Z`).toISOString());
   if (cursor) url.searchParams.set('cursor', cursor);
   const resp = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
@@ -354,16 +362,31 @@ export function renderStatusBadge(item) {
 export function renderTime(value) {
   const time = el('time', 'ph-time', formatTimestamp(value));
   time.dateTime = String(value ?? '');
-  time.title = `Original: ${value ?? '\u2014'}`;
+  time.title = `Shown in your local time. Original: ${value ?? '\u2014'}`;
   return time;
 }
 
 export function renderRequestCell(item, { onViewJson } = {}) {
   const cell = el('div', 'ph-request-cell');
   const details = el('details', 'ph-details');
-  const summary = el('summary', 'ph-request-id', `${String(item.requestId ?? '').slice(0, 8)}\u2026`);
-  summary.setAttribute('aria-label', 'Request details');
+  const summary = el('summary', 'ph-request-toggle');
+  summary.setAttribute('aria-label', `Request details for ${item.requestId ?? 'unknown request'}`);
+  summary.title = 'Show request details';
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('width', '20');
+  icon.setAttribute('height', '20');
+  icon.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M14 3H5v18h14V8z M14 3v5h5 M8 12h8 M8 16h8');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '1.5');
+  path.setAttribute('stroke-linejoin', 'round');
+  icon.append(path);
+  summary.append(icon, el('span', 'ph-sr-only', 'Request details'));
   details.append(summary);
+  const content = el('div', 'ph-request-body');
   const body = el('dl', 'ph-detail-list');
   const addRow = (term, value) => {
     body.append(el('dt', '', term), el('dd', '', value ?? '\u2014'));
@@ -372,46 +395,59 @@ export function renderRequestCell(item, { onViewJson } = {}) {
   addRow('Requestor', item.requestor);
   addRow('Started (original)', item.startedAt);
   addRow('Ended (original)', item.endedAt);
-  details.append(body);
+  content.append(body);
   const copy = el('button', 'ph-link', 'Copy request ID');
   copy.type = 'button';
   copy.addEventListener('click', () => copyText(item.requestId, copy));
-  details.append(copy);
-  cell.append(details);
+  content.append(copy);
 
   if (item.daPayloadPath) {
     const view = el('button', 'ph-link', 'View JSON');
     view.type = 'button';
     view.addEventListener('click', () => onViewJson?.(item.daPayloadPath));
-    cell.append(view);
+    content.append(view);
   } else {
     const none = el('span', 'ph-not-retained', 'Not retained');
     none.title = 'The source request path was not recorded for this publish, so the request file cannot be shown.';
-    cell.append(none, el('span', 'ph-help', 'Source reference unavailable for this record.'));
+    content.append(none, el('span', 'ph-help', 'Source reference unavailable for this record.'));
   }
+  details.append(content);
+  cell.append(details);
   return cell;
 }
 
 export function renderRow(item, handlers) {
-  const tr = el('tr', 'ph-row');
-  tr.dataset.requestId = item.requestId;
+  const rows = document.createDocumentFragment();
+  const first = el('tr', 'ph-row');
+  first.dataset.requestId = item.requestId;
   const th = el('th', 'ph-cell');
-  th.scope = 'row';
+  th.scope = 'rowgroup';
+  th.rowSpan = SECTION_COLUMNS.length;
   th.append(renderTime(item.startedAt));
-  tr.append(th);
+  first.append(th);
   const cells = [
     el('span', '', item.app ?? '\u2014'),
     el('span', 'ph-platform', item.platform ?? '\u2014'),
     renderStatusBadge(item),
-    ...SECTION_COLUMNS.map((c) => renderSectionCell(item, c, handlers?.languageNames)),
     renderRequestCell(item, handlers),
   ];
   cells.forEach((c) => {
     const td = el('td', 'ph-cell');
+    td.rowSpan = SECTION_COLUMNS.length;
     td.append(c);
-    tr.append(td);
+    first.append(td);
   });
-  return tr;
+  SECTION_COLUMNS.forEach((column, index) => {
+    const tr = index === 0 ? first : el('tr', 'ph-row');
+    tr.dataset.requestId = item.requestId;
+    const section = el('th', 'ph-section-label', column.label);
+    section.scope = 'row';
+    const languages = el('td', 'ph-cell');
+    languages.append(renderSectionCell(item, column, handlers?.languageNames));
+    tr.append(section, languages);
+    rows.append(tr);
+  });
+  return rows;
 }
 
 export function renderCard(item, handlers) {
@@ -438,15 +474,21 @@ export function renderResults(items, handlers) {
   const caption = el('caption', 'ph-sr-only', 'Publish requests');
   const thead = el('thead');
   const headRow = el('tr');
-  ['Started', 'App', 'Platform', 'Overall', ...SECTION_COLUMNS.map((c) => c.label), 'Request'].forEach((h) => {
-    const th = el('th', '', h);
+  ['Started', 'App', 'Platform', 'Overall', 'Request', 'Section', 'Languages'].forEach((h) => {
+    const th = el('th');
+    if (h === 'Request') th.append(el('span', 'ph-sr-only', h));
+    else th.textContent = h;
     th.scope = 'col';
     headRow.append(th);
   });
   thead.append(headRow);
-  const tbody = el('tbody');
-  items.forEach((item) => tbody.append(renderRow(item, handlers)));
-  table.append(caption, thead, tbody);
+  table.append(caption, thead);
+  items.forEach((item) => {
+    const tbody = el('tbody', 'ph-request-group');
+    tbody.dataset.requestId = item.requestId;
+    tbody.append(renderRow(item, handlers));
+    table.append(tbody);
+  });
   const cards = el('ul', 'ph-cards');
   items.forEach((item) => cards.append(renderCard(item, handlers)));
   root.append(table, cards);
@@ -511,8 +553,13 @@ export function init({ context, token }) {
     statusFilter: $('ph-filter-status'),
     from: $('ph-filter-from'),
     to: $('ph-filter-to'),
+    byMe: $('ph-filter-by-me'),
+    all: $('ph-filter-all'),
   };
   const state = { items: [], nextCursor: null, loading: false, loaded: false, seq: 0 };
+  const apps = new Set();
+  const platforms = new Set();
+  let abortController;
   const { org, repo } = context || {};
   const handlers = {
     languageNames: new Map(),
@@ -520,22 +567,29 @@ export function init({ context, token }) {
   };
 
   function renderFilters() {
-    fillSelect(els.app, 'apps', [...new Set(state.items.map((i) => i.app).filter(Boolean))].sort());
-    fillSelect(els.platform, 'platforms', [...new Set(state.items.map((i) => i.platform).filter(Boolean))].sort());
+    state.items.forEach((item) => {
+      if (item.app) apps.add(item.app);
+      if (item.platform) platforms.add(item.platform);
+    });
+    fillSelect(els.app, 'apps', [...apps].sort());
+    fillSelect(els.platform, 'platforms', [...platforms].sort());
     const seen = state.items.map((i) => normalizeStatus(i.overallStatus)).filter(Boolean);
-    fillSelect(els.statusFilter, 'statuses', [...new Set([...STATUS_OPTIONS, ...seen])], (v) => getStatusMeta(v).label);
+    fillSelect(els.statusFilter, 'statuses', [...new Set([...STATUS_OPTIONS, ...seen, els.statusFilter.value].filter(Boolean))], (v) => getStatusMeta(v).label);
   }
 
-  function render() {
-    closePopover();
-    const filters = {
+  function readFilters() {
+    return {
+      byMe: els.byMe.checked,
       app: els.app.value,
       platform: els.platform.value,
       status: els.statusFilter.value,
       from: els.from.value,
       to: els.to.value,
     };
-    const visible = applyFilters(state.items, filters);
+  }
+
+  function render() {
+    closePopover();
     els.more.hidden = !state.nextCursor;
     els.more.disabled = state.loading;
     els.refresh.disabled = state.loading;
@@ -551,16 +605,14 @@ export function init({ context, token }) {
       return;
     }
     const more = state.nextCursor ? ' More records are available.' : ' End of loaded history.';
-    els.status.textContent = `Showing ${visible.length} of ${state.items.length} loaded records (filters apply to loaded records only).${more}${state.loading ? ' Loading\u2026' : ''}`;
-    if (!visible.length) {
-      els.results.replaceChildren(el('p', 'ph-empty', 'No loaded records match the current filters.'));
-      return;
-    }
-    els.results.replaceChildren(renderResults(visible, handlers));
+    els.status.textContent = `Showing ${state.items.length} loaded records matching the current filters.${more}${state.loading ? ' Loading\u2026' : ''}`;
+    els.results.replaceChildren(renderResults(state.items, handlers));
   }
 
   async function load({ append = false } = {}) {
-    if (state.loading) return;
+    if (append && state.loading) return;
+    abortController?.abort();
+    abortController = new AbortController();
     state.loading = true;
     state.seq += 1;
     const { seq } = state;
@@ -568,7 +620,12 @@ export function init({ context, token }) {
     render();
     try {
       const [page, languages] = await Promise.all([
-        fetchPublishLogs({ token, cursor: append ? state.nextCursor : undefined }),
+        fetchPublishLogs({
+          token,
+          cursor: append ? state.nextCursor : undefined,
+          signal: abortController.signal,
+          ...readFilters(),
+        }),
         fetchLanguages({ context, token, configFile: getConfigFileOverride() }),
       ]);
       if (seq !== state.seq) return;
@@ -597,8 +654,13 @@ export function init({ context, token }) {
 
   els.refresh.addEventListener('click', () => load());
   els.more.addEventListener('click', () => load({ append: true }));
-  [els.app, els.platform, els.statusFilter, els.from, els.to]
-    .forEach((control) => control.addEventListener('change', render));
+  [els.app, els.platform, els.statusFilter, els.from, els.to, els.byMe, els.all]
+    .forEach((control) => control.addEventListener('change', () => {
+      state.items = [];
+      state.nextCursor = null;
+      state.loaded = false;
+      load();
+    }));
   renderFilters();
 
   const tabButton = document.querySelector('.tab-button[data-tab="publish-history"]');

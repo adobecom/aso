@@ -248,8 +248,13 @@
             <h2 class="export-title" id="ph-title">Publish Results</h2>
             <button type="button" class="ph-button" id="ph-refresh">Refresh</button>
           </div>
-          <p class="export-description">Results of store publish requests. Filters apply to the records loaded below, not to all history.</p>
+          <p class="export-description">Results of store publish requests, grouped by section. Started timestamps use your local time. Filters search all history; date filters use UTC.</p>
           <form class="ph-filters" id="ph-filters" aria-label="Filter publish results" onsubmit="return false">
+            <fieldset class="ph-requestor-filter">
+              <legend>Published by</legend>
+              <label class="ph-requestor-option"><input type="radio" name="ph-requestor" id="ph-filter-by-me" value="me" checked> By Me</label>
+              <label class="ph-requestor-option"><input type="radio" name="ph-requestor" id="ph-filter-all" value="all"> All</label>
+            </fieldset>
             <div class="control-group"><label for="ph-filter-app">App</label><select id="ph-filter-app" class="select-dropdown"></select></div>
             <div class="control-group"><label for="ph-filter-platform">Platform</label><select id="ph-filter-platform" class="select-dropdown"></select></div>
             <div class="control-group"><label for="ph-filter-status">Status</label><select id="ph-filter-status" class="select-dropdown"></select></div>
