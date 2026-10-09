@@ -57,7 +57,7 @@ export function collectOverallErrors(item) {
   return [...new Set(messages.filter(Boolean))];
 }
 
-// Locales chosen at publish time; those with no data are absent from the section results.
+// Locales chosen at publish time, including those absent from the section results.
 export function getSelectedLocales(item) {
   const list = item?.selectedLocales ?? item?.request?.selectedLocales;
   if (!Array.isArray(list)) return [];
@@ -65,7 +65,7 @@ export function getSelectedLocales(item) {
   return [...new Set(names)];
 }
 
-// Returns { metadata: [chip], promos: [chip], cpp: [chip] }; a missing column stays undefined.
+// Order failures, successes, pending and unreported locales; absent sections stay undefined.
 export function mapSections(item) {
   const columns = {};
   const sections = Array.isArray(item?.response?.sections) ? item.response.sections : [];
@@ -83,12 +83,13 @@ export function mapSections(item) {
     (section.pending ?? []).forEach((l) => add(l, 'pending'));
   });
   const selected = getSelectedLocales(item);
+  const statusOrder = ['failed', 'success', 'pending', 'missing'];
   Object.entries(columns).forEach(([column, chips]) => {
-    if (!chips.length) return;
     const seen = new Set(chips.map((c) => c.locale.toLowerCase()));
     selected.filter((l) => !seen.has(l.toLowerCase())).forEach((locale) => {
       chips.push({ locale, status: 'missing', error: '', section: column });
     });
+    chips.sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
   });
   return columns;
 }
@@ -302,7 +303,7 @@ const CHIP_LABELS = {
   success: 'Passed',
   failed: 'Failed',
   pending: 'Pending',
-  missing: 'No data exists',
+  missing: 'No result recorded',
 };
 
 export function renderChip(chip, sectionLabel, languageNames = new Map()) {

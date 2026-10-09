@@ -47,7 +47,7 @@ describe('publish-history data helpers', () => {
 
   it('maps success, failed and pending outcomes', () => {
     const cols = mapSections({ response: { sections: [{ type: 'metadata', success: ['en'], failure: [{ locale: 'fr', error: 'x' }], pending: ['de'] }] } });
-    expect(cols.metadata.map((c) => c.status)).to.deep.equal(['success', 'failed', 'pending']);
+    expect(cols.metadata.map((c) => c.status)).to.deep.equal(['failed', 'success', 'pending']);
   });
 
   it('leaves missing sections undefined', () => {
@@ -213,7 +213,7 @@ describe('publish-history rendering', () => {
     document.body.append(root);
     [root.querySelector('.ph-table'), root.querySelector('.ph-card')].forEach((view) => {
       expect([...view.querySelectorAll('.ph-chip-locale')].map((chip) => chip.textContent))
-        .to.deep.equal(['English', 'English - British', 'Japanese']);
+        .to.deep.equal(['Japanese', 'English', 'English - British']);
       view.querySelector('.ph-more').click();
       expect([...view.querySelectorAll('.ph-chip-locale')].map((chip) => chip.textContent))
         .to.include.members(['French', 'xx']);
@@ -326,7 +326,7 @@ describe('publish-history rendering', () => {
     });
   });
 
-  it('adds selected locales without data as grey chips after the results, and keeps empty sections as a dash', () => {
+  it('orders failed, successful and grey selected locales, including empty result sections', () => {
     const item = {
       selectedLocales: ['en-US', 'ja-jp', 'ko-kr', 'de-de'],
       response: {
@@ -338,17 +338,59 @@ describe('publish-history rendering', () => {
     };
     const sections = mapSections(item);
     expect(sections.metadata.map((c) => [c.locale, c.status])).to.deep.equal([
-      ['en-US', 'success'], ['JA-JP', 'failed'], ['ko-kr', 'missing'], ['de-de', 'missing'],
+      ['JA-JP', 'failed'], ['en-US', 'success'], ['ko-kr', 'missing'], ['de-de', 'missing'],
     ]);
-    expect(sections.promos).to.deep.equal([]);
+    expect(sections.promos.map((c) => [c.locale, c.status])).to.deep.equal(
+      item.selectedLocales.map((locale) => [locale, 'missing']),
+    );
     const cell = renderSectionCell(item, { key: 'metadata', label: 'Metadata' });
     expect(cell.querySelectorAll('.ph-chip-missing')).to.have.length(1);
-    expect(cell.querySelector('.ph-chip-missing').title).to.equal('No data exists (ko-kr)');
+    expect(cell.querySelector('.ph-chip-missing').title).to.equal('No result recorded (ko-kr)');
     cell.querySelector('.ph-more').click();
     expect(cell.querySelectorAll('.ph-chip-missing')).to.have.length(2);
-    expect(renderSectionCell(item, { key: 'promos', label: 'Promos' }).textContent).to.equal('\u2014');
+    const promos = renderSectionCell(item, { key: 'promos', label: 'Promos' });
+    expect(promos.querySelectorAll('.ph-chip-missing')).to.have.length(3);
+    promos.querySelector('.ph-more').click();
+    expect(promos.querySelectorAll('.ph-chip-missing')).to.have.length(4);
     expect(renderSectionCell(item, { key: 'cpp', label: 'CPP' }).textContent).to.equal('\u2014');
     expect(mapSections({ response: item.response }).metadata).to.have.length(2);
+  });
+
+  it('uses request-selected locales and sorts merged section results before unreported locales', () => {
+    const item = {
+      request: { selectedLocales: ['en', 'fr', 'de', 'ja', 'ko'] },
+      response: {
+        sections: [
+          { type: 'metadata', success: ['en'], pending: ['de'] },
+          { type: 'localizations', success: ['ja'], failure: [{ locale: 'fr', error: 'bad' }] },
+        ],
+      },
+    };
+    expect(mapSections(item).metadata.map((c) => [c.locale, c.status])).to.deep.equal([
+      ['fr', 'failed'], ['en', 'success'], ['ja', 'success'], ['de', 'pending'], ['ko', 'missing'],
+    ]);
+    const root = renderResults([item], {});
+    [root.querySelector('.ph-table'), root.querySelector('.ph-card')].forEach((view) => {
+      expect([...view.querySelectorAll('.ph-chip')].map((chip) => chip.title))
+        .to.deep.equal(['Failed (fr)', 'Passed (en)', 'Passed (ja)']);
+      view.querySelector('.ph-more').click();
+      expect([...view.querySelectorAll('.ph-chip')].map((chip) => chip.title))
+        .to.deep.equal(['Failed (fr)', 'Passed (en)', 'Passed (ja)', 'Pending (de)', 'No result recorded (ko)']);
+    });
+  });
+
+  it('renders unreported selected languages grey with an accessible status', async () => {
+    const style = document.createElement('style');
+    style.textContent = await readFile({ path: '../../../../tools/aso-dashboard/css/aso-dashboard.css' });
+    const cell = renderSectionCell({
+      selectedLocales: ['fr'],
+      response: { sections: [{ type: 'metadata' }] },
+    }, { key: 'metadata', label: 'Metadata' }, new Map([['fr', 'French']]));
+    document.body.append(style, cell);
+    const chip = cell.querySelector('.ph-chip-missing');
+    expect(chip.textContent).to.contain('French');
+    expect(chip.getAttribute('aria-label')).to.equal('Metadata French (fr): No result recorded');
+    expect(getComputedStyle(chip).backgroundColor).to.equal('rgb(236, 236, 236)');
   });
 
   it('groups each request into three section rows with shared cells and matching mobile labels', () => {
