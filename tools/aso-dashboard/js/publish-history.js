@@ -426,7 +426,7 @@ export function renderRow(item, handlers) {
   th.append(renderTime(item.startedAt));
   first.append(th);
   const cells = [
-    el('span', '', item.app ?? '\u2014'),
+    el('span', 'ph-app', item.app ?? '\u2014'),
     el('span', 'ph-platform', item.platform ?? '\u2014'),
     renderStatusBadge(item),
     renderRequestCell(item, handlers),

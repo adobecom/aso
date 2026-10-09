@@ -322,18 +322,63 @@ describe('publish-history rendering', () => {
     expect(rows[2].querySelector('.ph-chip').title).to.equal('Pending (de)');
   });
 
-  it('centers shared cells and only separates complete request groups', async () => {
+  it('styles the list as a rounded gray panel with spacious grouped rows', async () => {
     const style = document.createElement('style');
     style.textContent = await readFile({ path: '../../../../tools/aso-dashboard/css/aso-dashboard.css' });
     const root = renderResults([SUCCESS], {});
     document.body.append(style, root);
     const group = root.querySelector('tbody');
+    const panel = getComputedStyle(root);
+    expect(panel.backgroundColor).to.equal('rgb(247, 247, 247)');
+    expect(panel.borderRadius).to.equal('12px');
+    expect(panel.borderTopWidth).to.equal('1px');
+    expect(panel.overflow).to.equal('visible');
+    expect(getComputedStyle(root.querySelector('thead th')).backgroundColor)
+      .to.equal('rgb(243, 243, 243)');
+    expect(getComputedStyle(root.querySelector('.ph-app')).fontWeight).to.equal('600');
     expect(getComputedStyle(group.querySelector('[rowspan]')).verticalAlign).to.equal('middle');
+    expect(getComputedStyle(group.querySelector('[rowspan]')).paddingTop).to.equal('24px');
+    expect(getComputedStyle(group.rows[0].querySelector('.ph-section-label')).paddingTop)
+      .to.equal('24px');
+    expect(getComputedStyle(group.rows[2].querySelector('.ph-section-label')).paddingBottom)
+      .to.equal('24px');
+    expect(getComputedStyle(group.querySelector('.ph-section-label')).textTransform)
+      .to.equal('uppercase');
+    expect(getComputedStyle(group.querySelector('.ph-section-label')).color)
+      .to.equal('rgb(119, 119, 119)');
     expect(getComputedStyle(group.rows[0].querySelector('.ph-section-label')).borderBottomWidth)
       .to.equal('0px');
     expect(getComputedStyle(group.rows[1].querySelector('td')).borderBottomWidth).to.equal('0px');
     expect(getComputedStyle(group.rows[2].querySelector('td')).borderBottomWidth).to.equal('1px');
     expect(getComputedStyle(root.querySelector('.ph-request-toggle')).display).to.equal('inline-flex');
+    expect(getComputedStyle(root.querySelector('.ph-request-toggle')).minWidth).to.equal('40px');
+    expect(getComputedStyle(root.querySelector('.ph-card')).borderBottomWidth).to.equal('0px');
+    expect(getComputedStyle(root.querySelector('.ph-card-label')).textTransform).to.equal('uppercase');
+  });
+
+  it('fits the desktop panel and switches to matching cards on mobile', async () => {
+    const css = await readFile({ path: '../../../../tools/aso-dashboard/css/aso-dashboard.css' });
+    const frame = document.createElement('iframe');
+    frame.style.width = '900px';
+    document.body.append(frame);
+    const style = frame.contentDocument.createElement('style');
+    style.textContent = css;
+    frame.contentDocument.head.append(style);
+    const root = renderResults([PARTIAL, MANY], {});
+    frame.contentDocument.body.append(root);
+    const table = root.querySelector('.ph-table');
+    const cards = root.querySelector('.ph-cards');
+    const styles = (node) => frame.contentWindow.getComputedStyle(node);
+    expect(styles(table).display).to.equal('table');
+    expect(styles(cards).display).to.equal('none');
+    expect(table.getBoundingClientRect().width).to.be.at.most(root.clientWidth);
+    frame.style.width = '650px';
+    expect(styles(table).display).to.equal('none');
+    expect(styles(cards).display).to.equal('grid');
+    expect(cards.getBoundingClientRect().width).to.be.at.most(root.clientWidth);
+    const details = cards.querySelector('details');
+    details.querySelector('summary').click();
+    expect(details.open).to.equal(true);
   });
 });
 
