@@ -326,6 +326,31 @@ describe('publish-history rendering', () => {
     });
   });
 
+  it('adds selected locales without data as grey chips after the results, and keeps empty sections as a dash', () => {
+    const item = {
+      selectedLocales: ['en-US', 'ja-jp', 'ko-kr', 'de-de'],
+      response: {
+        sections: [
+          { type: 'metadata', success: ['en-US'], failure: [{ locale: 'JA-JP', error: 'bad' }] },
+          { type: 'promos', success: [] },
+        ],
+      },
+    };
+    const sections = mapSections(item);
+    expect(sections.metadata.map((c) => [c.locale, c.status])).to.deep.equal([
+      ['en-US', 'success'], ['JA-JP', 'failed'], ['ko-kr', 'missing'], ['de-de', 'missing'],
+    ]);
+    expect(sections.promos).to.deep.equal([]);
+    const cell = renderSectionCell(item, { key: 'metadata', label: 'Metadata' });
+    expect(cell.querySelectorAll('.ph-chip-missing')).to.have.length(1);
+    expect(cell.querySelector('.ph-chip-missing').title).to.equal('No data exists (ko-kr)');
+    cell.querySelector('.ph-more').click();
+    expect(cell.querySelectorAll('.ph-chip-missing')).to.have.length(2);
+    expect(renderSectionCell(item, { key: 'promos', label: 'Promos' }).textContent).to.equal('\u2014');
+    expect(renderSectionCell(item, { key: 'cpp', label: 'CPP' }).textContent).to.equal('\u2014');
+    expect(mapSections({ response: item.response }).metadata).to.have.length(2);
+  });
+
   it('groups each request into three section rows with shared cells and matching mobile labels', () => {
     const root = renderResults(fixture.items, {});
     expect([...root.querySelectorAll('thead th')].map((t) => t.textContent))

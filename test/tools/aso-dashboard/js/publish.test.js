@@ -59,6 +59,11 @@ describe('publish', () => {
       }
     });
 
+    it(`lists every selected locale in ${platform} selectedLocales even without data`, () => {
+      const payload = buildPublishPayload([], { product: 'app', platform, languages: [{ code: 'en' }, { code: 'ja-jp' }], blockTypes: ['listing'] });
+      expect(payload.selectedLocales).to.deep.equal(['en', 'ja-jp']);
+    });
+
     it(`omits ${platform} metadata when no languages are selected`, () => {
       const payload = buildPublishPayload([], { product: 'app', platform, languages: [], blockTypes: ['listing'] });
       expect(payload).not.to.have.property('metadata');
@@ -84,6 +89,7 @@ describe('publish', () => {
     expect(payload).to.deep.equal({
       app: 'app',
       platform: 'google',
+      selectedLocales: ['en-US'],
       metadata: {
         localizations: [{
           locale: 'en-US',
@@ -104,7 +110,7 @@ describe('publish', () => {
       platform: 'google',
       languages: [language],
     });
-    expect(payload).to.deep.equal({ app: 'app', platform: 'google' });
+    expect(payload).to.deep.equal({ app: 'app', platform: 'google', selectedLocales: ['en-US'] });
   });
 
   it('omits empty Apple promo localizations independently for each promo', () => {
@@ -140,7 +146,7 @@ describe('publish', () => {
       languages: [{ code: 'en' }],
       promoNames: ['p1'],
     });
-    expect(payload).to.deep.equal({ app: 'app', promos: [{ referenceName: 'p1' }] });
+    expect(payload).to.deep.equal({ app: 'app', selectedLocales: ['en'], promos: [{ referenceName: 'p1' }] });
   });
 
   it('omits promos when no promo names are selected', () => {
@@ -150,7 +156,7 @@ describe('publish', () => {
       languages: [{ code: 'en' }],
       promoNames: [],
     });
-    expect(payload).to.deep.equal({ app: 'app' });
+    expect(payload).to.deep.equal({ app: 'app', selectedLocales: ['en'] });
   });
 
   describe('createPublishProgressModal', () => {

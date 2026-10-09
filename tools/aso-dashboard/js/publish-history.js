@@ -57,6 +57,14 @@ export function collectOverallErrors(item) {
   return [...new Set(messages.filter(Boolean))];
 }
 
+// Locales chosen at publish time; those with no data are absent from the section results.
+export function getSelectedLocales(item) {
+  const list = item?.selectedLocales ?? item?.request?.selectedLocales;
+  if (!Array.isArray(list)) return [];
+  const names = list.map((l) => String(l ?? '').trim()).filter(Boolean);
+  return [...new Set(names)];
+}
+
 // Returns { metadata: [chip], promos: [chip], cpp: [chip] }; a missing column stays undefined.
 export function mapSections(item) {
   const columns = {};
@@ -73,6 +81,14 @@ export function mapSections(item) {
     (section.success ?? []).forEach((l) => add(l, 'success'));
     (section.failure ?? []).forEach((f) => add(f?.locale, 'failed', f?.error));
     (section.pending ?? []).forEach((l) => add(l, 'pending'));
+  });
+  const selected = getSelectedLocales(item);
+  Object.entries(columns).forEach(([column, chips]) => {
+    if (!chips.length) return;
+    const seen = new Set(chips.map((c) => c.locale.toLowerCase()));
+    selected.filter((l) => !seen.has(l.toLowerCase())).forEach((locale) => {
+      chips.push({ locale, status: 'missing', error: '', section: column });
+    });
   });
   return columns;
 }
@@ -281,8 +297,13 @@ function attachTooltip(anchor, text) {
 
 // ---------- Renderers ----------
 
-const CHIP_ICONS = { success: '\u2713', failed: '\u2715', pending: '\u23F1' };
-const CHIP_LABELS = { success: 'Passed', failed: 'Failed', pending: 'Pending' };
+const CHIP_ICONS = { success: '\u2713', failed: '\u2715', pending: '\u23F1', missing: '\u2212' };
+const CHIP_LABELS = {
+  success: 'Passed',
+  failed: 'Failed',
+  pending: 'Pending',
+  missing: 'No data exists',
+};
 
 export function renderChip(chip, sectionLabel, languageNames = new Map()) {
   const languageName = languageNames.get(chip.locale.toLowerCase()) || chip.locale;

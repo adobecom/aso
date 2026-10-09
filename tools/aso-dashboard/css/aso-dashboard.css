@@ -1319,6 +1319,7 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
 .ph-chip-success { background: #d7f4e0; color: #0b6b2b; }
 .ph-chip-failed { background: #fddcd9; color: #b3261e; border-color: #b3261e; cursor: pointer; }
 .ph-chip-pending { background: var(--s2-gray-50); color: var(--s2-gray-700); border-color: var(--s2-gray-200); }
+.ph-chip-missing { background: #ececec; color: #6b6b6b; border-color: #d5d5d5; cursor: default; opacity: 0.85; }
 
 .ph-none { color: var(--s2-gray-700); }
 

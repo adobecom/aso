@@ -73,7 +73,7 @@ export function buildPublishPayload(cells, options) {
 
   if (platform === 'apple') {
     const listingFields = ['name', 'subtitle', 'description', 'keywords', 'marketingUrl', 'promotionalText', 'supportUrl'];
-    const payload = { app: product };
+    const payload = { app: product, selectedLocales: langCodes };
     if (blockTypes.includes('listing')) {
       payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)).filter(Boolean) };
     }
@@ -94,6 +94,7 @@ export function buildPublishPayload(cells, options) {
   const payload = {
     app: product,
     platform: 'google',
+    selectedLocales: langCodes,
   };
   if (blockTypes.includes('listing')) {
     payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean) };
