@@ -196,6 +196,30 @@ export async function fetchSourceJson({ org, repo, path, token }) {
   }
 }
 
+async function loadSelectedLocales(items, context) {
+  const results = [];
+  for (let start = 0; start < items.length; start += 5) {
+    // Bound DA reads when a history page omits the original language selections.
+    // eslint-disable-next-line no-await-in-loop
+    const batch = await Promise.allSettled(items.slice(start, start + 5).map(async (item) => {
+      if (Array.isArray(item.selectedLocales) || Array.isArray(item.request?.selectedLocales)
+        || !item.daPayloadPath) return item;
+      const source = JSON.parse(await fetchSourceJson({ ...context, path: item.daPayloadPath }));
+      if (!Array.isArray(source?.selectedLocales)) {
+        throw new Error('Source JSON does not record selectedLocales.');
+      }
+      return { ...item, selectedLocales: getSelectedLocales(source) };
+    }));
+    results.push(...batch);
+  }
+  return {
+    items: results.map((result, index) => (result.status === 'fulfilled'
+      ? result.value : items[index])),
+    errors: results.flatMap((result, index) => (result.status === 'rejected'
+      ? [`${items[index].requestId || items[index].daPayloadPath}: ${result.reason.message}`] : [])),
+  };
+}
+
 // ---------- DOM helpers ----------
 
 function el(tag, className, text) {
@@ -666,15 +690,22 @@ export function init({ context, token }) {
         fetchLanguages({ context, token, configFile: getConfigFileOverride() }),
       ]);
       if (seq !== state.seq) return;
+      const selected = await loadSelectedLocales(page.items, { org, repo, token });
+      if (seq !== state.seq) return;
       handlers.languageNames.clear();
       languages.forEach((language) => {
         if (language.code) {
           handlers.languageNames.set(language.code.toLowerCase(), language.label);
         }
       });
-      state.items = append ? mergeItems(state.items, page.items) : mergeItems([], page.items);
+      state.items = append
+        ? mergeItems(state.items, selected.items) : mergeItems([], selected.items);
       state.nextCursor = page.nextCursor;
       state.loaded = true;
+      if (selected.errors.length) {
+        els.error.textContent = `Some selected languages could not be loaded. Grey pills may be missing. ${selected.errors.join(' ')}`;
+        els.error.hidden = false;
+      }
       renderFilters();
     } catch (error) {
       if (seq !== state.seq) return;

@@ -647,9 +647,107 @@ describe('publish-history API and controller', () => {
   }
   const q = (s) => document.querySelector(s);
 
+  it('loads selected locales from the saved request when the history API omits them', async () => {
+    const item = {
+      ...SUCCESS,
+      response: {
+        sections: [
+          { type: 'metadata', success: ['en'], failure: [{ locale: 'ja-jp', error: 'bad' }] },
+          { type: 'promos', success: ['ko-kr'] },
+        ],
+      },
+    };
+    delete item.selectedLocales;
+    const stub = sinon.stub(window, 'fetch');
+    stub.withArgs(sinon.match('list-publish-logs')).resolves(jsonResponse({ items: [item] }));
+    const source = stub.withArgs(
+      `https://admin.da.live/source/o/r/${item.daPayloadPath}`,
+    ).resolves(jsonResponse({ selectedLocales: ['en', 'ja-jp', 'ko-kr', 'fr-fr'] }));
+    const controller = await mount();
+    await controller.load();
+    expect(source.calledOnce).to.equal(true);
+    expect(controller.state.items[0].selectedLocales)
+      .to.deep.equal(['en', 'ja-jp', 'ko-kr', 'fr-fr']);
+    [q('.ph-table'), q('.ph-card')].forEach((view) => {
+      view.querySelectorAll('.ph-more').forEach((more) => more.click());
+      expect([...view.querySelectorAll('.ph-chip')].map((chip) => chip.title)).to.deep.equal([
+        'Failed (ja-jp)', 'Passed (en)', 'No result recorded (ko-kr)', 'No result recorded (fr-fr)',
+        'Passed (ko-kr)', 'No result recorded (en)', 'No result recorded (ja-jp)', 'No result recorded (fr-fr)',
+      ]);
+    });
+    expect(q('#ph-error').hidden).to.equal(true);
+  });
+
+  it('does not fetch source when the request already includes selected locales', async () => {
+    const item = { ...SUCCESS, request: { selectedLocales: ['en', 'fr-fr'] } };
+    delete item.selectedLocales;
+    const stub = sinon.stub(window, 'fetch').resolves(jsonResponse({ items: [item] }));
+    const controller = await mount();
+    await controller.load();
+    expect(stub.calledOnce).to.equal(true);
+    q('.ph-table .ph-more').click();
+    expect(q('.ph-chip-missing').title).to.equal('No result recorded (fr-fr)');
+  });
+
+  it('keeps history visible and reports retained-request failures without inventing languages', async () => {
+    const item = { ...SUCCESS };
+    delete item.selectedLocales;
+    const stub = sinon.stub(window, 'fetch');
+    stub.withArgs(sinon.match('list-publish-logs')).resolves(jsonResponse({ items: [item] }));
+    stub.withArgs(sinon.match('admin.da.live/source')).resolves(jsonResponse({}, 404));
+    const controller = await mount();
+    await controller.load();
+    expect(q('.ph-table')).to.not.equal(null);
+    expect(q('.ph-chip-missing')).to.equal(null);
+    expect(q('#ph-error').hidden).to.equal(false);
+    expect(q('#ph-error').textContent).to.contain('Grey pills may be missing');
+    expect(q('#ph-error').textContent).to.contain('Source file was not found');
+  });
+
+  it('reports saved requests without selectedLocales, and blocks invalid source paths', async () => {
+    const items = [
+      { ...SUCCESS, selectedLocales: undefined },
+      { ...SUCCESS, selectedLocales: undefined, requestId: 'invalid', daPayloadPath: 'https://evil.com/source.json' },
+    ];
+    const stub = sinon.stub(window, 'fetch');
+    stub.withArgs(sinon.match('list-publish-logs')).resolves(jsonResponse({ items }));
+    stub.withArgs(sinon.match('admin.da.live/source')).resolves(jsonResponse({ app: 'firefly' }));
+    const controller = await mount();
+    await controller.load();
+    expect(stub.callCount).to.equal(2);
+    expect(q('#ph-error').textContent).to.contain('Source JSON does not record selectedLocales');
+    expect(q('#ph-error').textContent).to.contain('Source path is not a valid publish request path');
+    expect(q('.ph-table').querySelectorAll('tbody')).to.have.length(2);
+  });
+
+  it('discards stale selected locales if history refreshes during a source read', async () => {
+    const item = { ...SUCCESS, selectedLocales: undefined };
+    let finishSource;
+    const stub = sinon.stub(window, 'fetch');
+    const logs = stub.withArgs(sinon.match('list-publish-logs'));
+    logs.onCall(0).resolves(jsonResponse({ items: [item] }));
+    logs.onCall(1).resolves(jsonResponse({ items: [FAILED] }));
+    stub.withArgs(sinon.match('admin.da.live/source')).returns(new Promise((resolve) => {
+      finishSource = resolve;
+    }));
+    const controller = await mount();
+    const initial = controller.load();
+    await tick();
+    await controller.load();
+    finishSource(jsonResponse({ selectedLocales: ['en', 'fr-fr'] }));
+    await initial;
+    expect(controller.state.items).to.deep.equal([FAILED]);
+    expect(q('#ph-error').hidden).to.equal(true);
+    expect(controller.state.loading).to.equal(false);
+  });
+
   it('reuses the cached language mapping used by Export', async () => {
     const section = { type: 'metadata', success: ['en', 'DE-DE', 'uk', 'en-GB'] };
-    const item = { ...SUCCESS, response: { sections: [section] } };
+    const item = {
+      ...SUCCESS,
+      selectedLocales: section.success,
+      response: { sections: [section] },
+    };
     const stub = sinon.stub(window, 'fetch').resolves(jsonResponse({ items: [item] }));
     const controller = await mount();
     await controller.load();
