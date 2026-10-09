@@ -311,6 +311,21 @@ describe('publish-history rendering', () => {
     expect(css).to.match(/\.ph-request-group:hover[^{]*\{[^}]*--ph-edge: #2b4fd8/);
   });
 
+  it('keeps the table inside its panel and chips unbroken at narrow desktop widths', async () => {
+    const style = document.createElement('style');
+    style.textContent = await readFile({ path: '../../../../tools/aso-dashboard/css/aso-dashboard.css' });
+    const root = renderResults(fixture.items, {});
+    const host = document.createElement('div');
+    host.style.width = '1000px';
+    host.append(root);
+    document.body.append(style, host);
+    const table = root.querySelector('table');
+    expect(table.getBoundingClientRect().right).to.be.at.most(root.getBoundingClientRect().right);
+    root.querySelectorAll('.ph-chip').forEach((chip) => {
+      expect(chip.getBoundingClientRect().height).to.be.below(32);
+    });
+  });
+
   it('groups each request into three section rows with shared cells and matching mobile labels', () => {
     const root = renderResults(fixture.items, {});
     expect([...root.querySelectorAll('thead th')].map((t) => t.textContent))
@@ -481,6 +496,20 @@ describe('publish-history API and controller', () => {
     sinon.restore();
     window.history.replaceState(null, '', originalUrl);
     document.body.innerHTML = '';
+  });
+
+  it('reads alternate cursor fields and sends structured cursors back as JSON', async () => {
+    const stub = sinon.stub(window, 'fetch');
+    stub.onCall(0).resolves(jsonResponse({ items: [], nextToken: 'tok2' }));
+    stub.onCall(1).resolves(jsonResponse({ items: [], lastEvaluatedKey: { pk: 'a', sk: 'b' } }));
+    stub.onCall(2).resolves(jsonResponse({ items: [], nextCursor: null }));
+    expect((await fetchPublishLogs({ token: 't' })).nextCursor).to.equal('tok2');
+    const { nextCursor } = await fetchPublishLogs({ token: 't' });
+    expect(JSON.parse(nextCursor)).to.deep.equal({ pk: 'a', sk: 'b' });
+    expect((await fetchPublishLogs({ token: 't' })).nextCursor).to.equal(null);
+    stub.resolves(jsonResponse({ items: [] }));
+    await fetchPublishLogs({ token: 't', cursor: nextCursor });
+    expect(new URL(stub.lastCall.args[0]).searchParams.get('cursor')).to.equal(nextCursor);
   });
 
   it('sends bearer token and cursor; surfaces nextCursor', async () => {

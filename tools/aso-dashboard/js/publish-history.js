@@ -130,6 +130,18 @@ export function applyFilters(items, filters = {}) {
   });
 }
 
+const CURSOR_KEYS = ['nextCursor', 'cursor', 'nextToken', 'nextPageToken', 'lastEvaluatedKey'];
+
+// Cursor may be a string or a structured key (e.g. a DynamoDB key); objects go back as JSON.
+export function extractNextCursor(data) {
+  const body = data?.pagination || data?.meta || {};
+  const value = [data, body]
+    .flatMap((src) => CURSOR_KEYS.map((key) => src?.[key]))
+    .find((v) => v !== undefined && v !== null && v !== '');
+  if (value === undefined) return null;
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
 export async function fetchPublishLogs({
   token, cursor, signal, byMe = true, app, platform, status,
 } = {}) {
@@ -152,7 +164,7 @@ export async function fetchPublishLogs({
     throw new Error('Publish results response was not valid JSON.');
   }
   if (!Array.isArray(data?.items)) throw new Error('Publish results response is missing "items".');
-  return { items: data.items, nextCursor: data.nextCursor || null };
+  return { items: data.items, nextCursor: extractNextCursor(data) };
 }
 
 // Only paths under the publish request folder are fetched, always through the DA source client.

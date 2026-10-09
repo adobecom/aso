@@ -1067,12 +1067,12 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
 }
 
 .ph-table {
-  --ph-pad: clamp(12px, 1.5vw, 24px);
+  --ph-pad: clamp(8px, 1vw, 20px);
 
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.5;
   color: #292929;
 }
@@ -1112,7 +1112,6 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: #777;
-  white-space: nowrap;
 }
 
 .ph-time {
@@ -1314,6 +1313,7 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   font-size: 13px;
   font-weight: 400;
   line-height: 1.5;
+  white-space: nowrap;
 }
 
 .ph-chip-success { background: #d7f4e0; color: #0b6b2b; }
