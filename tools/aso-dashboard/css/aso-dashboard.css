@@ -954,7 +954,6 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
 .ph-chip:focus-visible,
 .ph-more:focus-visible,
 .ph-info:focus-visible,
-.ph-date:focus-visible,
 .ph-popover:focus-visible {
   outline: 2px solid var(--s2-blue-800);
   outline-offset: 2px;
@@ -972,15 +971,6 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   flex-direction: column;
   gap: 4px;
   font-size: 14px;
-}
-
-.ph-date {
-  height: 40px;
-  padding: 0 var(--spacing-200);
-  font-family: var(--body-font-family);
-  border: 1px solid var(--s2-gray-200);
-  border-radius: var(--s2-radius-100);
-  background: #fff;
 }
 
 .ph-requestor-filter {
@@ -1033,7 +1023,52 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   background: #f7f7f7;
 }
 
+.ph-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 16px;
+  min-height: 320px;
+  padding: 0 28px;
+}
+
+.ph-loading-text {
+  margin: 0;
+  text-align: center;
+  color: #777;
+}
+
+.ph-loading-bar {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #e0e0e0;
+}
+
+.ph-loading-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #8fb0f7 0%, #5b86f5 35%, rgb(91 134 245 / 0%) 100%);
+  animation: ph-loading-slide 1.6s ease-in-out infinite;
+}
+
+@keyframes ph-loading-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ph-loading-bar-fill { animation-duration: 4s; }
+}
+
 .ph-table {
+  --ph-pad: clamp(12px, 1.5vw, 24px);
+
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -1044,8 +1079,7 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
 
 .ph-table th,
 .ph-table td {
-  padding: 8px clamp(12px, 1.5vw, 24px);
-  border-bottom: 1px solid #dedede;
+  padding: 8px var(--ph-pad);
   text-align: left;
   vertical-align: top;
   overflow-wrap: anywhere;
@@ -1054,6 +1088,7 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
 .ph-table thead th {
   padding-top: 16px;
   padding-bottom: 16px;
+  border-bottom: 1px solid #dedede;
   background: #f3f3f3;
   font-weight: 700;
   white-space: nowrap;
@@ -1116,9 +1151,64 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   padding-bottom: 24px;
 }
 
-.ph-request-group > .ph-row:not(:last-child) > .ph-section-label,
-.ph-request-group > .ph-row:not(:last-child) > td:not([rowspan]) {
-  border-bottom: 0;
+.ph-request-group {
+  --ph-line: #dedede;
+  --ph-edge: transparent;
+  --ph-hover-bg: transparent;
+  --ph-name: inherit;
+}
+
+.ph-request-group:hover,
+.ph-request-group:focus-within {
+  --ph-line: transparent;
+  --ph-edge: #2b4fd8;
+  --ph-hover-bg: #e6f0fd;
+  --ph-name: #2b4fd8;
+}
+
+.ph-request-group > .ph-row > * {
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+  background-color: var(--ph-hover-bg);
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  background-position: left bottom;
+  background-size: 100% 1px;
+}
+
+.ph-request-group > .ph-row:first-child > * {
+  border-top-color: var(--ph-edge);
+}
+
+.ph-request-group > .ph-row > [rowspan],
+.ph-request-group > .ph-row:last-child > * {
+  border-bottom-color: var(--ph-edge);
+}
+
+.ph-request-group:not(:last-child) > .ph-row > [rowspan],
+.ph-request-group:not(:last-child) > .ph-row:last-child > * {
+  background-image: linear-gradient(var(--ph-line), var(--ph-line));
+}
+
+.ph-request-group:not(:last-child) > .ph-row > th[scope="rowgroup"] {
+  background-size: calc(100% - var(--ph-pad)) 1px;
+  background-position: right bottom;
+}
+
+.ph-request-group:not(:last-child) > .ph-row:last-child > td:last-child {
+  background-size: calc(100% - var(--ph-pad)) 1px;
+}
+
+.ph-request-group:last-child > .ph-row > th[scope="rowgroup"] {
+  border-bottom-left-radius: 11px;
+}
+
+.ph-request-group:last-child > .ph-row:last-child > td:last-child {
+  border-bottom-right-radius: 11px;
+}
+
+.ph-request-group .ph-app {
+  color: var(--ph-name);
 }
 
 .ph-cards {
@@ -1134,6 +1224,12 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   font-size: 16px;
   color: #292929;
   overflow-wrap: anywhere;
+}
+
+.ph-card:hover,
+.ph-card:focus-within {
+  background: #e6f0fd;
+  box-shadow: inset 0 1px 0 #2b4fd8, inset 0 -1px 0 #2b4fd8;
 }
 
 .ph-card:last-child {

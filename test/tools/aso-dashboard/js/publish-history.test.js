@@ -87,9 +87,6 @@ describe('publish-history data helpers', () => {
     expect(applyFilters(fixture.items, { app: 'firefly' })).to.deep.equal([SUCCESS]);
     expect(applyFilters(fixture.items, { status: 'partial' })).to.have.length(2);
     expect(applyFilters(fixture.items, { app: 'nope' })).to.have.length(0);
-    const d = new Date(FAILED.startedAt);
-    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    expect(applyFilters(fixture.items, { from: day, to: day })).to.deep.equal([FAILED]);
   });
 });
 
@@ -277,6 +274,43 @@ describe('publish-history rendering', () => {
     expect(time.title).to.contain(value);
   });
 
+  it('styles the loading state as a tall panel with a full-width gradient bar', async () => {
+    const style = document.createElement('style');
+    style.textContent = await readFile({ path: '../../../../tools/aso-dashboard/css/aso-dashboard.css' });
+    const panel = document.createElement('div');
+    panel.className = 'ph-results-inner ph-loading';
+    panel.innerHTML = '<p class="ph-loading-text">x</p><div class="ph-loading-bar"><div class="ph-loading-bar-fill"></div></div>';
+    document.body.append(style, panel);
+    expect(panel.getBoundingClientRect().height).to.be.at.least(320);
+    const bar = panel.querySelector('.ph-loading-bar');
+    expect(bar.getBoundingClientRect().width).to.be.above(panel.clientWidth - 80);
+    expect(getComputedStyle(bar).backgroundColor).to.equal('rgb(224, 224, 224)');
+    expect(getComputedStyle(panel.querySelector('.ph-loading-bar-fill')).backgroundImage)
+      .to.contain('linear-gradient');
+  });
+
+  it('separates request groups with inset delimiters and highlights the active group with a border', async () => {
+    const style = document.createElement('style');
+    style.textContent = await readFile({ path: '../../../../tools/aso-dashboard/css/aso-dashboard.css' });
+    const root = renderResults([SUCCESS, PARTIAL, FAILED], {});
+    document.body.append(style, root);
+    const [first, , last] = root.querySelectorAll('tbody');
+    const line = (cell) => getComputedStyle(cell).backgroundImage;
+    const firstCell = (group) => group.querySelector('th[scope="rowgroup"]');
+    const lastLanguages = (group) => group.rows[2].cells[1];
+
+    expect(line(firstCell(first))).to.contain('linear-gradient');
+    expect(getComputedStyle(firstCell(first)).backgroundPosition).to.equal('100% 100%');
+    expect(line(lastLanguages(first))).to.contain('linear-gradient');
+    expect(getComputedStyle(lastLanguages(first)).backgroundPosition).to.equal('0% 100%');
+    expect(line(firstCell(last))).to.equal('none');
+    expect(getComputedStyle(firstCell(first)).backgroundColor).to.equal('rgba(0, 0, 0, 0)');
+
+    const css = style.textContent;
+    expect(css).to.match(/\.ph-request-group:hover[^{]*\{[^}]*--ph-hover-bg: #e6f0fd/);
+    expect(css).to.match(/\.ph-request-group:hover[^{]*\{[^}]*--ph-edge: #2b4fd8/);
+  });
+
   it('groups each request into three section rows with shared cells and matching mobile labels', () => {
     const root = renderResults(fixture.items, {});
     expect([...root.querySelectorAll('thead th')].map((t) => t.textContent))
@@ -347,9 +381,9 @@ describe('publish-history rendering', () => {
     expect(getComputedStyle(group.querySelector('.ph-section-label')).color)
       .to.equal('rgb(119, 119, 119)');
     expect(getComputedStyle(group.rows[0].querySelector('.ph-section-label')).borderBottomWidth)
-      .to.equal('0px');
-    expect(getComputedStyle(group.rows[1].querySelector('td')).borderBottomWidth).to.equal('0px');
-    expect(getComputedStyle(group.rows[2].querySelector('td')).borderBottomWidth).to.equal('1px');
+      .to.equal('1px');
+    expect(getComputedStyle(group.rows[0].querySelector('.ph-section-label')).borderBottomColor)
+      .to.equal('rgba(0, 0, 0, 0)');
     expect(getComputedStyle(root.querySelector('.ph-request-toggle')).display).to.equal('inline-flex');
     expect(getComputedStyle(root.querySelector('.ph-request-toggle')).minWidth).to.equal('40px');
     expect(getComputedStyle(root.querySelector('.ph-card')).borderBottomWidth).to.equal('0px');
@@ -460,7 +494,7 @@ describe('publish-history API and controller', () => {
     expect(page.nextCursor).to.equal('abc');
   });
 
-  it('sends selected filters and inclusive UTC date bounds as encoded query parameters', async () => {
+  it('sends selected filters as encoded query parameters', async () => {
     const stub = sinon.stub(window, 'fetch').resolves(jsonResponse({ items: [] }));
     await fetchPublishLogs({
       token: 'tok',
@@ -468,8 +502,6 @@ describe('publish-history API and controller', () => {
       app: 'firefly',
       platform: 'apple',
       status: 'failed',
-      from: '2026-10-01',
-      to: '2026-10-09',
       cursor: 'next&=page',
     });
     const url = stub.firstCall.args[0];
@@ -478,17 +510,15 @@ describe('publish-history API and controller', () => {
       app: 'firefly',
       platform: 'apple',
       status: 'failed',
-      dateFrom: '2026-10-01T00:00:00.000Z',
-      dateTo: '2026-10-09T23:59:59.999Z',
       cursor: 'next&=page',
     });
-    expect(url).to.contain('dateFrom=2026-10-01T00%3A00%3A00.000Z');
+    expect(url).to.contain('cursor=next%26%3Dpage');
   });
 
-  it('omits unselected optional filters', async () => {
+  it('omits unselected optional filters and ignores date arguments', async () => {
     const stub = sinon.stub(window, 'fetch').resolves(jsonResponse({ items: [] }));
     await fetchPublishLogs({
-      token: 'tok', app: '', platform: '', status: '', from: '', to: '',
+      token: 'tok', app: '', platform: '', status: '', from: '2026-10-01', to: '2026-10-09',
     });
     expect(Object.fromEntries(new URL(stub.firstCall.args[0]).searchParams))
       .to.deep.equal({ byMe: 'true' });
@@ -512,7 +542,6 @@ describe('publish-history API and controller', () => {
         <button id="ph-refresh"></button>
         <select id="ph-filter-app"></select><select id="ph-filter-platform"></select>
         <select id="ph-filter-status"></select>
-        <input id="ph-filter-from" type="date">
         <input id="ph-filter-by-me" type="radio" name="ph-requestor" checked>
         <input id="ph-filter-all" type="radio" name="ph-requestor">
         <div id="ph-error" hidden></div><div id="ph-status"></div>
@@ -589,6 +618,9 @@ describe('publish-history API and controller', () => {
     expect(q('#ph-results').textContent).to.equal('');
     q('.tab-button').click();
     expect(q('#ph-status').textContent).to.contain('Loading');
+    const loading = q('#ph-results .ph-loading');
+    expect(loading.querySelector('[role="progressbar"]')).to.not.equal(null);
+    expect(loading.textContent).to.contain('Loading publish results');
     await tick();
     expect(q('.ph-table').querySelectorAll('tbody')).to.have.length(3);
     expect(q('#ph-load-more').hidden).to.equal(false);
@@ -623,8 +655,7 @@ describe('publish-history API and controller', () => {
     q('#ph-filter-app').value = FAILED.app;
     q('#ph-filter-platform').value = FAILED.platform;
     q('#ph-filter-status').value = 'failed';
-    q('#ph-filter-from').value = '2026-10-09';
-    q('#ph-filter-from').dispatchEvent(new Event('change'));
+    q('#ph-filter-status').dispatchEvent(new Event('change'));
     expect(controller.state.nextCursor).to.equal(null);
     await tick();
     const filters = {
@@ -632,8 +663,6 @@ describe('publish-history API and controller', () => {
       app: FAILED.app,
       platform: FAILED.platform,
       status: 'failed',
-      dateFrom: '2026-10-09T00:00:00.000Z',
-      dateTo: '2026-10-09T23:59:59.999Z',
     };
     expect(Object.fromEntries(new URL(stub.secondCall.args[0]).searchParams))
       .to.deep.equal(filters);

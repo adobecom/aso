@@ -120,37 +120,24 @@ export function mergeItems(existing, incoming) {
   return merged;
 }
 
-const localDateKey = (iso) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-};
-
 export function applyFilters(items, filters = {}) {
-  const { app, platform, status, from, to } = filters;
+  const { app, platform, status } = filters;
   return items.filter((item) => {
     if (app && item.app !== app) return false;
     if (platform && item.platform !== platform) return false;
     if (status && normalizeStatus(item.overallStatus) !== status) return false;
-    if (from || to) {
-      const day = localDateKey(item.startedAt);
-      if (!day || (from && day < from) || (to && day > to)) return false;
-    }
     return true;
   });
 }
 
 export async function fetchPublishLogs({
-  token, cursor, signal, byMe = true, app, platform, status, from, to,
+  token, cursor, signal, byMe = true, app, platform, status,
 } = {}) {
   const url = new URL(PUBLISH_LOGS_URL);
   url.searchParams.set('byMe', String(byMe));
   Object.entries({ app, platform, status }).forEach(([key, value]) => {
     if (value) url.searchParams.set(key, value);
   });
-  if (from) url.searchParams.set('dateFrom', new Date(`${from}T00:00:00.000Z`).toISOString());
-  if (to) url.searchParams.set('dateTo', new Date(`${to}T23:59:59.999Z`).toISOString());
   if (cursor) url.searchParams.set('cursor', cursor);
   const resp = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
@@ -565,7 +552,6 @@ export function init({ context, token }) {
     app: $('ph-filter-app'),
     platform: $('ph-filter-platform'),
     statusFilter: $('ph-filter-status'),
-    from: $('ph-filter-from'),
     byMe: $('ph-filter-by-me'),
     all: $('ph-filter-all'),
   };
@@ -596,8 +582,6 @@ export function init({ context, token }) {
       app: els.app.value,
       platform: els.platform.value,
       status: els.statusFilter.value,
-      from: els.from.value,
-      to: els.from.value,
     };
   }
 
@@ -609,7 +593,13 @@ export function init({ context, token }) {
     els.refresh.setAttribute('aria-busy', String(state.loading));
     if (!state.loaded && state.loading) {
       els.status.textContent = 'Loading publish results\u2026';
-      els.results.replaceChildren();
+      const bar = el('div', 'ph-loading-bar');
+      bar.append(el('div', 'ph-loading-bar-fill'));
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-label', 'Loading publish results');
+      const panel = el('div', 'ph-results-inner ph-loading');
+      panel.append(el('p', 'ph-loading-text', 'Loading publish results\u2026'), bar);
+      els.results.replaceChildren(panel);
       return;
     }
     if (!state.items.length) {
@@ -667,7 +657,7 @@ export function init({ context, token }) {
 
   els.refresh.addEventListener('click', () => load());
   els.more.addEventListener('click', () => load({ append: true }));
-  [els.app, els.platform, els.statusFilter, els.from, els.byMe, els.all]
+  [els.app, els.platform, els.statusFilter, els.byMe, els.all]
     .forEach((control) => control.addEventListener('change', () => {
       state.items = [];
       state.nextCursor = null;
