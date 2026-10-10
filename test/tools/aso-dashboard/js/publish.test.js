@@ -531,7 +531,11 @@ describe('publish', () => {
         releasePeriod: { year: '2026', quarter: 'q4', month: 'october' },
         requestorName: 'Test Publisher',
         blockTypes: ['listing'],
-        fetchPage: sinon.stub().resolves({ html: listingHtml, htmlFound: true }),
+        fetchPage: sinon.stub().resolves({
+          html: listingHtml,
+          htmlFound: true,
+          spacingSidecar: {},
+        }),
         now: new Date('2026-10-04T06:09:55.062Z'),
         onRequestAccepted: sinon.spy(),
       };

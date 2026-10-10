@@ -118,6 +118,7 @@ function dedupePaths(entries) {
       blockKey: entry.blockKey,
       sheet: entry.sheet,
       pageLeaf: entry.pageLeaf,
+      sourcePagePath: entry.sourcePagePath,
       promoName: entry.promoName,
       promoVariant: entry.promoVariant,
     });

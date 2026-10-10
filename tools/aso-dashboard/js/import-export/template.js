@@ -32,7 +32,7 @@ const STORE_BANNERS = Object.freeze({
 const SETTINGS_ROWS = Object.freeze([
   ['Product', 'product'],
   ['Store type', 'storeType'],
-  ['Test name', 'testName'],
+  ['Test/CPP Name', 'testName'],
   ['Year', 'year'],
   ['Quarter', 'quarter'],
   ['Month', 'month'],
@@ -88,7 +88,7 @@ function marketColumnCount(languageNames, includeAggregatedPlayColumn = false) {
 
 function readLanguageNamesFromSheet(ws) {
   const rowCount = ws.rowCount || ws.lastRow?.number || 0;
-  for (let rowNumber = 1; rowNumber <= Math.min(rowCount, 20); rowNumber += 1) {
+  for (let rowNumber = 1; rowNumber <= rowCount; rowNumber += 1) {
     const row = ws.getRow(rowNumber);
     const isHeaderRow = normalizeCellText(row.getCell(1).value) === 'Section'
       && normalizeCellText(row.getCell(2).value) === 'Languages';
@@ -502,6 +502,9 @@ function buildSettingsSheet(wb, settings) {
 
 function buildMetadataSheet(wb, payload) {
   const { languageNames, metadata } = payload;
+  const hasContent = ['google', 'apple'].some((device) => (metadata?.[device] || []).length);
+  if (!hasContent) return;
+
   const ws = wb.addWorksheet(SHEET_METADATA);
   ws.getColumn(1).width = 28;
   ws.getColumn(2).width = 36;
@@ -626,7 +629,10 @@ function buildWorkbook(ExcelJS, payload) {
 
 function parseSettingsSheet(ws) {
   const settings = {};
-  const labelToKey = Object.fromEntries(SETTINGS_ROWS.map(([label, key]) => [label, key]));
+  const labelToKey = Object.fromEntries([
+    ...SETTINGS_ROWS,
+    ['Test name', 'testName'],
+  ]);
   ws.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
     const label = normalizeCellText(row.getCell(1).value);
@@ -770,9 +776,11 @@ async function parseWorkbook(arrayBuffer, ExcelJS) {
   const mediaWs = wb.getWorksheet(SHEET_IMAGES_VIDEOS);
 
   let languageNames = [];
-  if (metadataWs) {
-    languageNames = readLanguageNamesFromSheet(metadataWs);
-  }
+  [metadataWs, promosWs, mediaWs].some((ws) => {
+    if (!ws) return false;
+    languageNames = readLanguageNamesFromSheet(ws);
+    return languageNames.length > 0;
+  });
 
   const metadata = { google: [], apple: [] };
   if (metadataWs && languageNames.length) {

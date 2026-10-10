@@ -21,7 +21,7 @@ const PARA_BREAK = '';
 // Matches authored constants: one <p> per line, blank line → <br><br>; value carries any <b>/<i>.
 function valueToConstantHtml(value) {
   return String(value ?? '')
-    .replace(/\n{2,}/g, PARA_BREAK)
+    .replace(/\n(?:[^\S\n]*\n)+/g, PARA_BREAK)
     .split('\n')
     .filter((line) => line.trim() !== '' || line.includes(PARA_BREAK))
     .map((line) => `<p>${line.split(PARA_BREAK).join('<br><br>')}</p>`)

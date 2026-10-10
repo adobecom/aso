@@ -159,6 +159,13 @@ describe('aso-utils', () => {
       expect(result).to.equal('First\n\nSecond\nThird');
     });
 
+    it('preserves section breaks with inline formatting', () => {
+      const div = document.createElement('div');
+      div.innerHTML = '<p><b>First</b></p> <p>Second</p><p><i>Third</i></p>';
+      expect(convertTags(div, { addParagraphBreaks: true }))
+        .to.equal('<b>First</b>\n\nSecond\n<i>Third</i>');
+    });
+
     it('converts br tags to newlines', () => {
       const div = document.createElement('div');
       div.innerHTML = '<p>Line one<br>Line two<br>Line three</p>';
@@ -286,6 +293,43 @@ describe('aso-utils', () => {
       const result = resolveFieldText(dataEl, values, { addParagraphBreaks: true });
       expect(result).to.match(/Before legal\n\n\[Optional access permissions\]/);
       expect(result).to.match(/Camera: Scan pages\n+After legal/);
+    });
+
+    it('keeps later section breaks aligned after replacing a sole-token paragraph', () => {
+      const dataEl = document.createElement('div');
+      dataEl.innerHTML = '<p>Intro</p><p>{{heading}}</p><p>Body</p><p>Next section</p><p>Last</p>';
+
+      expect(resolveFieldText(dataEl, { heading: '<p>Heading</p>' }, {
+        addParagraphBreaks: true,
+        sectionBreakAfter: [false, false, true, false],
+      })).to.equal('Intro\nHeading\nBody\n\nNext section\nLast');
+    });
+
+    it('preserves surrounding and internal breaks for multiple multi-paragraph constants', () => {
+      const dataEl = document.createElement('div');
+      dataEl.innerHTML = '<p>Intro</p><p>{{first}}</p><p>Body</p><p>{{legal}}</p><p>Last</p>';
+      const values = {
+        first: '<p>First line</p><p>Second line</p>',
+        legal: '<p>Terms</p><p>Policy<br><br>Rights</p>',
+      };
+
+      expect(resolveFieldText(dataEl, values, {
+        addParagraphBreaks: true,
+        sectionBreakAfter: [true, false, true, true],
+      })).to.equal('Intro\n\nFirst line\nSecond line\nBody\n\nTerms\nPolicy\n\nRights\n\nLast');
+      expect(dataEl.innerHTML).to.equal(
+        '<p>Intro</p><p>{{first}}</p><p>Body</p><p>{{legal}}</p><p>Last</p>',
+      );
+    });
+
+    it('keeps section breaks aligned after constants with inline formatting', () => {
+      const dataEl = document.createElement('div');
+      dataEl.innerHTML = '<p>Intro</p><p>{{heading}}</p><p>Body</p><p>Next section</p>';
+
+      expect(resolveFieldText(dataEl, { heading: '<p><b>Heading</b></p>' }, {
+        addParagraphBreaks: true,
+        sectionBreakAfter: [false, false, true],
+      })).to.equal('Intro\n<b>Heading</b>\nBody\n\nNext section');
     });
 
     it('merges multiple slugs when all values are mapped', () => {
