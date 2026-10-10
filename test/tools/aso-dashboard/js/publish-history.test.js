@@ -326,6 +326,32 @@ describe('publish-history rendering', () => {
     });
   });
 
+  it('wraps section labels at delimiters without splitting Metadata', async () => {
+    const style = document.createElement('style');
+    style.textContent = await readFile({ path: '../../../../tools/aso-dashboard/css/aso-dashboard.css' });
+    const table = document.createElement('table');
+    table.className = 'ph-table';
+    table.style.display = 'table';
+    table.style.width = '110px';
+    table.style.tableLayout = 'fixed';
+    table.innerHTML = '<tbody><tr><th class="ph-section-label">Metadata</th></tr>'
+      + '<tr><th class="ph-section-label">Custom Product Pages</th></tr></tbody>';
+    document.body.append(style, table);
+    const [metadata, custom] = table.querySelectorAll('th');
+    const range = document.createRange();
+    range.selectNodeContents(metadata);
+    expect(range.getClientRects()).to.have.length(1);
+    expect(getComputedStyle(metadata).overflowWrap).to.equal('normal');
+    range.selectNodeContents(custom);
+    expect(range.getClientRects().length).to.be.above(1);
+    ['Custom', 'Product', 'Pages'].forEach((word) => {
+      const start = custom.textContent.indexOf(word);
+      range.setStart(custom.firstChild, start);
+      range.setEnd(custom.firstChild, start + word.length);
+      expect(range.getClientRects()).to.have.length(1);
+    });
+  });
+
   it('orders failed, successful and grey selected locales, including empty result sections', () => {
     const item = {
       selectedLocales: ['en-US', 'ja-jp', 'ko-kr', 'de-de'],

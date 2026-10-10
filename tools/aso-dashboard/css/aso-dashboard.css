@@ -1106,7 +1106,9 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   font-weight: 400;
 }
 
-.ph-section-label {
+.ph-table .ph-section-label {
+  overflow-wrap: normal;
+  word-break: normal;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.03em;
