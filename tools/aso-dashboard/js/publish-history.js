@@ -196,23 +196,28 @@ export async function fetchSourceJson({ org, repo, path, token }) {
   }
 }
 
-async function loadSelectedLocales(items, context) {
+async function loadRequestDetails(items, context) {
   const results = [];
   for (let start = 0; start < items.length; start += 5) {
-    // Bound DA reads when a history page omits the original language selections.
+    // Bound DA reads when history omits the original selections or release period.
     // eslint-disable-next-line no-await-in-loop
     const batch = await Promise.allSettled(items.slice(start, start + 5).map(async (item) => {
-      if (Array.isArray(item.selectedLocales) || Array.isArray(item.request?.selectedLocales)
-        || !item.daPayloadPath) return item;
+      const hasLocales = Array.isArray(item.selectedLocales)
+        || Array.isArray(item.request?.selectedLocales);
+      const hasPeriod = Boolean(item.releasePeriod ?? item.request?.releasePeriod);
+      if ((hasLocales && hasPeriod) || !item.daPayloadPath) return item;
       const source = JSON.parse(await fetchSourceJson({ ...context, path: item.daPayloadPath }));
-      // Older requests predate selectedLocales and cannot supply missing-language pills.
-      if (source && typeof source === 'object' && !Object.hasOwn(source, 'selectedLocales')) {
-        return item;
-      }
-      if (!Array.isArray(source?.selectedLocales)) {
+      const details = { ...item };
+      // Older requests may predate either field; leave those values unrecorded.
+      if (!hasLocales && source && Object.hasOwn(source, 'selectedLocales')
+        && !Array.isArray(source.selectedLocales)) {
         throw new Error('Source JSON does not record selectedLocales.');
       }
-      return { ...item, selectedLocales: getSelectedLocales(source) };
+      if (!hasLocales && Array.isArray(source?.selectedLocales)) {
+        details.selectedLocales = getSelectedLocales(source);
+      }
+      if (!hasPeriod && source?.releasePeriod) details.releasePeriod = source.releasePeriod;
+      return details;
     }));
     results.push(...batch);
   }
@@ -479,6 +484,18 @@ export function renderRequestCell(item, { onViewJson } = {}) {
   return cell;
 }
 
+function renderReleasePeriod(item) {
+  const period = item.releasePeriod ?? item.request?.releasePeriod;
+  const parts = period ? [
+    period.year,
+    String(period.quarter ?? '').toUpperCase(),
+    String(period.month ?? '').replace(/^./, (letter) => letter.toUpperCase()),
+  ] : [];
+  const value = parts.length ? parts
+    .map((part) => String(part ?? '').trim() || '\u2014').join(' / ') : '\u2014';
+  return el('span', 'ph-release-period', value);
+}
+
 export function renderRow(item, handlers) {
   const rows = document.createDocumentFragment();
   const first = el('tr', 'ph-row');
@@ -491,6 +508,7 @@ export function renderRow(item, handlers) {
   const cells = [
     el('span', 'ph-app', item.app ?? '\u2014'),
     el('span', 'ph-platform', item.platform ?? '\u2014'),
+    renderReleasePeriod(item),
     renderStatusBadge(item),
     renderRequestCell(item, handlers),
   ];
@@ -519,6 +537,9 @@ export function renderCard(item, handlers) {
   const head = el('div', 'ph-card-head');
   head.append(el('strong', '', item.app ?? '\u2014'), el('span', 'ph-platform', item.platform ?? '\u2014'), renderStatusBadge(item));
   card.append(head, renderTime(item.startedAt));
+  const period = el('div', 'ph-card-group');
+  period.append(el('h4', 'ph-card-label', 'Release Period'), renderReleasePeriod(item));
+  card.append(period);
   SECTION_COLUMNS.forEach((c) => {
     const group = el('div', 'ph-card-group');
     group.append(
@@ -537,7 +558,9 @@ export function renderResults(items, handlers) {
   const caption = el('caption', 'ph-sr-only', 'Publish requests');
   const thead = el('thead');
   const headRow = el('tr');
-  ['Requested on', 'App', 'Platform', 'Overall', 'Request', 'Section', 'Languages'].forEach((h) => {
+  [
+    'Requested on', 'App', 'Platform', 'Release Period', 'Overall', 'Request', 'Section', 'Languages',
+  ].forEach((h) => {
     const th = el('th');
     if (h === 'Request') th.append(el('span', 'ph-sr-only', h));
     else th.textContent = h;
@@ -694,7 +717,7 @@ export function init({ context, token }) {
         fetchLanguages({ context, token, configFile: getConfigFileOverride() }),
       ]);
       if (seq !== state.seq) return;
-      const selected = await loadSelectedLocales(page.items, { org, repo, token });
+      const details = await loadRequestDetails(page.items, { org, repo, token });
       if (seq !== state.seq) return;
       handlers.languageNames.clear();
       languages.forEach((language) => {
@@ -703,11 +726,11 @@ export function init({ context, token }) {
         }
       });
       state.items = append
-        ? mergeItems(state.items, selected.items) : mergeItems([], selected.items);
+        ? mergeItems(state.items, details.items) : mergeItems([], details.items);
       state.nextCursor = page.nextCursor;
       state.loaded = true;
-      if (selected.errors.length) {
-        els.error.textContent = `Some selected languages could not be loaded. Grey pills may be missing. ${selected.errors.join(' ')}`;
+      if (details.errors.length) {
+        els.error.textContent = `Some publish request details could not be loaded. Grey pills may be missing and release periods may be unavailable. ${details.errors.join(' ')}`;
         els.error.hidden = false;
       }
       renderFilters();

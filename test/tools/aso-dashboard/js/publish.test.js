@@ -26,6 +26,17 @@ describe('publish', () => {
   });
 
   ['apple', 'google'].forEach((platform) => {
+    it(`includes the selected release period in the ${platform} payload`, () => {
+      const releasePeriod = { year: '2026', quarter: 'q4', month: 'october' };
+      const payload = buildPublishPayload([], {
+        product: 'app',
+        platform,
+        languages: [{ code: 'en' }],
+        releasePeriod,
+      });
+      expect(payload.releasePeriod).to.deep.equal(releasePeriod);
+    });
+
     it(`omits empty ${platform} metadata localizations`, () => {
       const fieldKey = platform === 'apple' ? 'name' : 'title';
       const cells = [
@@ -517,6 +528,7 @@ describe('publish', () => {
       expect(initialWrite.method).to.equal('POST');
       const initialPayload = JSON.parse(await initialWrite.body.get('data').text());
       expect(initialPayload.app).to.equal('adobe-express');
+      expect(initialPayload.releasePeriod).to.deep.equal(options.releasePeriod);
       expect(initialPayload).not.to.have.property('requestId');
       expect(serviceUrl).to.equal('https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore');
       expect(submission).to.deep.equal({

@@ -396,8 +396,8 @@ describe('publish-history rendering', () => {
   it('groups each request into three section rows with shared cells and matching mobile labels', () => {
     const root = renderResults(fixture.items, {});
     expect([...root.querySelectorAll('thead th')].map((t) => t.textContent))
-      .to.deep.equal(['Requested on', 'App', 'Platform', 'Overall', 'Request', 'Section', 'Languages']);
-    expect(root.querySelector('thead th:nth-child(5) .ph-sr-only').textContent).to.equal('Request');
+      .to.deep.equal(['Requested on', 'App', 'Platform', 'Release Period', 'Overall', 'Request', 'Section', 'Languages']);
+    expect(root.querySelector('thead th:nth-child(6) .ph-sr-only').textContent).to.equal('Request');
     expect(root.querySelectorAll('tbody')).to.have.length(fixture.items.length);
     expect(root.querySelectorAll('tbody tr')).to.have.length(fixture.items.length * 3);
     const labels = ['Metadata', 'Promos/In-App Events', 'Custom Product Pages'];
@@ -405,10 +405,10 @@ describe('publish-history rendering', () => {
       expect(group.dataset.requestId).to.equal(fixture.items[index].requestId);
       expect([...group.querySelectorAll('.ph-section-label')].map((cell) => cell.textContent))
         .to.deep.equal(labels);
-      expect(group.rows[0].cells).to.have.length(7);
+      expect(group.rows[0].cells).to.have.length(8);
       expect(group.rows[1].cells).to.have.length(2);
       expect(group.rows[2].cells).to.have.length(2);
-      expect(group.querySelectorAll('[rowspan="3"]')).to.have.length(5);
+      expect(group.querySelectorAll('[rowspan="3"]')).to.have.length(6);
       expect(group.rows[0].cells[0].scope).to.equal('rowgroup');
       expect(group.querySelectorAll('.ph-request-toggle')).to.have.length(1);
       expect(group.querySelectorAll('.ph-section-cell')).to.have.length(3);
@@ -416,7 +416,19 @@ describe('publish-history rendering', () => {
     expect(root.querySelectorAll('.ph-card')).to.have.length(fixture.items.length);
     [...root.querySelectorAll('.ph-card')].forEach((card) => {
       expect([...card.querySelectorAll('.ph-card-label')].map((label) => label.textContent))
-        .to.deep.equal(labels);
+        .to.deep.equal(['Release Period', ...labels]);
+    });
+  });
+
+  it('shows release periods in desktop and mobile history, with a dash for old records', () => {
+    const root = renderResults([
+      SUCCESS,
+      { ...PARTIAL, request: { releasePeriod: { year: '2025', quarter: 'q1', month: 'january' } } },
+      LEGACY,
+    ], {});
+    [root.querySelector('.ph-table'), root.querySelector('.ph-cards')].forEach((view) => {
+      expect([...view.querySelectorAll('.ph-release-period')].map((period) => period.textContent))
+        .to.deep.equal(['2026 / Q4 / October', '2025 / Q1 / January', '\u2014']);
     });
   });
 
@@ -646,6 +658,24 @@ describe('publish-history API and controller', () => {
     return init({ context: { org: 'o', repo: 'r' }, token: 't' });
   }
   const q = (s) => document.querySelector(s);
+
+  it('loads a release period from the saved request even when locales are already recorded', async () => {
+    const item = { ...SUCCESS };
+    delete item.releasePeriod;
+    const releasePeriod = { year: '2026', quarter: 'q4', month: 'october' };
+    const stub = sinon.stub(window, 'fetch');
+    stub.withArgs(sinon.match('list-publish-logs')).resolves(jsonResponse({ items: [item] }));
+    const source = stub.withArgs(sinon.match('admin.da.live/source'))
+      .resolves(jsonResponse({ selectedLocales: ['fr'], releasePeriod }));
+    const controller = await mount();
+    await controller.load();
+    expect(source.calledOnce).to.equal(true);
+    expect(controller.state.items[0].releasePeriod).to.deep.equal(releasePeriod);
+    expect(controller.state.items[0].selectedLocales).to.deep.equal(SUCCESS.selectedLocales);
+    expect([...document.querySelectorAll('.ph-release-period')].map((period) => period.textContent))
+      .to.deep.equal(['2026 / Q4 / October', '2026 / Q4 / October']);
+    expect(q('#ph-error').hidden).to.equal(true);
+  });
 
   it('loads selected locales from the saved request when the history API omits them', async () => {
     const item = {

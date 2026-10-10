@@ -60,6 +60,7 @@ export function buildPublishPayload(cells, options) {
     product,
     platform,
     languages,
+    releasePeriod,
     promoNames = [],
     blockTypes = PUBLISH_BLOCK_TYPES,
   } = options;
@@ -73,7 +74,7 @@ export function buildPublishPayload(cells, options) {
 
   if (platform === 'apple') {
     const listingFields = ['name', 'subtitle', 'description', 'keywords', 'marketingUrl', 'promotionalText', 'supportUrl'];
-    const payload = { app: product, selectedLocales: langCodes };
+    const payload = { app: product, selectedLocales: langCodes, releasePeriod };
     if (blockTypes.includes('listing')) {
       payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)).filter(Boolean) };
     }
@@ -95,6 +96,7 @@ export function buildPublishPayload(cells, options) {
     app: product,
     platform: 'google',
     selectedLocales: langCodes,
+    releasePeriod,
   };
   if (blockTypes.includes('listing')) {
     payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean) };
@@ -292,6 +294,7 @@ export async function publishSelection({
     product,
     platform,
     languages,
+    releasePeriod,
     promoNames,
     blockTypes: effectiveBlockTypes,
   });
