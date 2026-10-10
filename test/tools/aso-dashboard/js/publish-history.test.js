@@ -185,14 +185,49 @@ describe('publish-history rendering', () => {
     expect(pending.querySelector('[aria-hidden="true"]')).to.not.equal(null);
   });
 
-  it('limits to three chips and expands in place', () => {
+  it('limits to three chips and repeatedly expands and collapses in place', () => {
     const cell = renderSectionCell(MANY, { key: 'metadata', label: 'Metadata' });
     expect(cell.querySelectorAll('.ph-chip')).to.have.length(3);
     const more = cell.querySelector('.ph-more');
     expect(more.textContent).to.equal('+2 more');
+    expect(more.getAttribute('aria-expanded')).to.equal('false');
     more.click();
     expect(cell.querySelectorAll('.ph-chip')).to.have.length(5);
-    expect(cell.querySelector('.ph-more')).to.equal(null);
+    expect(more.textContent).to.equal('Less');
+    expect(more.getAttribute('aria-expanded')).to.equal('true');
+    more.click();
+    expect(cell.querySelectorAll('.ph-chip')).to.have.length(3);
+    expect(more.textContent).to.equal('+2 more');
+    expect(more.getAttribute('aria-expanded')).to.equal('false');
+    more.click();
+    expect(cell.querySelectorAll('.ph-chip')).to.have.length(5);
+    expect(cell.querySelectorAll('.ph-more')).to.have.length(1);
+  });
+
+  it('supports Less for large language lists independently in desktop and mobile views', () => {
+    const locales = Array.from({ length: 54 }, (_, index) => `locale-${index}`);
+    const item = { response: { sections: [{ type: 'metadata', success: locales }] } };
+    const root = renderResults([item], {});
+    document.body.append(root);
+    const table = root.querySelector('.ph-table');
+    const card = root.querySelector('.ph-card');
+    const tableToggle = table.querySelector('.ph-more');
+    const cardToggle = card.querySelector('.ph-more');
+    expect(tableToggle.textContent).to.equal('+51 more');
+    tableToggle.focus();
+    tableToggle.click();
+    expect(table.querySelectorAll('.ph-chip')).to.have.length(54);
+    expect(card.querySelectorAll('.ph-chip')).to.have.length(3);
+    expect(tableToggle.textContent).to.equal('Less');
+    expect(document.activeElement).to.equal(tableToggle);
+    cardToggle.click();
+    tableToggle.click();
+    expect(table.querySelectorAll('.ph-chip')).to.have.length(3);
+    expect(card.querySelectorAll('.ph-chip')).to.have.length(54);
+    expect(tableToggle.textContent).to.equal('+51 more');
+    cardToggle.click();
+    expect(card.querySelectorAll('.ph-chip')).to.have.length(3);
+    expect(cardToggle.getAttribute('aria-expanded')).to.equal('false');
   });
 
   it('shows names in table and mobile chips, including expanded chips and error details', () => {

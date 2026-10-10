@@ -6,3 +6,6 @@ values (for example, `"2026"`, `"q4"`, `"october"`). Publish History displays it
 as `2026 / Q4 / October` in the Release Period column and mobile cards. When the
 history API omits the period, the dashboard reads it from the saved request.
 Older requests without a recorded release period display a dash.
+
+Publish History initially shows three language pills per section. Use `+N more`
+to expand the list and `Less` to collapse it again, on desktop or mobile.

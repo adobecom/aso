@@ -387,11 +387,21 @@ export function renderSectionCell(item, column, languageNames) {
   const hidden = chips.slice(MAX_VISIBLE_CHIPS);
   if (hidden.length) {
     const more = el('button', 'ph-more', `+${hidden.length} more`);
+    let expandedChips = [];
     more.type = 'button';
     more.setAttribute('aria-expanded', 'false');
     more.addEventListener('click', () => {
-      hidden.forEach((c) => list.append(renderChip(c, column.label, languageNames)));
-      more.remove();
+      const expanded = more.getAttribute('aria-expanded') === 'true';
+      if (expanded) {
+        closePopover();
+        expandedChips.forEach((chip) => chip.remove());
+        expandedChips = [];
+      } else {
+        expandedChips = hidden.map((c) => renderChip(c, column.label, languageNames));
+        more.before(...expandedChips);
+      }
+      more.setAttribute('aria-expanded', String(!expanded));
+      more.textContent = expanded ? `+${hidden.length} more` : 'Less';
     });
     list.append(more);
   }
