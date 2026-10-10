@@ -1,4 +1,5 @@
 import { DEVICES, STORE_TYPE_UPDATES } from '../lib/content-taxonomy.js';
+import { runWithConcurrency } from '../lib/concurrency.js';
 import {
   getKeywordsSidecar,
   getSpacingSidecar,
@@ -58,6 +59,8 @@ function matchesSelection(selection, entry) {
 
   return true;
 }
+
+const PAGE_FETCH_CONCURRENCY = 10;
 
 function buildFieldRequests({
   schema,
@@ -292,7 +295,9 @@ async function collectExportData({
 
   const deduped = dedupePaths(requests);
 
-  const pages = await Promise.all(deduped.map(async (entry) => {
+  // Each page triggers several DA requests; unbounded parallelism over hundreds of pages
+  // floods the browser and surfaces as "Failed to fetch".
+  const pages = await runWithConcurrency(deduped, PAGE_FETCH_CONCURRENCY, async (entry) => {
     const fetched = await fetchPage(org, repo, entry.pagePath, token);
     return {
       pagePath: entry.pagePath,
@@ -303,7 +308,7 @@ async function collectExportData({
       constantsValues: fetched.constantsValues,
       refs: entry.refs,
     };
-  }));
+  });
 
   const sourceSpacingByPath = new Map(pages.map((page) => [page.pagePath, page.spacingSidecar]));
   const missingSourcePaths = new Set();
@@ -316,9 +321,9 @@ async function collectExportData({
       }
     });
   });
-  await Promise.all([...missingSourcePaths].map(async (path) => {
+  await runWithConcurrency([...missingSourcePaths], PAGE_FETCH_CONCURRENCY, async (path) => {
     sourceSpacingByPath.set(path, await fetchSpacingSidecar(org, repo, path, token));
-  }));
+  });
 
   const allCells = expandFetchedPages(pages, { schema, constantsValues, sourceSpacingByPath });
   const cells = allCells.filter((cell) => cell.hasHtml);

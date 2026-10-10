@@ -533,7 +533,7 @@ body {
 }
 
 /* Buttons (exclude tabs and toggle buttons) */
-button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-tab):not(.publish-progress-close):not(:where(.ph-chip, .ph-info, .ph-more, .ph-link)) {
+button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-select-all):not(.open-new-tab):not(.publish-progress-close):not(:where(.ph-chip, .ph-info, .ph-more, .ph-link)) {
   font-family: var(--body-font-family);
   display: inline-block;
   border: 2px solid #1373e6;
@@ -735,7 +735,8 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.open-new-
   font-weight: 400;
 }
 
-.select-all-link {
+.select-all-link,
+.publish-select-all {
   font-size: 14px;
   font-family: var(--body-font-family);
   font-weight: 400;
