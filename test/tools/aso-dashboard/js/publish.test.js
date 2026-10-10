@@ -5,6 +5,7 @@ import {
   formatPublishTimestamp,
   buildPublishPayload,
   createPublishProgressModal,
+  fetchRequestorName,
   publishSelection,
   waitForPublishCompletion,
 } from '../../../../tools/aso-dashboard/js/publish.js';
@@ -26,6 +27,16 @@ describe('publish', () => {
   });
 
   ['apple', 'google'].forEach((platform) => {
+    it(`records the requestor's full name in the ${platform} payload`, () => {
+      const payload = buildPublishPayload([], {
+        product: 'app',
+        platform,
+        languages: [{ code: 'en' }],
+        requestorName: 'Test Publisher',
+      });
+      expect(payload.requestorName).to.equal('Test Publisher');
+    });
+
     it(`includes the selected release period in the ${platform} payload`, () => {
       const releasePeriod = { year: '2026', quarter: 'q4', month: 'october' };
       const payload = buildPublishPayload([], {
@@ -35,6 +46,35 @@ describe('publish', () => {
         releasePeriod,
       });
       expect(payload.releasePeriod).to.deep.equal(releasePeriod);
+    });
+
+    describe('requestor profile', () => {
+      afterEach(() => sinon.restore());
+
+      it('fetches the signed-in full name with the publish token', async () => {
+        const stub = sinon.stub(window, 'fetch').resolves(new Response(JSON.stringify({ displayName: ' Test Publisher ' })));
+        expect(await fetchRequestorName('token')).to.equal('Test Publisher');
+        expect(stub.firstCall.args[0]).to.equal('https://ims-na1.adobelogin.com/ims/profile/v1');
+        expect(stub.firstCall.args[1].headers.Authorization).to.equal('Bearer token');
+      });
+
+      it('uses the profile name or first and last name', async () => {
+        const stub = sinon.stub(window, 'fetch');
+        stub.onCall(0).resolves(new Response(JSON.stringify({ name: 'Test Publisher' })));
+        stub.onCall(1).resolves(new Response(JSON.stringify({ first_name: 'Test', last_name: 'Publisher' })));
+        expect(await fetchRequestorName('token')).to.equal('Test Publisher');
+        expect(await fetchRequestorName('token')).to.equal('Test Publisher');
+      });
+
+      it('surfaces profile failures and missing names', async () => {
+        const stub = sinon.stub(window, 'fetch');
+        stub.onCall(0).resolves(new Response(null, { status: 401 }));
+        stub.onCall(1).resolves(new Response('{}'));
+        const httpError = await fetchRequestorName('token').catch((error) => error);
+        const missingName = await fetchRequestorName('token').catch((error) => error);
+        expect(httpError.message).to.contain('HTTP 401');
+        expect(missingName.message).to.contain('does not include a full name');
+      });
     });
 
     it(`omits empty ${platform} metadata localizations`, () => {
@@ -489,6 +529,7 @@ describe('publish', () => {
         platform: 'apple',
         languages: languages.filter((language) => language.name === 'German'),
         releasePeriod: { year: '2026', quarter: 'q4', month: 'october' },
+        requestorName: 'Test Publisher',
         blockTypes: ['listing'],
         fetchPage: sinon.stub().resolves({ html: listingHtml, htmlFound: true }),
         now: new Date('2026-10-04T06:09:55.062Z'),
@@ -529,6 +570,7 @@ describe('publish', () => {
       const initialPayload = JSON.parse(await initialWrite.body.get('data').text());
       expect(initialPayload.app).to.equal('adobe-express');
       expect(initialPayload.releasePeriod).to.deep.equal(options.releasePeriod);
+      expect(initialPayload.requestorName).to.equal('Test Publisher');
       expect(initialPayload).not.to.have.property('requestId');
       expect(serviceUrl).to.equal('https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore');
       expect(submission).to.deep.equal({
@@ -553,6 +595,27 @@ describe('publish', () => {
       expect(fetchStub.callCount).to.equal(2);
       expect(fetchStub.secondCall.args[0]).to.equal(fetchStub.firstCall.args[0]);
       expect(options.onRequestAccepted.called).to.equal(false);
+    });
+
+    it('captures the signed-in name before saving and submitting a publish request', async () => {
+      delete options.requestorName;
+      fetchStub.resetBehavior();
+      const profile = fetchStub.withArgs('https://ims-na1.adobelogin.com/ims/profile/v1')
+        .resolves(new Response(JSON.stringify({ displayName: 'Test Publisher' })));
+      const source = fetchStub.withArgs(`https://admin.da.live/source/test-org/test-repo${filePath}`);
+      source.onCall(0).resolves(new Response(null, { status: 201 }));
+      source.onCall(1).resolves(new Response(null, { status: 200 }));
+      fetchStub.withArgs(
+        'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore',
+      ).resolves(new Response(JSON.stringify(serviceResult), { status: 202 }));
+      const result = await publishSelection(options);
+      expect(result.ok).to.equal(true);
+      expect(profile.calledOnce).to.equal(true);
+      expect(JSON.parse(await source.firstCall.args[1].body.get('data').text()).requestorName)
+        .to.equal('Test Publisher');
+      expect(JSON.parse(await source.secondCall.args[1].body.get('data').text()).requestorName)
+        .to.equal('Test Publisher');
+      sinon.assert.calledOnceWithExactly(options.onRequestAccepted, serviceResult.requestId);
     });
 
     it('does not update the file when the service rejects the request', async () => {

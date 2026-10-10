@@ -199,16 +199,17 @@ export async function fetchSourceJson({ org, repo, path, token }) {
 async function loadRequestDetails(items, context) {
   const results = [];
   for (let start = 0; start < items.length; start += 5) {
-    // Bound DA reads when history omits the original selections or release period.
+    // Bound DA reads when history omits original selections, period or requestor name.
     // eslint-disable-next-line no-await-in-loop
     const batch = await Promise.allSettled(items.slice(start, start + 5).map(async (item) => {
       const hasLocales = Array.isArray(item.selectedLocales)
         || Array.isArray(item.request?.selectedLocales);
       const hasPeriod = Boolean(item.releasePeriod ?? item.request?.releasePeriod);
-      if ((hasLocales && hasPeriod) || !item.daPayloadPath) return item;
+      const hasName = Boolean(item.requestorName ?? item.request?.requestorName);
+      if ((hasLocales && hasPeriod && hasName) || !item.daPayloadPath) return item;
       const source = JSON.parse(await fetchSourceJson({ ...context, path: item.daPayloadPath }));
       const details = { ...item };
-      // Older requests may predate either field; leave those values unrecorded.
+      // Older requests may predate these fields; leave those values unrecorded.
       if (!hasLocales && source && Object.hasOwn(source, 'selectedLocales')
         && !Array.isArray(source.selectedLocales)) {
         throw new Error('Source JSON does not record selectedLocales.');
@@ -217,6 +218,9 @@ async function loadRequestDetails(items, context) {
         details.selectedLocales = getSelectedLocales(source);
       }
       if (!hasPeriod && source?.releasePeriod) details.releasePeriod = source.releasePeriod;
+      if (!hasName && typeof source?.requestorName === 'string') {
+        details.requestorName = source.requestorName;
+      }
       return details;
     }));
     results.push(...batch);
@@ -465,12 +469,25 @@ export function renderRequestCell(item, { onViewJson } = {}) {
   summary.append(icon, el('span', 'ph-sr-only', 'Request details'));
   details.append(summary);
   const content = el('div', 'ph-request-body');
+  const close = el('button', 'ph-link ph-request-close', '\u00d7');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Close request details');
+  close.title = 'Close request details';
+  close.addEventListener('click', () => {
+    details.open = false;
+    summary.focus();
+  });
+  content.append(close);
   const body = el('dl', 'ph-detail-list');
   const addRow = (term, value) => {
     body.append(el('dt', '', term), el('dd', '', value ?? '\u2014'));
   };
   addRow('Request ID', item.requestId);
-  addRow('Requestor', item.requestor);
+  const requestorName = item.requestorName ?? item.request?.requestorName;
+  const requestor = requestorName
+    ? [requestorName, item.requestor ? `(${item.requestor})` : ''].filter(Boolean).join(' ')
+    : item.requestor;
+  addRow('Requestor', requestor);
   addRow('Started (original)', item.startedAt);
   addRow('Ended (original)', item.endedAt);
   content.append(body);

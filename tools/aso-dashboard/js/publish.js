@@ -7,12 +7,26 @@ export const PUBLISH_REQUEST_PATH = '/.da/storepublish/request';
 
 const PUBLISH_SERVICE_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore';
 const PUBLISH_LOG_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/get-publish-log';
+const IMS_PROFILE_URL = 'https://ims-na1.adobelogin.com/ims/profile/v1';
 const PUBLISH_POLL_INTERVAL_MS = 10000;
 const PUBLISH_POLL_TIMEOUT_MS = 60000;
 
 const PUBLISH_BLOCK_TYPES = ['listing', 'promo'];
 
 const pad = (value, length = 2) => String(value).padStart(length, '0');
+
+export async function fetchRequestorName(token) {
+  const response = await fetch(IMS_PROFILE_URL, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) {
+    throw new Error(`Failed to load the publish requestor's name: HTTP ${response.status}`);
+  }
+  const profile = await response.json();
+  const name = [profile?.displayName, profile?.name,
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(' ')]
+    .find((value) => typeof value === 'string' && value.trim());
+  if (!name) throw new Error('The signed-in user profile does not include a full name.');
+  return name.trim();
+}
 
 // Publish request filename: YYYY-MM-DD-t-HH-MI-SS-SSS (24-hour clock, UTC).
 export function formatPublishTimestamp(date = new Date()) {
@@ -61,6 +75,7 @@ export function buildPublishPayload(cells, options) {
     platform,
     languages,
     releasePeriod,
+    requestorName,
     promoNames = [],
     blockTypes = PUBLISH_BLOCK_TYPES,
   } = options;
@@ -74,7 +89,7 @@ export function buildPublishPayload(cells, options) {
 
   if (platform === 'apple') {
     const listingFields = ['name', 'subtitle', 'description', 'keywords', 'marketingUrl', 'promotionalText', 'supportUrl'];
-    const payload = { app: product, selectedLocales: langCodes, releasePeriod };
+    const payload = { app: product, selectedLocales: langCodes, releasePeriod, requestorName };
     if (blockTypes.includes('listing')) {
       payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)).filter(Boolean) };
     }
@@ -97,6 +112,7 @@ export function buildPublishPayload(cells, options) {
     platform: 'google',
     selectedLocales: langCodes,
     releasePeriod,
+    requestorName,
   };
   if (blockTypes.includes('listing')) {
     payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean) };
@@ -247,6 +263,7 @@ export async function publishSelection({
   platform,
   languages,
   releasePeriod,
+  requestorName,
   fetchPage,
   blockTypes = PUBLISH_BLOCK_TYPES,
   promoContexts = [],
@@ -290,11 +307,13 @@ export async function publishSelection({
     fetchPage,
   });
 
+  const publisherName = requestorName || await fetchRequestorName(token);
   const payload = buildPublishPayload(cells, {
     product,
     platform,
     languages,
     releasePeriod,
+    requestorName: publisherName,
     promoNames,
     blockTypes: effectiveBlockTypes,
   });

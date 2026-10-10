@@ -287,10 +287,58 @@ describe('publish-history rendering', () => {
     expect(details.open).to.equal(true);
     expect(details.querySelector('dl').textContent).to.contain(SUCCESS.requestId);
     expect(details.querySelector('dl').textContent).to.contain(SUCCESS.requestor);
+    expect(details.querySelector('dl').textContent).to.contain(
+      `${SUCCESS.requestorName} (${SUCCESS.requestor})`,
+    );
     [...details.querySelectorAll('button')].find((button) => button.textContent === 'View JSON').click();
     expect(onViewJson.calledOnceWithExactly(SUCCESS.daPayloadPath)).to.equal(true);
     summary.click();
     expect(details.open).to.equal(false);
+    summary.click();
+    const close = details.querySelector('.ph-request-close');
+    expect(close.getAttribute('aria-label')).to.equal('Close request details');
+    close.focus();
+    close.click();
+    expect(details.open).to.equal(false);
+    expect(document.activeElement).to.equal(summary);
+    summary.click();
+    expect(details.open).to.equal(true);
+  });
+
+  it('keeps legacy requestors email-only and renders names as text', () => {
+    const legacy = renderRequestCell(LEGACY);
+    const requestor = [...legacy.querySelectorAll('dt')]
+      .find((term) => term.textContent === 'Requestor').nextElementSibling;
+    expect(requestor.textContent).to.equal(LEGACY.requestor);
+    const named = renderRequestCell({
+      ...SUCCESS,
+      requestorName: undefined,
+      request: { requestorName: '<img src=x>' },
+    });
+    expect(named.querySelector('dl').textContent).to.contain(`<img src=x> (${SUCCESS.requestor})`);
+    expect(named.querySelector('img')).to.equal(null);
+  });
+
+  it('places the request close button at the top right in desktop and mobile overlays', async () => {
+    const style = document.createElement('style');
+    style.textContent = await readFile({ path: '../../../../tools/aso-dashboard/css/aso-dashboard.css' });
+    const root = renderResults([SUCCESS], {});
+    document.body.append(style, root);
+    [root.querySelector('.ph-table'), root.querySelector('.ph-cards')].forEach((view) => {
+      view.style.display = view.classList.contains('ph-table') ? 'table' : 'grid';
+      const details = view.querySelector('details');
+      details.open = true;
+      const content = details.querySelector('.ph-request-body');
+      const close = details.querySelector('.ph-request-close');
+      expect(content.firstElementChild).to.equal(close);
+      expect(getComputedStyle(close).alignSelf).to.equal('flex-end');
+      expect(close.getBoundingClientRect().right)
+        .to.be.at.most(content.getBoundingClientRect().right);
+      expect(close.getBoundingClientRect().bottom)
+        .to.be.at.most(content.querySelector('dl').getBoundingClientRect().top);
+      close.click();
+      expect(details.open).to.equal(false);
+    });
   });
 
   it('formats Started in the viewer local time while preserving the original timestamp', () => {
@@ -719,6 +767,24 @@ describe('publish-history API and controller', () => {
     return init({ context: { org: 'o', repo: 'r' }, token: 't' });
   }
   const q = (s) => document.querySelector(s);
+
+  it('loads the full requestor name from the saved request and shows it with the email', async () => {
+    const item = { ...SUCCESS };
+    delete item.requestorName;
+    const stub = sinon.stub(window, 'fetch');
+    stub.withArgs(sinon.match('list-publish-logs')).resolves(jsonResponse({ items: [item] }));
+    const source = stub.withArgs(sinon.match('admin.da.live/source'))
+      .resolves(jsonResponse({ requestorName: 'Test Publisher' }));
+    const controller = await mount();
+    await controller.load();
+    expect(source.calledOnce).to.equal(true);
+    expect(controller.state.items[0].requestorName).to.equal('Test Publisher');
+    [q('.ph-table'), q('.ph-card')].forEach((view) => {
+      expect(view.querySelector('.ph-detail-list').textContent)
+        .to.contain(`Test Publisher (${item.requestor})`);
+    });
+    expect(q('#ph-error').hidden).to.equal(true);
+  });
 
   it('loads a release period from the saved request even when locales are already recorded', async () => {
     const item = { ...SUCCESS };

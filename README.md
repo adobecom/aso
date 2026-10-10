@@ -9,3 +9,7 @@ Older requests without a recorded release period display a dash.
 
 Publish History initially shows three language pills per section. Use `+N more`
 to expand the list and `Less` to collapse it again, on desktop or mobile.
+
+New publish requests also store `requestorName`, fetched from the signed-in
+Adobe user profile. The request-details overlay shows the full name alongside
+the requestor email. Older requests without a recorded name remain email-only.
