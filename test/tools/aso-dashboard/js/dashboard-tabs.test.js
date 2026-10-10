@@ -32,6 +32,39 @@ describe('history-first Publish workspace', () => {
     expect(publishHistory.ensureLoaded.calledOnce).to.equal(true);
   });
 
+  it('places Refresh with the filters and keeps a compact New publish action in the heading', () => {
+    expect($('#ph-filters').contains($('#ph-refresh'))).to.equal(true);
+    expect($('#ph-refresh').type).to.equal('button');
+    expect($('#ph-refresh').classList.contains('ph-button')).to.equal(true);
+    expect($('.ph-heading-actions').contains($('#ph-refresh'))).to.equal(false);
+    expect($('.ph-heading-actions').contains($('#publish-new'))).to.equal(true);
+    expect($('#publish-new').classList.contains('ph-button')).to.equal(true);
+  });
+
+  it('renders New publish smaller than Refresh and keeps Refresh inside narrow filter layouts', async () => {
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = '/tools/aso-dashboard/css/aso-dashboard.css';
+    await new Promise((resolve, reject) => {
+      stylesheet.onload = resolve;
+      stylesheet.onerror = reject;
+      root.append(stylesheet);
+    });
+    $('.tab-button[data-tab="publish"]').click();
+    const newPublish = $('#publish-new');
+    const refresh = $('#ph-refresh');
+    expect(Number.parseFloat(getComputedStyle(newPublish).fontSize))
+      .to.be.lessThan(Number.parseFloat(getComputedStyle(refresh).fontSize));
+    expect(newPublish.getBoundingClientRect().height)
+      .to.be.lessThan(refresh.getBoundingClientRect().height);
+    root.style.width = '360px';
+    const filtersBounds = $('#ph-filters').getBoundingClientRect();
+    const refreshBounds = refresh.getBoundingClientRect();
+    expect(refreshBounds.left).to.be.at.least(filtersBounds.left);
+    expect(refreshBounds.right).to.be.at.most(filtersBounds.right);
+    expect(refreshBounds.bottom).to.be.at.most(filtersBounds.bottom);
+  });
+
   it('preserves form selections and shared scope while navigating between views', () => {
     $('.tab-button[data-tab="publish"]').click();
     $('#publish-new').click();

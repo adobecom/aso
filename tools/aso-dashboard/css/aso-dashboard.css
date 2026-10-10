@@ -977,6 +977,18 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   margin: var(--spacing-400) auto;
 }
 
+#publish-new {
+  height: 36px;
+  padding: 0 var(--spacing-300);
+  font-size: 14px;
+  border-radius: var(--s2-radius-100);
+}
+
+.ph-filter-refresh {
+  align-self: end;
+  justify-self: start;
+}
+
 .ph-button:focus-visible,
 .ph-link:focus-visible,
 .ph-chip:focus-visible,
