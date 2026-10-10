@@ -3,7 +3,7 @@ import { collectExportData } from './import-export/collect.js';
 import { putJsonSource } from './lib/da-source-client.js';
 import { getRelativeProductsPath } from './lib/utils.js';
 
-export const PUBLISH_REQUEST_PATH = '/.da/storepublish/request';
+export const PUBLISH_REQUEST_PATH = '/.da/store-publish/request';
 
 const PUBLISH_SERVICE_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore';
 const PUBLISH_LOG_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/get-publish-log';

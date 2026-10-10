@@ -521,7 +521,7 @@ describe('publish', () => {
   });
 
   describe('publishSelection', () => {
-    const filePath = '/.da/storepublish/request/2026-10-04-t-06-09-55-062.json';
+    const filePath = '/.da/store-publish/request/2026-10-04-t-06-09-55-062.json';
     const serviceResult = { requestId: 'b9bf6f64-58a3-42b3-a4f6-c1361643547a', status: 'queued' };
     let options;
     let fetchStub;

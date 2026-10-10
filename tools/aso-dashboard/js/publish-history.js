@@ -30,7 +30,7 @@ const STATUS_META = {
 
 export const STATUS_OPTIONS = Object.keys(STATUS_META);
 
-const SOURCE_PATH_PATTERN = /^\/?\.da\/storepublish\/request\/[A-Za-z0-9._-]+\.json$/;
+const SOURCE_PATH_PATTERN = /^\/?\.da\/store-publish\/request\/[A-Za-z0-9._-]+\.json$/;
 
 // ---------- Pure data helpers ----------
 

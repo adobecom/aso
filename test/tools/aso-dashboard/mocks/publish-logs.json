@@ -2,7 +2,7 @@
   "items": [
     {
       "app": "firefly",
-      "daPayloadPath": ".da/storepublish/request/2026-10-08-t-06-04-59-983.json",
+      "daPayloadPath": ".da/store-publish/request/2026-10-08-t-06-04-59-983.json",
       "selectedLocales": ["en", "ja-jp", "ko-kr"],
       "releasePeriod": { "year": "2026", "quarter": "q4", "month": "october" },
       "requestorName": "Test Publisher",
@@ -91,7 +91,7 @@
     },
     {
       "app": "TEST_APP",
-      "daPayloadPath": ".da/storepublish/request/2026-10-07-t-16-55-58-542.json",
+      "daPayloadPath": ".da/store-publish/request/2026-10-07-t-16-55-58-542.json",
       "selectedLocales": ["en", "ko-kr", "hi-in", "fr-fr", "ja-jp"],
       "releasePeriod": { "year": "2026", "quarter": "q4", "month": "october" },
       "requestorName": "Test Publisher",

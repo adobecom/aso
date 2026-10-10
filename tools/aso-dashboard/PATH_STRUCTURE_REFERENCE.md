@@ -60,10 +60,10 @@ and `fullDescription` in `metadata.localizations`, alongside the `app` and
 are not included in the Google payload. Apple publishing is unchanged.
 
 Publish mode in the Export section saves the selected product/platform payload to
-`/.da/storepublish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json` (UTC), then sends a JSON
+`/.da/store-publish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json` (UTC), then sends a JSON
 `POST` to
 `https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore`
-with `{"daPayloadPath": ".da/storepublish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json"}`.
+with `{"daPayloadPath": ".da/store-publish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json"}`.
 The service path does not include a leading slash. The service request includes
 the current DA token in the `Authorization: Bearer <token>` header; the token is
 not included in the JSON body or saved request file.

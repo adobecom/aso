@@ -74,9 +74,9 @@ describe('publish-history data helpers', () => {
   });
 
   it('validates source paths', () => {
-    expect(isValidSourcePath('.da/storepublish/request/a-b.json')).to.equal(true);
-    expect(isValidSourcePath('/.da/storepublish/request/a.json')).to.equal(true);
-    ['https://evil.com/x.json', '.da/storepublish/request/../x.json', '/etc/passwd', '', null]
+    expect(isValidSourcePath('.da/store-publish/request/a-b.json')).to.equal(true);
+    expect(isValidSourcePath('/.da/store-publish/request/a.json')).to.equal(true);
+    ['https://evil.com/x.json', '.da/store-publish/request/../x.json', '/etc/passwd', '', null]
       .forEach((p) => expect(isValidSourcePath(p)).to.equal(false));
   });
 
