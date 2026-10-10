@@ -30,8 +30,6 @@ const STATUS_META = {
 
 export const STATUS_OPTIONS = Object.keys(STATUS_META);
 
-const SOURCE_PATH_PATTERN = /^\/?\.da\/store-publish\/request\/[A-Za-z0-9._-]+\.json$/;
-
 // ---------- Pure data helpers ----------
 
 export function normalizeStatus(value) {
@@ -95,8 +93,8 @@ export function mapSections(item) {
 }
 
 export function isValidSourcePath(path) {
-  return typeof path === 'string' && SOURCE_PATH_PATTERN.test(path.trim())
-    && !path.includes('..');
+  return typeof path === 'string' && path.trim() !== ''
+    && !/^[a-z][a-z0-9+.-]*:/i.test(path.trim()) && !path.includes('..');
 }
 
 const DATE_FORMAT = { year: 'numeric', month: 'short', day: 'numeric' };
@@ -184,7 +182,7 @@ export async function fetchPublishLogs({
   return { items: data.items, nextCursor: extractNextCursor(data) };
 }
 
-// Only paths under the publish request folder are fetched, always through the DA source client.
+// The path comes from the history response and is fetched through the DA source client.
 export async function fetchSourceJson({ org, repo, path, token }) {
   if (!isValidSourcePath(path)) throw new Error('Source path is not a valid publish request path.');
   const text = await getSourceText(org, repo, path.trim(), token);
