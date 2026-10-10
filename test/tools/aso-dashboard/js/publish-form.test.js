@@ -56,7 +56,10 @@ describe('publish form', () => {
     fetchStub = sinon.stub(window, 'fetch').callsFake(async (url) => {
       const target = String(url);
       if (target.includes('store-publish.json')) {
-        return json({ 'app-languages': { data: [{ app: 'adobe-express', platform: 'apple', languages: 'de,en' }] } });
+        return json({
+          config: { data: [{ key: 'store-publish.api', value: 'https://api.example.test/aso-publisher' }] },
+          'app-languages': { data: [{ app: 'adobe-express', platform: 'apple', languages: 'de,en' }] },
+        });
       }
       if (target.includes('block-schema.json')) return json(schema);
       if (target.includes('sheet-to-block-map.json')) return json(sheetMap);
@@ -73,6 +76,7 @@ describe('publish form', () => {
 
   afterEach(() => {
     sinon.restore();
+    document.querySelectorAll('dialog').forEach((dialog) => dialog.remove());
     root.remove();
   });
 
@@ -159,5 +163,41 @@ describe('publish form', () => {
     const radios = root.querySelectorAll('input[name="publish-platform"]');
     expect(radios).to.have.lengthOf(2);
     radios.forEach((radio) => expect(radio.type).to.equal('radio'));
+  });
+
+  ['success', 'failed'].forEach((overallStatus) => {
+    it(`hands accepted requests to History after a ${overallStatus} completion`, async () => {
+      await selectEverything({ promos: false });
+      fetchStub.withArgs(sinon.match('admin.da.live/source')).callsFake(async (url, options) => {
+        if (options?.method === 'PUT') return json({});
+        return new Response('<main><div class="aso-app"><div><div>promotionalText</div><div>Test content</div></div></div></main>');
+      });
+      fetchStub.withArgs(sinon.match('ims/profile')).resolves(json({ displayName: 'Test Publisher' }));
+      fetchStub.withArgs(sinon.match('publish-to-appstore'))
+        .resolves(json({ requestId: 'request-123', status: 'accepted' }));
+      fetchStub.withArgs(sinon.match('get-publish-log')).resolves(json({ overallStatus }));
+      const log = sinon.stub(console, 'error');
+      const submitted = new Promise((resolve) => {
+        root.addEventListener('publish-request-submitted', resolve, { once: true });
+      });
+      $('#publish-button').click();
+      const event = await submitted;
+      expect(event.detail).to.deep.equal({ requestId: 'request-123' });
+      expect($('#publish-summary').textContent).to.contain('request-123');
+      expect($('#publish-summary').textContent)
+        .to.contain(overallStatus === 'failed' ? 'Publish failed (failed)' : 'Published Request ID:');
+      expect(log.calledWith('[aso publish]')).to.equal(overallStatus === 'failed');
+    });
+  });
+
+  it('does not navigate to History when the request was not accepted', async () => {
+    await selectEverything({ promos: false });
+    const submitted = sinon.spy();
+    root.addEventListener('publish-request-submitted', submitted);
+    sinon.stub(console, 'error');
+    $('#publish-button').click();
+    await flush();
+    expect(submitted.called).to.equal(false);
+    expect($('#publish-summary').textContent).to.not.equal('');
   });
 });

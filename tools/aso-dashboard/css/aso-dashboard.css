@@ -932,6 +932,27 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--spacing-300);
+  flex-wrap: wrap;
+}
+
+.ph-heading-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-300);
+}
+
+.ph-request-group.ph-highlighted {
+  --ph-hover-bg: var(--s2-blue-200);
+  --ph-edge: var(--s2-blue-800);
+}
+
+.ph-card.ph-highlighted {
+  background: var(--s2-blue-200);
+}
+
+#publish-back {
+  margin-bottom: var(--spacing-300);
 }
 
 .ph-button {

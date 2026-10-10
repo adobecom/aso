@@ -26,7 +26,6 @@
         <button class="tab-button" data-tab="preview">Preview</button>
         <button class="tab-button" data-tab="export">Export</button>
         <button class="tab-button" data-tab="publish">Publish</button>
-        <button class="tab-button" data-tab="publish-history">Publish History</button>
       </div>
 
       <div class="tab-content" data-tab-content="preview">
@@ -231,8 +230,9 @@
 
       <div class="tab-content" data-tab-content="publish">
         <div class="export-container">
+          <button type="button" class="ph-link" id="publish-back">Back to history</button>
           <h2 class="export-title">Publish to Store</h2>
-          <p class="export-description">Publish current DA content for one product and one platform to the store request queue. Track progress in Publish History.</p>
+          <p class="export-description">Publish current DA content for one product and one platform to the store request queue. After submission, return to history to track the request.</p>
 
           <div class="export-section" id="publish-platform-section">
             <h3>Platform</h3>
@@ -316,8 +316,11 @@
       <div class="tab-content" data-tab-content="publish-history">
         <section class="ph-container" aria-labelledby="ph-title">
           <div class="ph-heading-row">
-            <h2 class="export-title" id="ph-title">Publish History</h2>
-            <button type="button" class="ph-button" id="ph-refresh">Refresh</button>
+            <h2 class="export-title" id="ph-title" tabindex="-1">Publish History</h2>
+            <div class="ph-heading-actions">
+              <button type="button" class="ph-link" id="ph-refresh">Refresh</button>
+              <button type="button" class="ph-button" id="publish-new">New publish</button>
+            </div>
           </div>
           <p class="export-description">Results of store publish requests, grouped by section. Requested-on times use your local time. Filters search all history.</p>
           <form class="ph-filters" id="ph-filters" aria-label="Filter publish results" onsubmit="return false">

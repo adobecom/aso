@@ -561,6 +561,9 @@ export function renderRow(item, handlers) {
 export function renderCard(item, handlers) {
   const card = el('li', 'ph-card');
   card.dataset.requestId = item.requestId;
+  if (item.requestId && item.requestId === handlers?.highlightedRequestId) {
+    card.classList.add('ph-highlighted');
+  }
   const head = el('div', 'ph-card-head');
   head.append(el('strong', '', item.app ?? '\u2014'), el('span', 'ph-platform', item.platform ?? '\u2014'), renderStatusBadge(item));
   card.append(head, renderTime(item.startedAt));
@@ -599,6 +602,9 @@ export function renderResults(items, handlers) {
   items.forEach((item) => {
     const tbody = el('tbody', 'ph-request-group');
     tbody.dataset.requestId = item.requestId;
+    if (item.requestId && item.requestId === handlers?.highlightedRequestId) {
+      tbody.classList.add('ph-highlighted');
+    }
     tbody.append(renderRow(item, handlers));
     table.append(tbody);
   });
@@ -699,6 +705,11 @@ export function init({ context, token }) {
 
   function render() {
     closePopover();
+    const requestId = handlers.highlightedRequestId;
+    const requestStatus = requestId
+      ? ` Request ${requestId}${state.items.some((item) => item.requestId === requestId)
+        ? ' is highlighted below.' : ' is not in the loaded history yet. Refresh to check its status.'}`
+      : '';
     els.more.hidden = !state.nextCursor;
     els.more.disabled = state.loading;
     els.refresh.disabled = state.loading;
@@ -715,12 +726,12 @@ export function init({ context, token }) {
       return;
     }
     if (!state.items.length) {
-      els.status.textContent = '';
+      els.status.textContent = requestStatus.trim();
       els.results.replaceChildren(state.loaded && !els.error.hidden ? '' : el('p', 'ph-empty', state.loaded ? 'No publish requests found.' : ''));
       return;
     }
     const more = state.nextCursor ? ' More records are available.' : ' End of loaded history.';
-    els.status.textContent = `Showing ${state.items.length} loaded records matching the current filters.${more}${state.loading ? ' Loading\u2026' : ''}`;
+    els.status.textContent = `Showing ${state.items.length} loaded records matching the current filters.${more}${state.loading ? ' Loading\u2026' : ''}${requestStatus}`;
     els.results.replaceChildren(renderResults(state.items, handlers));
   }
 
@@ -787,9 +798,22 @@ export function init({ context, token }) {
     }));
   renderFilters();
 
-  const tabButton = document.querySelector('.tab-button[data-tab="publish-history"]');
-  tabButton?.addEventListener('click', () => {
+  function ensureLoaded() {
     if (!state.loaded && !state.loading) load();
-  });
-  return { load, state, render };
+  }
+
+  function showRequest(requestId) {
+    handlers.highlightedRequestId = requestId;
+    els.app.value = '';
+    els.platform.value = '';
+    els.statusFilter.value = '';
+    els.byMe.checked = true;
+    els.all.checked = false;
+    state.items = [];
+    state.nextCursor = null;
+    state.loaded = false;
+    load();
+  }
+
+  return { load, state, render, ensureLoaded, showRequest };
 }

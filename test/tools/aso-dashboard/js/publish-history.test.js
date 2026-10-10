@@ -38,6 +38,11 @@ const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), 
 const tick = () => new Promise((r) => { setTimeout(r, 50); });
 
 describe('publish-history data helpers', () => {
+  it('does not highlight history by default, including records without a request ID', () => {
+    const view = renderResults([SUCCESS, { ...SUCCESS, requestId: undefined }], {});
+    expect(view.querySelector('.ph-highlighted')).to.equal(null);
+  });
+
   it('maps sections independent of order, incl. legacy localizations', () => {
     const cols = mapSections(PARTIAL);
     expect(cols.metadata.map((c) => c.locale)).to.deep.equal(['en', 'fr-fr']);
@@ -789,6 +794,42 @@ describe('publish-history API and controller', () => {
   }
   const q = (s) => document.querySelector(s);
 
+  it('refreshes submitted requests without stale filters and highlights desktop and mobile results', async () => {
+    const stub = sinon.stub(window, 'fetch')
+      .callsFake(async () => jsonResponse({ items: [SUCCESS, FAILED] }));
+    const controller = await mount();
+    await controller.load();
+    q('#ph-filter-app').value = FAILED.app;
+    q('#ph-filter-platform').value = FAILED.platform;
+    q('#ph-filter-status').value = 'failed';
+    q('#ph-filter-by-me').checked = false;
+    q('#ph-filter-all').checked = true;
+    controller.showRequest(SUCCESS.requestId);
+    await tick();
+    expect(q('#ph-filter-app').value).to.equal('');
+    expect(q('#ph-filter-platform').value).to.equal('');
+    expect(q('#ph-filter-status').value).to.equal('');
+    expect(q('#ph-filter-by-me').checked).to.equal(true);
+    expect(q('#ph-filter-all').checked).to.equal(false);
+    const query = new URL(stub.lastCall.args[0]).searchParams;
+    expect(query.get('byMe')).to.equal('true');
+    ['app', 'platform', 'status', 'cursor'].forEach((key) => expect(query.has(key)).to.equal(false));
+    expect([...document.querySelectorAll('.ph-highlighted')].map((row) => row.dataset.requestId))
+      .to.deep.equal([SUCCESS.requestId, SUCCESS.requestId]);
+    controller.ensureLoaded();
+    expect(stub.callCount).to.equal(2);
+  });
+
+  it('keeps the submitted request ID visible when it is not in history yet', async () => {
+    sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [] }));
+    const controller = await mount();
+    controller.showRequest('new-request');
+    await tick();
+    expect(q('#ph-status').textContent).to.contain('Request new-request');
+    expect(q('#ph-status').textContent).to.contain('Refresh to check its status');
+    expect(q('#ph-results').textContent).to.contain('No publish requests found');
+  });
+
   it('loads the full requestor name from the saved request and shows it with the email', async () => {
     const item = { ...SUCCESS };
     delete item.requestorName;
@@ -1007,14 +1048,15 @@ describe('publish-history API and controller', () => {
     expect(log.calledWith('Failed to fetch missing-history-languages.json:', 503)).to.equal(true);
   });
 
-  it('loads on tab click, paginates without duplicates, keeps rows on refresh failure', async () => {
+  it('loads when opened, paginates without duplicates, keeps rows on refresh failure', async () => {
     const stub = sinon.stub(window, 'fetch');
     stub.onCall(0).resolves(jsonResponse({ items: fixture.items.slice(0, 3), nextCursor: 'n1' }));
     stub.onCall(1).resolves(jsonResponse({ items: fixture.items.slice(2) }));
     stub.onCall(2).resolves(jsonResponse({}, 503));
-    await mount();
+    const controller = await mount();
     expect(q('#ph-results').textContent).to.equal('');
-    q('.tab-button').click();
+    controller.ensureLoaded();
+    controller.ensureLoaded();
     expect(q('#ph-status').textContent).to.contain('Loading');
     const loading = q('#ph-results .ph-loading');
     expect(loading.querySelector('[role="progressbar"]')).to.not.equal(null);

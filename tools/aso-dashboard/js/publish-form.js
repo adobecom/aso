@@ -394,6 +394,7 @@ async function handlePublish(org, repo, token) {
   if (summary) summary.textContent = '';
 
   let progress;
+  let submittedRequestId;
   try {
     progress = createPublishProgressModal(button);
     if (!schemaCache || !sheetMapCache) throw new Error('Config fetch failed');
@@ -429,7 +430,10 @@ async function handlePublish(org, repo, token) {
       blockTypes,
       promoContexts,
       selection,
-      onRequestAccepted: progress.setRequestId,
+      onRequestAccepted: (requestId) => {
+        submittedRequestId = requestId;
+        progress.setRequestId(requestId);
+      },
     });
 
     if (!result.ok) {
@@ -455,6 +459,13 @@ async function handlePublish(org, repo, token) {
     progress?.finish('Publish failed', error.message || 'Unknown error', true);
     showStatus('Publish failed');
     if (summary) summary.textContent = error.message || 'Unknown error';
+  } finally {
+    if (submittedRequestId) {
+      button.dispatchEvent(new CustomEvent('publish-request-submitted', {
+        bubbles: true,
+        detail: { requestId: submittedRequestId },
+      }));
+    }
   }
 }
 

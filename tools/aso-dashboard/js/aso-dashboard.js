@@ -5,36 +5,14 @@ import { init as initExport } from './export.js';
 import { init as initImport } from './import.js';
 import { init as initPublish } from './publish-form.js';
 import { init as initPublishHistory } from './publish-history.js';
-
-function setupTabs() {
-  const scopeSections = document.querySelector('.scope-sections');
-  const tabs = document.querySelector('.tabs');
-
-  function applyActiveTab(tabName) {
-    if (!['preview', 'export', 'publish'].includes(tabName)) return;
-    const slot = document.querySelector(`[data-tab-content="${tabName}"] .scope-sections-slot`);
-    if (slot) slot.appendChild(scopeSections);
-  }
-
-  tabs.addEventListener('click', (e) => {
-    const button = e.target.closest('.tab-button');
-    if (!button) return;
-    document.querySelectorAll('.tab-button, .tab-content').forEach((el) => el.classList.remove('active'));
-    button.classList.add('active');
-    document.querySelector(`[data-tab-content="${button.dataset.tab}"]`).classList.add('active');
-    applyActiveTab(button.dataset.tab);
-  });
-
-  const initialButton = tabs.querySelector('.tab-button.active');
-  if (initialButton) applyActiveTab(initialButton.dataset.tab);
-}
+import { setupTabs } from './dashboard-tabs.js';
 
 (async function init() {
   try {
     const { context, token } = await DA_SDK;
-    setupTabs();
+    const publishHistory = initPublishHistory({ context, token });
+    setupTabs({ publishHistory });
     initReleasePeriodSettings();
-    initPublishHistory({ context, token });
     await Promise.all([
       initPreview({ context, token }),
       initExport({ context, token }),
