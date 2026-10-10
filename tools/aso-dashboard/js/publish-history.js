@@ -157,11 +157,14 @@ export function extractNextCursor(data) {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
+const PAGE_SIZE = 25;
+
 export async function fetchPublishLogs({
   token, cursor, signal, byMe = true, app, platform, status,
 } = {}) {
   const url = new URL(PUBLISH_LOGS_URL);
   url.searchParams.set('byMe', String(byMe));
+  url.searchParams.set('pageSize', String(PAGE_SIZE));
   Object.entries({ app, platform, status }).forEach(([key, value]) => {
     if (value) url.searchParams.set(key, value);
   });

@@ -708,6 +708,7 @@ describe('publish-history API and controller', () => {
     expect(url).to.contain('list-publish-logs');
     expect(url).to.contain('cursor=c1');
     expect(new URL(url).searchParams.get('byMe')).to.equal('true');
+    expect(new URL(url).searchParams.get('pageSize')).to.equal('25');
     expect(opts.headers.Authorization).to.equal('Bearer tok');
     expect(page.nextCursor).to.equal('abc');
   });
