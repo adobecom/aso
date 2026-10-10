@@ -5,8 +5,8 @@ Export's content pipeline (`collectExportData` and the shared `lib/da-page-fetch
 spacing, keywords and constants resolve the same way. The Export tab is unchanged from upstream.
 
 Publish supports Store updates and CPP (Store tests are hidden). CPP requires exactly one
-campaign and adds `storeType: "cpp"` and `cppName` to the request; Store updates requests
-are unchanged.
+campaign and is sent as `cpp: [{ referenceName, localizations }]` instead of `metadata`
+(`storeType` is UI-only). Store updates requests are unchanged.
 
 Publish requests include the selected release period as
 `releasePeriod: { year, quarter, month }`, using the Release period controls'

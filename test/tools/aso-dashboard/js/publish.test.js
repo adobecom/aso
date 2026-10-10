@@ -48,18 +48,17 @@ describe('publish', () => {
       expect(payload.releasePeriod).to.deep.equal(releasePeriod);
     });
 
-    it(`adds the CPP campaign to the ${platform} payload only for CPP`, () => {
-      const base = {
-        product: 'app',
-        platform,
-        languages: [{ code: 'en' }],
-      };
-      const cpp = buildPublishPayload([], { ...base, storeType: 'cpp', testName: 'spring' });
-      expect(cpp.storeType).to.equal('cpp');
-      expect(cpp.cppName).to.equal('spring');
-      const updates = buildPublishPayload([], base);
-      expect(updates).to.not.have.property('storeType');
-      expect(updates).to.not.have.property('cppName');
+    it(`sends CPP content as a cpp entry in the ${platform} payload`, () => {
+      const field = platform === 'apple' ? 'promotionalText' : 'shortDescription';
+      const cells = [{ language: { code: 'en' }, device: platform, blockType: 'listing', fieldKey: field, text: 'Hi' }];
+      const base = { product: 'app', platform, languages: [{ code: 'en' }] };
+      const cpp = buildPublishPayload(cells, { ...base, storeType: 'cpp', testName: 'Holiday Campaign' });
+      expect(cpp).to.not.have.property('storeType');
+      expect(cpp).to.not.have.property('cppName');
+      expect(cpp).to.not.have.property('metadata');
+      expect(cpp.cpp[0].referenceName).to.equal('Holiday Campaign');
+      expect(cpp.cpp[0].localizations[0].locale).to.equal('en');
+      expect(buildPublishPayload(cells, base)).to.not.have.property('cpp');
     });
 
     describe('requestor profile', () => {

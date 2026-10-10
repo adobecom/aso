@@ -81,8 +81,13 @@ export function buildPublishPayload(cells, options) {
     promoNames = [],
     blockTypes = PUBLISH_BLOCK_TYPES,
   } = options;
-  // Store updates keep the original payload shape; CPP adds which campaign is being published.
-  const storeFields = storeType === STORE_TYPE_CPP ? { storeType, cppName: testName } : {};
+  // storeType is UI-only: CPP content is sent as a `cpp` entry instead of `metadata`.
+  const isCpp = storeType === STORE_TYPE_CPP;
+  const listingKey = isCpp ? 'cpp' : 'metadata';
+  const listingEntry = (localizations) => {
+    if (!isCpp) return { localizations };
+    return [{ referenceName: testName, localizations }];
+  };
   const cellIndex = new Map();
   cells.forEach((cell) => {
     const key = `${cell.language.code}|${cell.device}|${cell.blockType}|${cell.fieldKey}|${cell.promoName ?? ''}`;
@@ -98,10 +103,9 @@ export function buildPublishPayload(cells, options) {
       selectedLocales: langCodes,
       releasePeriod,
       requestorName,
-      ...storeFields,
     };
     if (blockTypes.includes('listing')) {
-      payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)).filter(Boolean) };
+      payload[listingKey] = listingEntry(langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)).filter(Boolean));
     }
 
     if (blockTypes.includes('promo') && promoNames.length) {
@@ -123,10 +127,9 @@ export function buildPublishPayload(cells, options) {
     selectedLocales: langCodes,
     releasePeriod,
     requestorName,
-    ...storeFields,
   };
   if (blockTypes.includes('listing')) {
-    payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean) };
+    payload[listingKey] = listingEntry(langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean));
   }
   return omitEmptyContainers(payload);
 }
