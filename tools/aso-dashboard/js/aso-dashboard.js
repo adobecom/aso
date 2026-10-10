@@ -3,6 +3,7 @@ import { initReleasePeriodSettings } from './release-period-settings.js';
 import { init as initPreview } from './preview.js';
 import { init as initExport } from './export.js';
 import { init as initImport } from './import.js';
+import { init as initPublish } from './publish-form.js';
 import { init as initPublishHistory } from './publish-history.js';
 
 function setupTabs() {
@@ -10,7 +11,7 @@ function setupTabs() {
   const tabs = document.querySelector('.tabs');
 
   function applyActiveTab(tabName) {
-    if (tabName !== 'preview' && tabName !== 'export') return;
+    if (!['preview', 'export', 'publish'].includes(tabName)) return;
     const slot = document.querySelector(`[data-tab-content="${tabName}"] .scope-sections-slot`);
     if (slot) slot.appendChild(scopeSections);
   }
@@ -38,6 +39,7 @@ function setupTabs() {
       initPreview({ context, token }),
       initExport({ context, token }),
       initImport({ context, token }),
+      initPublish({ context, token }),
     ]);
   } catch (error) {
     console.error('Error initializing dashboard:', error);

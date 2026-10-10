@@ -1,4 +1,3 @@
-import { loadConstantsValuesForPage } from '../../../blocks/aso-app/constants-runtime.js';
 import {
   isReleasePeriodComplete,
   readReleasePeriod,
@@ -34,7 +33,6 @@ import {
   updateStoreTestsCount,
 } from './store-scope-settings.js';
 import { collectExportData } from './import-export/collect.js';
-import { createPublishProgressModal, publishSelection, waitForPublishCompletion } from './publish.js';
 import { collectMediaExportData } from './import-export/media-collect.js';
 import { listMediaAssetFields, listSchemaFields } from './import-export/page-map.js';
 import {
@@ -42,12 +40,7 @@ import {
   buildWorkbook,
   parseWorkbook,
 } from './import-export/template.js';
-import { buildHtmlSourcePath } from './import-export/paths.js';
-import {
-  getKeywordsSidecar,
-  getSourceText,
-  getSpacingSidecar,
-} from './lib/da-source-client.js';
+import { createAdminFetch, createFetchPage } from './lib/da-page-fetch.js';
 import { isFileTooLarge, loadExcelJS, MAX_WORKBOOK_FILE_BYTES } from './lib/excel-loader.js';
 import { loadJSZip } from './lib/zip-loader.js';
 import {
@@ -93,49 +86,6 @@ function getSelectedItems() {
   };
 }
 
-function getCheckedDevices() {
-  const devices = [];
-  if (document.getElementById('device-apple')?.checked) devices.push('apple');
-  if (document.getElementById('device-google')?.checked) devices.push('google');
-  return devices;
-}
-
-// Export/Publish share one UI; Publish only ever targets a single store platform.
-function getExportMode() {
-  return document.querySelector('input[name="export-mode"]:checked')?.value || 'export';
-}
-
-function isPublishMode() {
-  return getExportMode() === 'publish';
-}
-
-function defaultActionLabel() {
-  return isPublishMode() ? 'Publish to Store' : 'Export from DA';
-}
-
-// Mirrors the old Publish tab's radio-button behavior using the same checkboxes Export uses,
-// so Export keeps allowing both platforms while Publish enforces exactly one.
-function enforceSingleDeviceInPublishMode(changedId) {
-  if (!isPublishMode()) return;
-  const otherId = changedId === 'device-apple' ? 'device-google' : 'device-apple';
-  const changed = document.getElementById(changedId);
-  const other = document.getElementById(otherId);
-  if (changed?.checked && other) other.checked = false;
-}
-
-// "Load fields from a file" pre-fills product/languages/devices/release-period, which Publish
-// also relies on (via getSelectedItems/readReleasePeriod), so it stays visible in both modes.
-// "Content to export" (metadata/promos field + promo selection) is shared too, so Publish can
-// filter what goes into the payload — only Images & Videos and Media Assets are export-only,
-// since the store publish payload carries text metadata/promos, not media.
-const EXPORT_ONLY_SELECTORS = [
-  '#export-scope-images-videos-item',
-  '#export-images-videos-fields',
-  '#export-media-assets-section',
-];
-
-const PUBLISH_BLOCK_TYPES = ['listing', 'promo'];
-
 function refreshFieldScope() {
   if (!schemaCache || !sheetMapCache) return;
   const { devices } = getSelectedItems();
@@ -163,7 +113,6 @@ async function refreshMediaAssetsAvailability(org, repo, token, schema, {
   languages,
   devices,
 }) {
-  if (isPublishMode()) return;
   const releasePeriod = readReleasePeriod();
   const storeType = readStoreType();
   const testName = isStoreTestsScope() ? getSelectedTestNames()[0] : undefined;
@@ -226,10 +175,6 @@ function getExportBlockTypes() {
   return blockTypes;
 }
 
-function getPublishBlockTypes() {
-  return getExportBlockTypes().filter((blockType) => PUBLISH_BLOCK_TYPES.includes(blockType));
-}
-
 function getPromoContexts() {
   if (!document.getElementById('export-scope-promos')?.checked) return [];
   return getSelectedPromoContexts();
@@ -243,40 +188,6 @@ function togglePromoFields() {
   if (countEl) {
     countEl.textContent = promosChecked ? `(${getSelectedPromoContexts().length} selected)` : '(not included)';
   }
-}
-
-function createAdminFetch(org, repo, token) {
-  const adminOrigin = `https://admin.da.live/source/${org}/${repo}`;
-  return async (input) => {
-    const url = typeof input === 'string' ? input : input.url;
-    if (url.startsWith('/')) {
-      // .json/.html fetched verbatim; extensionless source paths get .html appended.
-      const sourcePath = url.endsWith('.html') || url.endsWith('.json') ? url : `${url}.html`;
-      return fetch(`${adminOrigin}${sourcePath}`, { headers: { Authorization: `Bearer ${token}` } });
-    }
-    return fetch(input);
-  };
-}
-
-function createFetchPage(org, repo, token, adminFetch) {
-  return async (_org, _repo, pagePath) => {
-    const htmlPath = buildHtmlSourcePath(pagePath);
-    const [html, spacingSidecar, keywordsSidecar] = await Promise.all([
-      getSourceText(org, repo, htmlPath, token),
-      getSpacingSidecar(org, repo, pagePath, token),
-      getKeywordsSidecar(org, repo, pagePath, token),
-    ]);
-    const constantsValues = html !== null
-      ? await loadConstantsValuesForPage({ pathname: pagePath, fetch: adminFetch })
-      : {};
-    return {
-      html: html ?? '',
-      htmlFound: html !== null,
-      spacingSidecar,
-      keywordsSidecar,
-      constantsValues,
-    };
-  };
 }
 
 function downloadWorkbook(buffer, filename) {
@@ -344,52 +255,24 @@ function renderImageExportSummary(container, totalCount, fileCount, problems) {
 function updateExportButtonState() {
   const hasProduct = Boolean(document.getElementById('export-product')?.value);
   const hasLanguages = getSelectedCheckboxes('.language-checkbox').length > 0;
-  const devices = getCheckedDevices();
-  const releasePeriodReady = isReleasePeriodComplete();
-  const exportButton = document.getElementById('export-button');
-  const imagesButton = document.getElementById('export-images-button');
-
-  if (isPublishMode()) {
-    const publishReady = hasProduct && hasLanguages && devices.length === 1 && releasePeriodReady
-      && getPublishBlockTypes().length > 0 && isPromoScopeComplete();
-    if (exportButton) {
-      exportButton.disabled = exportButton.classList.contains('loading') || !publishReady;
-    }
-    if (imagesButton) imagesButton.disabled = true;
-    return;
-  }
-
-  const hasDevices = devices.length > 0;
+  const hasDevices = document.getElementById('device-apple')?.checked
+    || document.getElementById('device-google')?.checked;
   const hasScope = getExportBlockTypes().length > 0;
+  const releasePeriodReady = isReleasePeriodComplete();
   const promosNeedName = !isPromoScopeComplete();
   const storeTestsNeedSelection = isStoreTestsScope() && !isStoreScopeComplete();
   const baseReady = hasProduct && hasLanguages && hasDevices && releasePeriodReady
     && !storeTestsNeedSelection;
 
+  const exportButton = document.getElementById('export-button');
   if (exportButton) {
-    exportButton.disabled = exportButton.classList.contains('loading')
-      || !(baseReady && hasScope && !promosNeedName);
+    exportButton.disabled = !(baseReady && hasScope && !promosNeedName);
   }
 
+  const imagesButton = document.getElementById('export-images-button');
   if (imagesButton) {
     imagesButton.disabled = !baseReady || !mediaAssetsAvailable;
   }
-}
-
-// Toggles the export-only sections (workbook load, field scope, media assets) and the
-// button label whenever the Export/Publish mode radio changes.
-function applyExportMode() {
-  const publish = isPublishMode();
-  EXPORT_ONLY_SELECTORS.forEach((selector) => {
-    document.querySelector(selector)?.classList.toggle('hidden', publish);
-  });
-  const scopeHeading = document.getElementById('export-scope-heading');
-  if (scopeHeading) scopeHeading.textContent = publish ? 'Content to publish' : 'Content to export';
-  const exportButton = document.getElementById('export-button');
-  if (exportButton && !exportButton.classList.contains('loading')) {
-    exportButton.textContent = defaultActionLabel();
-  }
-  updateExportButtonState();
 }
 
 function showExportStatus(message, duration = 2500) {
@@ -398,7 +281,7 @@ function showExportStatus(message, duration = 2500) {
   exportButton.textContent = message;
   exportButton.classList.remove('loading');
   window.setTimeout(() => {
-    exportButton.textContent = defaultActionLabel();
+    exportButton.textContent = 'Export from DA';
     updateExportButtonState();
   }, duration);
 }
@@ -576,89 +459,6 @@ async function handleExport(org, repo, token) {
     // eslint-disable-next-line no-console
     console.error('[aso export]', error);
     showExportStatus('Export failed');
-  }
-}
-
-// Publish counterpart of handleExport — same product/language/device/release-period
-// selections, but writes a single-platform payload to the store request queue instead of
-// downloading a workbook.
-async function handlePublishAction(org, repo, token) {
-  const exportButton = document.getElementById('export-button');
-  if (exportButton.classList.contains('loading')) return;
-  const summaryContainer = document.getElementById('export-summary');
-  exportButton.classList.add('loading');
-  exportButton.textContent = 'Publishing...';
-  exportButton.disabled = true;
-  if (summaryContainer) summaryContainer.innerHTML = '';
-
-  let progress;
-  try {
-    progress = createPublishProgressModal(exportButton);
-    const [schema, sheetMap] = await Promise.all([
-      fetchBlockSchema({ context: { org, repo }, token }),
-      fetchSheetBlockMap({ context: { org, repo }, token }),
-    ]);
-    if (!schema || !sheetMap) {
-      throw new Error('Config fetch failed');
-    }
-
-    const { product, languages, devices } = getSelectedItems();
-    const [platform] = devices;
-    if (!platform) {
-      throw new Error('Select a platform');
-    }
-
-    const blockTypes = getPublishBlockTypes();
-    if (!blockTypes.length) {
-      throw new Error('Select content');
-    }
-    const promoContexts = getPromoContexts().filter((context) => context.device === platform);
-    if (blockTypes.includes('promo') && !promoContexts.length) {
-      throw new Error('Select promo');
-    }
-    const selection = { fieldsByDeviceBlock: getSelectedFieldsByDeviceBlock() };
-
-    const releasePeriod = readReleasePeriod();
-    const adminFetch = createAdminFetch(org, repo, token);
-    const fetchPage = createFetchPage(org, repo, token, adminFetch);
-
-    const result = await publishSelection({
-      org,
-      repo,
-      token,
-      schema,
-      sheetMap,
-      product,
-      platform,
-      languages,
-      releasePeriod,
-      fetchPage,
-      blockTypes,
-      promoContexts,
-      selection,
-      onRequestAccepted: progress.setRequestId,
-    });
-
-    if (result.ok) {
-      const completion = await waitForPublishCompletion(
-        { requestId: result.requestId, token },
-      );
-      const title = completion.timedOut ? 'Publish not yet confirmed' : 'Published';
-      const message = completion.timedOut
-        ? 'Publish completion was not confirmed within one minute; it may still finish. Do not resubmit this request.'
-        : 'Published';
-      progress.finish(title, message, completion.timedOut);
-      showExportStatus(title, 3000);
-      if (summaryContainer) summaryContainer.textContent = `${message} Request ID: ${result.requestId}. Status: ${completion.overallStatus}. Saved to ${result.filePath}`;
-    } else {
-      throw new Error(`Error ${result.status}: ${result.statusText || 'write failed'}`);
-    }
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('[aso publish]', error);
-    progress?.finish('Publish failed', error.message || 'Unknown error', true);
-    showExportStatus('Publish failed');
-    if (summaryContainer) summaryContainer.textContent = error.message || 'Unknown error';
   }
 }
 
@@ -843,6 +643,13 @@ function handleSelectAll(target) {
   checkboxes.forEach((cb) => { cb.checked = !allChecked; });
   updateSelectionCount(target);
   updateExportButtonState();
+}
+
+function getCheckedDevices() {
+  const devices = [];
+  if (document.getElementById('device-apple')?.checked) devices.push('apple');
+  if (document.getElementById('device-google')?.checked) devices.push('google');
+  return devices;
 }
 
 function getBaseListProbeFields() {
@@ -1158,9 +965,6 @@ function setupListeners(org, repo, token) {
   ]);
   document.querySelectorAll(selectors).forEach((element) => {
     element.addEventListener('change', () => {
-      if (element.id === 'device-apple' || element.id === 'device-google') {
-        enforceSingleDeviceInPublishMode(element.id);
-      }
       if (element.id === 'export-scope-promos') togglePromoFields();
       if (fieldScopeTriggers.has(element.id)) refreshFieldScope();
       if (mediaAssetsTriggerIds.has(element.id)
@@ -1172,17 +976,13 @@ function setupListeners(org, repo, token) {
     });
   });
 
-  document.querySelectorAll('input[name="export-mode"]').forEach((radio) => {
-    radio.addEventListener('change', applyExportMode);
-  });
-
   document.querySelectorAll('.select-all-link').forEach((button) => {
     button.addEventListener('click', () => handleSelectAll(button.dataset.target));
   });
-  document.getElementById('export-button')?.addEventListener('click', () => {
-    if (isPublishMode()) handlePublishAction(org, repo, token);
-    else handleExport(org, repo, token);
-  });
+  document.getElementById('export-button')?.addEventListener(
+    'click',
+    () => handleExport(org, repo, token),
+  );
   document.getElementById('export-images-button')?.addEventListener(
     'click',
     () => handleImageExport(org, repo, token),
@@ -1245,7 +1045,7 @@ export async function init({ context, token }) {
     togglePromoFields();
   }
   setupListeners(org, repo, token);
-  applyExportMode();
+  updateExportButtonState();
 }
 
 export {

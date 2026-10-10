@@ -93,6 +93,11 @@ body {
   margin-bottom: var(--spacing-400);
 }
 
+/* Publish always targets store updates, so the shared store-content picker is hidden there. */
+[data-tab-content="publish"] .store-scope-settings {
+  display: none;
+}
+
 .release-period-heading {
   grid-column: 1 / -1;
   font-size: 14px;
