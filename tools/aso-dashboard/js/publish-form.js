@@ -2,7 +2,16 @@ import {
   isReleasePeriodComplete,
   readReleasePeriod,
 } from './release-period-settings.js';
-import { STORE_TYPE_UPDATES } from './store-scope-settings.js';
+import {
+  getSelectedTestNames,
+  isStoreTestsScope,
+  normalizeStoreType,
+  readStoreType,
+  refreshStoreTests,
+  STORE_TYPE_TESTS,
+  toggleStoreTestsFields,
+  updateStoreTestsCount,
+} from './store-scope-settings.js';
 import { listSchemaFields } from './import-export/page-map.js';
 import { parseWorkbook } from './import-export/template.js';
 import { createAdminFetch, createFetchPage } from './lib/da-page-fetch.js';
@@ -66,6 +75,16 @@ function getSelectedFieldKeys() {
     .map((checkbox) => checkbox.value);
 }
 
+// Publish covers Store updates and a single CPP campaign; the shared panel is hidden for
+// Store tests, so an instance name is only ever required for CPP.
+function getCppName() {
+  return isStoreTestsScope() ? getSelectedTestNames()[0] : undefined;
+}
+
+function isStoreScopeReady() {
+  return !isStoreTestsScope() || getSelectedTestNames().length === 1;
+}
+
 function getPromoContexts() {
   const device = getPlatform();
   if (!isPromosChecked() || !device) return [];
@@ -105,6 +124,7 @@ function updateButtonState() {
     && getSelectedLanguages().length > 0
     && Boolean(getPlatform())
     && isReleasePeriodComplete()
+    && isStoreScopeReady()
     && getPublishBlockTypes().length > 0
     && (!isListingChecked() || getSelectedFieldKeys().length > 0)
     && (!isPromosChecked() || getPromoContexts().length > 0);
@@ -207,7 +227,7 @@ function refreshFields() {
   container.append(group);
 }
 
-function getPromoProbe() {
+function getBaseProbe() {
   const product = byId('publish-product')?.value;
   const device = getPlatform();
   const releasePeriod = readReleasePeriod();
@@ -222,8 +242,23 @@ function getPromoProbe() {
     year: releasePeriod.year,
     quarter: releasePeriod.quarter,
     month: releasePeriod.month,
-    storeType: STORE_TYPE_UPDATES,
+    storeType: readStoreType(),
   };
+}
+
+function getStoreProbe() {
+  return getBaseProbe();
+}
+
+function getPromoProbe() {
+  const probe = getBaseProbe();
+  if (!probe) return null;
+  if (isStoreTestsScope()) {
+    const testName = getCppName();
+    if (!testName) return null;
+    return { ...probe, testName };
+  }
+  return probe;
 }
 
 function renderPromoGroups(container, promos) {
@@ -267,6 +302,11 @@ function renderPromoVariants(container, promoName, variants) {
     item.classList.add('promo-variant-item');
     list.append(item);
   });
+}
+
+async function refreshStoreNames(context, token) {
+  if (!isStoreTestsScope()) return;
+  await refreshStoreTests(context, token, getStoreProbe);
 }
 
 async function refreshPromos(context, token) {
@@ -342,6 +382,7 @@ async function handlePublish(org, repo, token) {
 
     const platform = getPlatform();
     if (!platform) throw new Error('Select a platform');
+    if (!isStoreScopeReady()) throw new Error('Select one CPP campaign');
     const blockTypes = getPublishBlockTypes();
     if (!blockTypes.length) throw new Error('Select content');
     const promoContexts = getPromoContexts();
@@ -362,6 +403,8 @@ async function handlePublish(org, repo, token) {
       platform,
       languages: getSelectedLanguages(),
       releasePeriod: readReleasePeriod(),
+      storeType: readStoreType(),
+      testName: getCppName(),
       fetchPage: createFetchPage(org, repo, token, adminFetch),
       blockTypes,
       promoContexts,
@@ -442,6 +485,15 @@ async function handleLoadFile(context, token, file) {
     const hasProduct = [...select.options].some((option) => option.value === product);
     select.value = hasProduct ? product : '';
     applyReleasePeriod(parsed.settings);
+    const fileStoreType = normalizeStoreType(parsed.settings.storeType);
+    const notes = [];
+    if (fileStoreType === STORE_TYPE_TESTS) {
+      notes.push('Store tests cannot be published — keeping the current store content.');
+    } else {
+      const radio = document.querySelector(`input[name="store-type"][value="${fileStoreType}"]`);
+      if (radio) radio.checked = true;
+      toggleStoreTestsFields();
+    }
 
     const names = languageNamesWithContent(parsed);
     const known = new Set();
@@ -451,7 +503,6 @@ async function handleLoadFile(context, token, file) {
     });
 
     const devices = devicesFromParsed(parsed);
-    const notes = [];
     if (devices.size === 1) {
       const [device] = devices;
       const radio = byId(`publish-platform-${device}`);
@@ -468,6 +519,13 @@ async function handleLoadFile(context, token, file) {
 
     refreshFields();
     if (hasListing) restrictFieldsToFile(parsed);
+    await refreshStoreNames(context, token);
+    if (isStoreTestsScope() && parsed.settings.testName) {
+      document.querySelectorAll('.store-test-checkbox').forEach((checkbox) => {
+        checkbox.checked = checkbox.value === parsed.settings.testName;
+      });
+      updateStoreTestsCount();
+    }
     await refreshPromos(context, token);
     if (isPromosChecked()) restrictPromosToFile(parsed);
     updateButtonState();
@@ -492,14 +550,34 @@ function toggleAll(selector, onChange) {
 
 function setupListeners({ org, repo, token }) {
   const context = { org, repo };
-  const refreshAll = () => { refreshFields(); refreshPromos(context, token); updateButtonState(); };
+  const refreshAll = async () => {
+    toggleStoreTestsFields();
+    refreshFields();
+    await refreshStoreNames(context, token);
+    await refreshPromos(context, token);
+    updateButtonState();
+  };
   const promoTriggers = [
     '#publish-product', 'input[name="publish-platform"]',
     '#release-period-year', '#release-period-quarter', '#release-period-month',
   ].join(', ');
 
-  document.querySelectorAll(promoTriggers).forEach((element) => {
+  document.querySelectorAll(`${promoTriggers}, input[name="store-type"]`).forEach((element) => {
     element.addEventListener('change', refreshAll);
+  });
+  // CPP campaigns are published one at a time; the checkboxes live in the shared store panel.
+  const formRoot = byId('publish-product-section')?.parentElement;
+  document.addEventListener('change', (event) => {
+    const { target } = event;
+    if (!target?.classList?.contains('store-test-checkbox') || !formRoot?.contains(target)) return;
+    if (target.checked) {
+      document.querySelectorAll('.store-test-checkbox').forEach((checkbox) => {
+        if (checkbox !== target) checkbox.checked = false;
+      });
+    }
+    updateStoreTestsCount();
+    refreshPromos(context, token);
+    updateButtonState();
   });
   byId('publish-scope-listing')?.addEventListener('change', () => { refreshFields(); updateButtonState(); });
   byId('publish-scope-promos')?.addEventListener('change', () => refreshPromos(context, token));

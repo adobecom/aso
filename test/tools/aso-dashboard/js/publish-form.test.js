@@ -40,10 +40,9 @@ describe('publish form', () => {
     const html = await (await fetch('/tools/aso-dashboard/aso-dashboard.html')).text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
     root = document.createElement('div');
-    root.append(
-      doc.querySelector('.scope-sections'),
-      doc.querySelector('[data-tab-content="publish"]'),
-    );
+    root.append(doc.querySelector('[data-tab-content="publish"]'));
+    // The dashboard moves the shared release-period/store panel into the active tab's slot.
+    root.querySelector('.scope-sections-slot').append(doc.querySelector('.scope-sections'));
     document.body.append(root);
     initReleasePeriodSettings();
     ['year', 'quarter', 'month'].forEach((key) => {
@@ -59,6 +58,7 @@ describe('publish form', () => {
       if (target.includes('block-schema.json')) return json(schema);
       if (target.includes('sheet-to-block-map.json')) return json(sheetMap);
       if (target.includes('translate')) return json(translate);
+      if (target.includes('/cpp')) return json([folder('spring'), folder('summer')]);
       if (target.includes('/promos/') && target.includes('launch')) return json([page('default')]);
       if (target.includes('/promos')) return json(promoFolders);
       if (target.includes('/list/')) return json([folder('adobe-express')]);
@@ -113,6 +113,24 @@ describe('publish form', () => {
     await selectEverything({ promos: false, listing: false });
     expect($('#publish-button').disabled).to.equal(true);
     expect($('#publish-listing-field-count').textContent).to.equal('(not included)');
+  });
+
+  it('requires exactly one CPP campaign when CPP is selected', async () => {
+    await selectEverything({ promos: false });
+    const cpp = $('#store-type-cpp');
+    cpp.checked = true;
+    change(cpp);
+    await flush();
+    expect($('#publish-button').disabled).to.equal(true);
+
+    const campaigns = [...root.querySelectorAll('.store-test-checkbox')];
+    expect(campaigns.length).to.be.greaterThan(1);
+    campaigns[0].checked = true;
+    change(campaigns[0]);
+    campaigns[1].checked = true;
+    change(campaigns[1]);
+    expect(campaigns[0].checked).to.equal(false);
+    expect($('#publish-button').disabled).to.equal(false);
   });
 
   it('only allows a single platform', () => {

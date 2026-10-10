@@ -4,6 +4,10 @@ Publishing lives in its own **Publish** tab (one product and one platform per re
 Export's content pipeline (`collectExportData` and the shared `lib/da-page-fetch.js`), so text,
 spacing, keywords and constants resolve the same way. The Export tab is unchanged from upstream.
 
+Publish supports Store updates and CPP (Store tests are hidden). CPP requires exactly one
+campaign and adds `storeType: "cpp"` and `cppName` to the request; Store updates requests
+are unchanged.
+
 Publish requests include the selected release period as
 `releasePeriod: { year, quarter, month }`, using the Release period controls'
 values (for example, `"2026"`, `"q4"`, `"october"`). Publish History displays it

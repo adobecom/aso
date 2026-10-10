@@ -1,4 +1,4 @@
-import { STORE_TYPE_UPDATES } from './store-scope-settings.js';
+import { STORE_TYPE_CPP, STORE_TYPE_UPDATES } from './store-scope-settings.js';
 import { collectExportData } from './import-export/collect.js';
 import { putJsonSource } from './lib/da-source-client.js';
 import { getRelativeProductsPath } from './lib/utils.js';
@@ -76,9 +76,13 @@ export function buildPublishPayload(cells, options) {
     languages,
     releasePeriod,
     requestorName,
+    storeType = STORE_TYPE_UPDATES,
+    testName,
     promoNames = [],
     blockTypes = PUBLISH_BLOCK_TYPES,
   } = options;
+  // Store updates keep the original payload shape; CPP adds which campaign is being published.
+  const storeFields = storeType === STORE_TYPE_CPP ? { storeType, cppName: testName } : {};
   const cellIndex = new Map();
   cells.forEach((cell) => {
     const key = `${cell.language.code}|${cell.device}|${cell.blockType}|${cell.fieldKey}|${cell.promoName ?? ''}`;
@@ -89,7 +93,13 @@ export function buildPublishPayload(cells, options) {
 
   if (platform === 'apple') {
     const listingFields = ['name', 'subtitle', 'description', 'keywords', 'marketingUrl', 'promotionalText', 'supportUrl'];
-    const payload = { app: product, selectedLocales: langCodes, releasePeriod, requestorName };
+    const payload = {
+      app: product,
+      selectedLocales: langCodes,
+      releasePeriod,
+      requestorName,
+      ...storeFields,
+    };
     if (blockTypes.includes('listing')) {
       payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)).filter(Boolean) };
     }
@@ -113,6 +123,7 @@ export function buildPublishPayload(cells, options) {
     selectedLocales: langCodes,
     releasePeriod,
     requestorName,
+    ...storeFields,
   };
   if (blockTypes.includes('listing')) {
     payload.metadata = { localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean) };
@@ -264,6 +275,8 @@ export async function publishSelection({
   languages,
   releasePeriod,
   requestorName,
+  storeType = STORE_TYPE_UPDATES,
+  testName,
   fetchPage,
   blockTypes = PUBLISH_BLOCK_TYPES,
   promoContexts = [],
@@ -295,7 +308,8 @@ export async function publishSelection({
     quarter: releasePeriod.quarter,
     month: releasePeriod.month,
     productsPath: getRelativeProductsPath(),
-    storeType: STORE_TYPE_UPDATES,
+    storeType,
+    testName,
     blockTypes: effectiveBlockTypes,
     promoContexts: platformPromoContexts,
     selection: {
@@ -314,6 +328,8 @@ export async function publishSelection({
     languages,
     releasePeriod,
     requestorName: publisherName,
+    storeType,
+    testName,
     promoNames,
     blockTypes: effectiveBlockTypes,
   });

@@ -48,6 +48,20 @@ describe('publish', () => {
       expect(payload.releasePeriod).to.deep.equal(releasePeriod);
     });
 
+    it(`adds the CPP campaign to the ${platform} payload only for CPP`, () => {
+      const base = {
+        product: 'app',
+        platform,
+        languages: [{ code: 'en' }],
+      };
+      const cpp = buildPublishPayload([], { ...base, storeType: 'cpp', testName: 'spring' });
+      expect(cpp.storeType).to.equal('cpp');
+      expect(cpp.cppName).to.equal('spring');
+      const updates = buildPublishPayload([], base);
+      expect(updates).to.not.have.property('storeType');
+      expect(updates).to.not.have.property('cppName');
+    });
+
     describe('requestor profile', () => {
       afterEach(() => sinon.restore());
 

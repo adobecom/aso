@@ -93,8 +93,9 @@ body {
   margin-bottom: var(--spacing-400);
 }
 
-/* Publish always targets store updates, so the shared store-content picker is hidden there. */
-[data-tab-content="publish"] .store-scope-settings {
+/* Publish supports Store updates and CPP only, and publishes one CPP campaign per request. */
+[data-tab-content="publish"] .store-type-tests-option,
+[data-tab-content="publish"] #store-tests-select-all {
   display: none;
 }
 
