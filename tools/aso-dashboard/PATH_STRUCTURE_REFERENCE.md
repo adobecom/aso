@@ -62,7 +62,7 @@ are not included in the Google payload. Apple publishing is unchanged.
 Publish mode in the Export section saves the selected product/platform payload to
 `/.da/store-publish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json` (UTC), then sends a JSON
 `POST` to
-`https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore`
+`<store-publish.api>/publish-to-appstore` (from `.da/store-publish.json`)
 with `{"daPayloadPath": ".da/store-publish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json"}`.
 The service path does not include a leading slash. The service request includes
 the current DA token in the `Authorization: Bearer <token>` header; the token is
@@ -79,7 +79,7 @@ writing its response fails, the error includes the request ID and status;
 the service request is not automatically retried.
 
 After saving the service response, the dashboard immediately calls
-`GET https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/get-publish-log?requestId=<requestId>`
+`GET <store-publish.api>/get-publish-log?requestId=<requestId>`
 with the same bearer token. It polls at 10-second intervals for up to one minute.
 The modal displays `Starting to Publish...` immediately when Publish to Store is
 clicked, before configuration, content, or the service response has loaded.

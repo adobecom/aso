@@ -18,14 +18,17 @@ import { createAdminFetch, createFetchPage } from './lib/da-page-fetch.js';
 import { runWithConcurrency } from './lib/concurrency.js';
 import { isFileTooLarge, loadExcelJS, MAX_WORKBOOK_FILE_BYTES } from './lib/excel-loader.js';
 import {
+  fetchAppLanguages,
   fetchBlockSchema,
   fetchLanguages,
   fetchProducts,
   fetchPromoNames,
   fetchPromoVariants,
   fetchSheetBlockMap,
+  filterLanguagesForApp,
   getConfigFileOverride,
   getRelativeProductsPath,
+  getStorePublishApi,
 } from './lib/utils.js';
 import {
   applyReleasePeriod,
@@ -39,6 +42,8 @@ const VARIANT_FETCH_CONCURRENCY = 5;
 const PUBLISH_LABEL = 'Publish to Store';
 
 let languageIndexByName = new Map();
+let allLanguages = [];
+let appLanguages = [];
 let schemaCache = null;
 let sheetMapCache = null;
 let promoRefreshSeq = 0;
@@ -178,6 +183,19 @@ function renderLanguages(languages) {
     });
     item.querySelector('input').checked = false;
     container.append(item);
+  });
+}
+
+// Only languages listed for the selected app and platform in store-publish.json are offered.
+function refreshLanguages() {
+  const previous = new Set(
+    [...document.querySelectorAll('.publish-language-checkbox:checked')].map((box) => box.value),
+  );
+  renderLanguages(
+    filterLanguagesForApp(allLanguages, appLanguages, byId('publish-product')?.value, getPlatform()),
+  );
+  document.querySelectorAll('.publish-language-checkbox').forEach((box) => {
+    box.checked = previous.has(box.value);
   });
 }
 
@@ -392,8 +410,10 @@ async function handlePublish(org, repo, token) {
       ? { fieldsByDeviceBlock: { [`${platform}:listing`]: getSelectedFieldKeys() } }
       : {};
     const adminFetch = createAdminFetch(org, repo, token);
+    const apiBase = await getStorePublishApi({ context: { org, repo }, token });
 
     const result = await publishSelection({
+      apiBase,
       org,
       repo,
       token,
@@ -415,7 +435,11 @@ async function handlePublish(org, repo, token) {
     if (!result.ok) {
       throw new Error(`Error ${result.status}: ${result.statusText || 'write failed'}`);
     }
-    const completion = await waitForPublishCompletion({ requestId: result.requestId, token });
+    const completion = await waitForPublishCompletion({
+      apiBase,
+      requestId: result.requestId,
+      token,
+    });
     const title = completion.timedOut ? 'Publish not yet confirmed' : 'Published';
     const message = completion.timedOut
       ? 'Publish completion was not confirmed within one minute; it may still finish. Do not resubmit this request.'
@@ -495,13 +519,6 @@ async function handleLoadFile(context, token, file) {
       toggleStoreTestsFields();
     }
 
-    const names = languageNamesWithContent(parsed);
-    const known = new Set();
-    document.querySelectorAll('.publish-language-checkbox').forEach((checkbox) => {
-      known.add(checkbox.value);
-      checkbox.checked = names.includes(checkbox.value);
-    });
-
     const devices = devicesFromParsed(parsed);
     if (devices.size === 1) {
       const [device] = devices;
@@ -511,6 +528,14 @@ async function handleLoadFile(context, token, file) {
       document.querySelectorAll('input[name="publish-platform"]').forEach((radio) => { radio.checked = false; });
       notes.push('File has both platforms — choose one to publish.');
     }
+
+    refreshLanguages();
+    const names = languageNamesWithContent(parsed);
+    const known = new Set();
+    document.querySelectorAll('.publish-language-checkbox').forEach((checkbox) => {
+      known.add(checkbox.value);
+      checkbox.checked = names.includes(checkbox.value);
+    });
 
     const hasListing = (parsed.metadata?.apple?.length || 0)
       + (parsed.metadata?.google?.length || 0) > 0;
@@ -551,6 +576,7 @@ function toggleAll(selector, onChange) {
 function setupListeners({ org, repo, token }) {
   const context = { org, repo };
   const refreshAll = async () => {
+    refreshLanguages();
     toggleStoreTestsFields();
     refreshFields();
     await refreshStoreNames(context, token);
@@ -620,10 +646,13 @@ function setupListeners({ org, repo, token }) {
 export async function init({ context, token }) {
   const { org, repo } = context;
   if (!byId('publish-button')) return;
-  const [languages, products] = await Promise.all([
+  const [languages, products, appLanguageRows] = await Promise.all([
     fetchLanguages({ context, token, configFile: getConfigFileOverride() }),
     fetchProducts({ context, token }),
+    fetchAppLanguages({ context, token }),
   ]);
+  allLanguages = languages;
+  appLanguages = appLanguageRows;
   languageIndexByName = new Map(languages.map((language) => [language.name, language]));
   renderProducts(products);
   renderLanguages(languages);

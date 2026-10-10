@@ -4,6 +4,14 @@ Publishing lives in its own **Publish** tab (one product and one platform per re
 Export's content pipeline (`collectExportData` and the shared `lib/da-page-fetch.js`), so text,
 spacing, keywords and constants resolve the same way. The Export tab is unchanged from upstream.
 
+Publish, Publish History and the progress poll read the publish service URL from
+`.da/store-publish.json` (sheet `config`, key `store-publish.api`; endpoints
+`/publish-to-appstore`, `/get-publish-log` and `/list-publish-logs` are appended). Pass `?env=stage`
+or `?env=dev` to use `store-publish.api.stage` / `store-publish.api.dev` (the value is lower-cased
+with spaces removed). The `app-languages` sheet (`app`, `platform`, comma-separated translate.json
+language codes) limits the Publish languages for the chosen app and platform; apps or platforms not
+listed there are not filtered. The file is loaded once per session by `tools/utils.js`.
+
 Publish supports Store updates and CPP (Store tests are hidden). CPP requires exactly one
 campaign and is sent as `cpp: [{ referenceName, localizations }]` instead of `metadata`
 (`storeType` is UI-only). Store updates requests are unchanged.

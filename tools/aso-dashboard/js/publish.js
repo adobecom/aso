@@ -5,8 +5,6 @@ import { getRelativeProductsPath } from './lib/utils.js';
 
 export const PUBLISH_REQUEST_PATH = '/.da/store-publish/request';
 
-const PUBLISH_SERVICE_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore';
-const PUBLISH_LOG_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/get-publish-log';
 const IMS_PROFILE_URL = 'https://ims-na1.adobelogin.com/ims/profile/v1';
 const PUBLISH_POLL_INTERVAL_MS = 10000;
 const PUBLISH_POLL_TIMEOUT_MS = 60000;
@@ -223,7 +221,7 @@ export function createPublishProgressModal(button) {
   };
 }
 
-export async function waitForPublishCompletion({ requestId, token }) {
+export async function waitForPublishCompletion({ apiBase, requestId, token }) {
   const controller = new AbortController();
   const deadline = Date.now() + PUBLISH_POLL_TIMEOUT_MS;
   const timeout = window.setTimeout(() => controller.abort(), PUBLISH_POLL_TIMEOUT_MS);
@@ -231,7 +229,7 @@ export async function waitForPublishCompletion({ requestId, token }) {
   try {
     while (Date.now() < deadline) {
       // eslint-disable-next-line no-await-in-loop
-      const response = await fetch(`${PUBLISH_LOG_URL}?requestId=${encodeURIComponent(requestId)}`, {
+      const response = await fetch(`${apiBase}/get-publish-log?requestId=${encodeURIComponent(requestId)}`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}` },
         signal: controller.signal,
@@ -268,6 +266,7 @@ export async function waitForPublishCompletion({ requestId, token }) {
 // "Content to publish" filters (block types, selected promos/variants, per-field selection),
 // plus the DA fetch plumbing — callers (export.js) pass in an already-authenticated fetchPage.
 export async function publishSelection({
+  apiBase,
   org,
   repo,
   token,
@@ -343,7 +342,7 @@ export async function publishSelection({
     return { ok: false, status: result.status, statusText: result.statusText, filePath };
   }
 
-  const response = await fetch(PUBLISH_SERVICE_URL, {
+  const response = await fetch(`${apiBase}/publish-to-appstore`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

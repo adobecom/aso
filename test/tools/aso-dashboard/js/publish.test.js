@@ -11,6 +11,8 @@ import {
 } from '../../../../tools/aso-dashboard/js/publish.js';
 import { buildLanguageIndex } from '../../../../tools/aso-dashboard/js/lib/translate-paths.js';
 
+const API_BASE = 'https://api.example.test/aso-publisher';
+
 describe('publish', () => {
   it('formats the request filename as YYYY-MM-DD-t-HH-MI-SS-SSS (24h, UTC)', () => {
     const date = new Date(Date.UTC(2025, 2, 7, 15, 4, 5, 9));
@@ -327,7 +329,7 @@ describe('publish', () => {
       expect(modal.open).to.equal(true);
       progress.setRequestId('request-123');
       modal.querySelector('button').click();
-      const completion = waitForPublishCompletion({ requestId: 'request-123', token: 'token' });
+      const completion = waitForPublishCompletion({ apiBase: API_BASE, requestId: 'request-123', token: 'token' });
       await clock.tickAsync(0);
       expect(fetchStub.callCount).to.equal(1);
       expect(button.disabled).to.equal(true);
@@ -412,7 +414,7 @@ describe('publish', () => {
     });
 
     function monitor() {
-      return waitForPublishCompletion({ requestId, token: 'da-token' });
+      return waitForPublishCompletion({ apiBase: API_BASE, requestId, token: 'da-token' });
     }
 
     function expectRestored() {
@@ -426,7 +428,7 @@ describe('publish', () => {
       await clock.tickAsync(0);
       expect(fetchStub.callCount).to.equal(1);
       const [url, request] = fetchStub.firstCall.args;
-      expect(url).to.equal(`https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/get-publish-log?requestId=${requestId}`);
+      expect(url).to.equal(`${API_BASE}/get-publish-log?requestId=${requestId}`);
       expect(request.method).to.equal('GET');
       expect(request.headers).to.deep.equal({ Authorization: 'Bearer da-token' });
       expect(request.signal).to.be.instanceOf(AbortSignal);
@@ -514,7 +516,7 @@ describe('publish', () => {
 
     it('encodes the request ID in the log URL', async () => {
       fetchStub.resolves(logResponse({ overallStatus: 'success' }));
-      await waitForPublishCompletion({ requestId: 'request&123', token: 'token' });
+      await waitForPublishCompletion({ apiBase: API_BASE, requestId: 'request&123', token: 'token' });
       expect(fetchStub.firstCall.args[0]).to.include('?requestId=request%26123');
       expectRestored();
     });
@@ -533,6 +535,7 @@ describe('publish', () => {
       const listingHtml = await readFile({ path: '../../../blocks/aso-app/mocks/apple.html' });
       const languages = buildLanguageIndex(translateData.languages.data, translateData);
       options = {
+        apiBase: API_BASE,
         org: 'test-org',
         repo: 'test-repo',
         token: 'token',
@@ -589,7 +592,7 @@ describe('publish', () => {
       expect(initialPayload.releasePeriod).to.deep.equal(options.releasePeriod);
       expect(initialPayload.requestorName).to.equal('Test Publisher');
       expect(initialPayload).not.to.have.property('requestId');
-      expect(serviceUrl).to.equal('https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore');
+      expect(serviceUrl).to.equal(`${API_BASE}/publish-to-appstore`);
       expect(submission).to.deep.equal({
         method: 'POST',
         headers: {
@@ -623,7 +626,7 @@ describe('publish', () => {
       source.onCall(0).resolves(new Response(null, { status: 201 }));
       source.onCall(1).resolves(new Response(null, { status: 200 }));
       fetchStub.withArgs(
-        'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/publish-to-appstore',
+        `${API_BASE}/publish-to-appstore`,
       ).resolves(new Response(JSON.stringify(serviceResult), { status: 202 }));
       const result = await publishSelection(options);
       expect(result.ok).to.equal(true);

@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import sinon from 'sinon';
+import { fetchStorePublishConfig } from '../../../../tools/utils.js';
 import { fetchLanguageIndex } from '../../../../tools/aso-dashboard/js/lib/translate-paths.js';
 import {
   NO_ERROR_DETAILS,
@@ -692,18 +693,18 @@ describe('publish-history API and controller', () => {
     stub.onCall(0).resolves(jsonResponse({ items: [], nextToken: 'tok2' }));
     stub.onCall(1).resolves(jsonResponse({ items: [], lastEvaluatedKey: { pk: 'a', sk: 'b' } }));
     stub.onCall(2).resolves(jsonResponse({ items: [], nextCursor: null }));
-    expect((await fetchPublishLogs({ token: 't' })).nextCursor).to.equal('tok2');
-    const { nextCursor } = await fetchPublishLogs({ token: 't' });
+    expect((await fetchPublishLogs({ apiBase: 'https://api.example.test/aso-publisher', token: 't' })).nextCursor).to.equal('tok2');
+    const { nextCursor } = await fetchPublishLogs({ apiBase: 'https://api.example.test/aso-publisher', token: 't' });
     expect(JSON.parse(nextCursor)).to.deep.equal({ pk: 'a', sk: 'b' });
-    expect((await fetchPublishLogs({ token: 't' })).nextCursor).to.equal(null);
+    expect((await fetchPublishLogs({ apiBase: 'https://api.example.test/aso-publisher', token: 't' })).nextCursor).to.equal(null);
     stub.resolves(jsonResponse({ items: [] }));
-    await fetchPublishLogs({ token: 't', cursor: nextCursor });
+    await fetchPublishLogs({ apiBase: 'https://api.example.test/aso-publisher', token: 't', cursor: nextCursor });
     expect(new URL(stub.lastCall.args[0]).searchParams.get('cursor')).to.equal(nextCursor);
   });
 
   it('sends bearer token and cursor; surfaces nextCursor', async () => {
     const stub = sinon.stub(window, 'fetch').resolves(jsonResponse({ items: [SUCCESS], nextCursor: 'abc' }));
-    const page = await fetchPublishLogs({ token: 'tok', cursor: 'c1' });
+    const page = await fetchPublishLogs({ apiBase: 'https://api.example.test/aso-publisher', token: 'tok', cursor: 'c1' });
     const [url, opts] = stub.firstCall.args;
     expect(url).to.contain('list-publish-logs');
     expect(url).to.contain('cursor=c1');
@@ -716,6 +717,7 @@ describe('publish-history API and controller', () => {
   it('sends selected filters as encoded query parameters', async () => {
     const stub = sinon.stub(window, 'fetch').resolves(jsonResponse({ items: [] }));
     await fetchPublishLogs({
+      apiBase: 'https://api.example.test/aso-publisher',
       token: 'tok',
       byMe: false,
       app: 'firefly',
@@ -738,7 +740,13 @@ describe('publish-history API and controller', () => {
   it('omits unselected optional filters and ignores date arguments', async () => {
     const stub = sinon.stub(window, 'fetch').resolves(jsonResponse({ items: [] }));
     await fetchPublishLogs({
-      token: 'tok', app: '', platform: '', status: '', from: '2026-10-01', to: '2026-10-09',
+      apiBase: 'https://api.example.test/aso-publisher',
+      token: 'tok',
+      app: '',
+      platform: '',
+      status: '',
+      from: '2026-10-01',
+      to: '2026-10-09',
     });
     expect(Object.fromEntries(new URL(stub.firstCall.args[0]).searchParams))
       .to.deep.equal({ byMe: 'true', pageSize: '25' });
@@ -749,13 +757,23 @@ describe('publish-history API and controller', () => {
     stub.onCall(0).resolves(jsonResponse({}, 500));
     stub.onCall(1).resolves(jsonResponse({ nope: 1 }));
     let e1; let e2;
-    try { await fetchPublishLogs({ token: 't' }); } catch (e) { e1 = e; }
-    try { await fetchPublishLogs({ token: 't' }); } catch (e) { e2 = e; }
+    try { await fetchPublishLogs({ apiBase: 'https://api.example.test/aso-publisher', token: 't' }); } catch (e) { e1 = e; }
+    try { await fetchPublishLogs({ apiBase: 'https://api.example.test/aso-publisher', token: 't' }); } catch (e) { e2 = e; }
     expect(e1.message).to.contain('HTTP 500');
     expect(e2.message).to.contain('items');
   });
 
+  // Seeds the shared store-publish.json cache so the controller does not hit the fetch stubs.
+  async function seedPublishConfig() {
+    const original = window.fetch;
+    const data = [{ key: 'store-publish.api', value: 'https://api.example.test/aso-publisher' }];
+    window.fetch = async () => jsonResponse({ config: { data } });
+    await fetchStorePublishConfig({ context: { org: 'o', repo: 'r' }, token: 't' });
+    window.fetch = original;
+  }
+
   async function mount() {
+    await seedPublishConfig();
     document.body.innerHTML = `
       <button class="tab-button" data-tab="publish-history"></button>
       <div data-tab-content="publish-history">
@@ -1077,6 +1095,7 @@ describe('publish-history API and controller', () => {
     stub.onCall(1).resolves(jsonResponse({ items: [FAILED] }));
     const controller = await mount();
     const initial = controller.load();
+    await tick();
     q('#ph-filter-status').value = 'failed';
     q('#ph-filter-status').dispatchEvent(new Event('change'));
     await tick();

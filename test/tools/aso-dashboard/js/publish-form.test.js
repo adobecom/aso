@@ -55,6 +55,9 @@ describe('publish form', () => {
     const translate = JSON.parse(await readFile({ path: '../mocks/translate.json' }));
     fetchStub = sinon.stub(window, 'fetch').callsFake(async (url) => {
       const target = String(url);
+      if (target.includes('store-publish.json')) {
+        return json({ 'app-languages': { data: [{ app: 'adobe-express', platform: 'apple', languages: 'de,en' }] } });
+      }
       if (target.includes('block-schema.json')) return json(schema);
       if (target.includes('sheet-to-block-map.json')) return json(sheetMap);
       if (target.includes('translate')) return json(translate);
@@ -113,6 +116,25 @@ describe('publish form', () => {
     await selectEverything({ promos: false, listing: false });
     expect($('#publish-button').disabled).to.equal(true);
     expect($('#publish-listing-field-count').textContent).to.equal('(not included)');
+  });
+
+  it('limits languages to the app-languages list for the chosen app and platform', async () => {
+    const names = () => [...root.querySelectorAll('.publish-language-checkbox')]
+      .map((checkbox) => checkbox.value);
+    const all = names();
+    $('#publish-product').value = 'adobe-express';
+    change($('#publish-product'));
+    expect(names()).to.deep.equal(all);
+
+    $('#publish-platform-apple').checked = true;
+    change($('#publish-platform-apple'));
+    await flush();
+    expect(names()).to.deep.equal(['English', 'German']);
+
+    $('#publish-platform-google').checked = true;
+    change($('#publish-platform-google'));
+    await flush();
+    expect(names()).to.deep.equal(all);
   });
 
   it('requires exactly one CPP campaign when CPP is selected', async () => {

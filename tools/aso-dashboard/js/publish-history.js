@@ -1,7 +1,6 @@
 import { getSourceText } from './lib/da-source-client.js';
-import { fetchLanguages, getConfigFileOverride } from './lib/utils.js';
+import { fetchLanguages, getConfigFileOverride, getStorePublishApi } from './lib/utils.js';
 
-export const PUBLISH_LOGS_URL = 'https://14257-asopublisher-develop.adobeioruntime.net/api/v1/web/aso-publisher/list-publish-logs';
 export const NO_ERROR_DETAILS = 'No error details recorded.';
 export const SOURCE_DISCLAIMER = 'Current source JSON\u2014not an archived snapshot.';
 export const MAX_VISIBLE_CHIPS = 3;
@@ -160,9 +159,9 @@ export function extractNextCursor(data) {
 const PAGE_SIZE = 25;
 
 export async function fetchPublishLogs({
-  token, cursor, signal, byMe = true, app, platform, status,
+  apiBase, token, cursor, signal, byMe = true, app, platform, status,
 } = {}) {
-  const url = new URL(PUBLISH_LOGS_URL);
+  const url = new URL(`${apiBase}/list-publish-logs`);
   url.searchParams.set('byMe', String(byMe));
   url.searchParams.set('pageSize', String(PAGE_SIZE));
   Object.entries({ app, platform, status }).forEach(([key, value]) => {
@@ -735,8 +734,10 @@ export function init({ context, token }) {
     els.error.hidden = true;
     render();
     try {
+      const apiBase = await getStorePublishApi({ context, token });
       const [page, languages] = await Promise.all([
         fetchPublishLogs({
+          apiBase,
           token,
           cursor: append ? state.nextCursor : undefined,
           signal: abortController.signal,
