@@ -704,7 +704,21 @@ describe('publish-history API and controller', () => {
     expect(q('#ph-error').textContent).to.contain('Source file was not found');
   });
 
-  it('reports saved requests without selectedLocales, and blocks invalid source paths', async () => {
+  it('silently skips legacy requests without selectedLocales', async () => {
+    const item = { ...SUCCESS };
+    delete item.selectedLocales;
+    const stub = sinon.stub(window, 'fetch');
+    stub.withArgs(sinon.match('list-publish-logs')).resolves(jsonResponse({ items: [item] }));
+    stub.withArgs(sinon.match('admin.da.live/source')).resolves(jsonResponse({ app: 'firefly' }));
+    const controller = await mount();
+    await controller.load();
+    expect(controller.state.items).to.deep.equal([item]);
+    expect(q('.ph-table')).to.not.equal(null);
+    expect(q('.ph-chip-missing')).to.equal(null);
+    expect(q('#ph-error').hidden).to.equal(true);
+  });
+
+  it('skips legacy requests while still blocking invalid source paths', async () => {
     const items = [
       { ...SUCCESS, selectedLocales: undefined },
       { ...SUCCESS, selectedLocales: undefined, requestId: 'invalid', daPayloadPath: 'https://evil.com/source.json' },
@@ -715,9 +729,21 @@ describe('publish-history API and controller', () => {
     const controller = await mount();
     await controller.load();
     expect(stub.callCount).to.equal(2);
-    expect(q('#ph-error').textContent).to.contain('Source JSON does not record selectedLocales');
+    expect(q('#ph-error').textContent).to.not.contain('Source JSON does not record selectedLocales');
     expect(q('#ph-error').textContent).to.contain('Source path is not a valid publish request path');
     expect(q('.ph-table').querySelectorAll('tbody')).to.have.length(2);
+  });
+
+  it('still reports malformed selectedLocales in saved requests', async () => {
+    const item = { ...SUCCESS, selectedLocales: undefined };
+    const stub = sinon.stub(window, 'fetch');
+    stub.withArgs(sinon.match('list-publish-logs')).resolves(jsonResponse({ items: [item] }));
+    stub.withArgs(sinon.match('admin.da.live/source'))
+      .resolves(jsonResponse({ selectedLocales: 'en' }));
+    const controller = await mount();
+    await controller.load();
+    expect(q('#ph-error').hidden).to.equal(false);
+    expect(q('#ph-error').textContent).to.contain('Source JSON does not record selectedLocales');
   });
 
   it('discards stale selected locales if history refreshes during a source read', async () => {

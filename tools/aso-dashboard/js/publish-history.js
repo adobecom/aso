@@ -205,6 +205,10 @@ async function loadSelectedLocales(items, context) {
       if (Array.isArray(item.selectedLocales) || Array.isArray(item.request?.selectedLocales)
         || !item.daPayloadPath) return item;
       const source = JSON.parse(await fetchSourceJson({ ...context, path: item.daPayloadPath }));
+      // Older requests predate selectedLocales and cannot supply missing-language pills.
+      if (source && typeof source === 'object' && !Object.hasOwn(source, 'selectedLocales')) {
+        return item;
+      }
       if (!Array.isArray(source?.selectedLocales)) {
         throw new Error('Source JSON does not record selectedLocales.');
       }
