@@ -726,6 +726,7 @@ describe('publish-history API and controller', () => {
     const url = stub.firstCall.args[0];
     expect(Object.fromEntries(new URL(url).searchParams)).to.deep.equal({
       byMe: 'false',
+      pageSize: '25',
       app: 'firefly',
       platform: 'apple',
       status: 'failed',
@@ -740,7 +741,7 @@ describe('publish-history API and controller', () => {
       token: 'tok', app: '', platform: '', status: '', from: '2026-10-01', to: '2026-10-09',
     });
     expect(Object.fromEntries(new URL(stub.firstCall.args[0]).searchParams))
-      .to.deep.equal({ byMe: 'true' });
+      .to.deep.equal({ byMe: 'true', pageSize: '25' });
   });
 
   it('throws on HTTP and malformed responses', async () => {
@@ -1039,6 +1040,7 @@ describe('publish-history API and controller', () => {
     await tick();
     const filters = {
       byMe: 'true',
+      pageSize: '25',
       app: FAILED.app,
       platform: FAILED.platform,
       status: 'failed',
@@ -1064,7 +1066,7 @@ describe('publish-history API and controller', () => {
     q('#ph-filter-all').click();
     await tick();
     expect(Object.fromEntries(new URL(stub.getCall(4).args[0]).searchParams))
-      .to.deep.equal({ ...filters, byMe: 'false' });
+      .to.deep.equal({ ...filters, byMe: 'false', pageSize: '25' });
     expect(q('#ph-filter-by-me').checked).to.equal(false);
   });
 
