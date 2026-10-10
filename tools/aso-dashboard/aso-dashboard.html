@@ -234,6 +234,20 @@
           <h2 class="export-title">Publish to Store</h2>
           <p class="export-description">Publish current DA content for one product and one platform to the store request queue. Track progress in Publish History.</p>
 
+          <div class="export-section" id="publish-platform-section">
+            <h3>Platform</h3>
+            <div class="checkbox-group horizontal">
+              <div class="checkbox-item">
+                <input type="radio" name="publish-platform" id="publish-platform-apple" value="apple">
+                <label for="publish-platform-apple">Apple</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="radio" name="publish-platform" id="publish-platform-google" value="google">
+                <label for="publish-platform-google">Google</label>
+              </div>
+            </div>
+          </div>
+
           <div class="export-section" id="publish-load-from-file-section">
             <h3>Load fields from a file (optional)</h3>
             <p class="export-description">Pre-fills product, languages, platform, and content below — content is always pulled fresh from DA, not from this file.</p>
@@ -258,20 +272,6 @@
             </h3>
             <div class="checkbox-group" id="publish-languages-checkboxes">
               <p>Loading languages...</p>
-            </div>
-          </div>
-
-          <div class="export-section" id="publish-platform-section">
-            <h3>Platform</h3>
-            <div class="checkbox-group horizontal">
-              <div class="checkbox-item">
-                <input type="radio" name="publish-platform" id="publish-platform-apple" value="apple">
-                <label for="publish-platform-apple">Apple</label>
-              </div>
-              <div class="checkbox-item">
-                <input type="radio" name="publish-platform" id="publish-platform-google" value="google">
-                <label for="publish-platform-google">Google</label>
-              </div>
             </div>
           </div>
 
