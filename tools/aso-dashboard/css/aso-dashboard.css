@@ -1017,8 +1017,62 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   display: inline-flex;
   align-self: center;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacing-100);
   font-size: 14px;
+  cursor: pointer;
+}
+
+#ph-filter-all {
+  appearance: none;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  border: 2px solid transparent;
+  border-radius: 24px;
+  background: #c6c6c6;
+  cursor: pointer;
+}
+
+#ph-filter-all::before {
+  content: "";
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+#ph-filter-all:checked {
+  background: var(--s2-blue-800);
+}
+
+#ph-filter-all:checked::before {
+  transform: translateX(20px);
+}
+
+#ph-filter-all:focus-visible {
+  outline: 2px solid var(--s2-blue-800);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  #ph-filter-all {
+    border-color: ButtonText;
+    background: canvas;
+  }
+
+  #ph-filter-all::before {
+    background: ButtonText;
+  }
+
+  #ph-filter-all:checked {
+    background: Highlight;
+  }
+
+  #ph-filter-all:checked::before {
+    background: HighlightText;
+  }
 }
 
 .ph-scope {

@@ -41,11 +41,11 @@ describe('history-first Publish workspace', () => {
     expect($('#publish-new').classList.contains('ph-button')).to.equal(true);
   });
 
-  it('orders placeholder-only filters with Platform first and Everyone last', () => {
+  it('orders placeholder-only filters with Platform first and Everyone before Refresh', () => {
     const filters = $('#ph-filters');
     expect([...filters.querySelectorAll('select, button, input')].map((control) => control.id))
       .to.deep.equal([
-        'ph-filter-platform', 'ph-filter-app', 'ph-filter-status', 'ph-refresh', 'ph-filter-all',
+        'ph-filter-platform', 'ph-filter-app', 'ph-filter-status', 'ph-filter-all', 'ph-refresh',
       ]);
     expect(filters.querySelector('legend')).to.equal(null);
     ['platform', 'app', 'status'].forEach((name) => {
@@ -55,6 +55,7 @@ describe('history-first Publish workspace', () => {
       expect(filters.querySelector(`label[for="${select.id}"]`)).to.equal(null);
     });
     expect($('#ph-filter-all').type).to.equal('checkbox');
+    expect($('#ph-filter-all').getAttribute('role')).to.equal('switch');
     expect($('#ph-filter-all').checked).to.equal(false);
     expect($('#ph-filter-all').closest('label').textContent.trim()).to.equal('Everyone');
     expect($('#ph-requestor-help').textContent).to.contain('Unchecked shows only your publish requests');
@@ -76,6 +77,17 @@ describe('history-first Publish workspace', () => {
       .to.be.lessThan(Number.parseFloat(getComputedStyle(refresh).fontSize));
     expect(newPublish.getBoundingClientRect().height)
       .to.be.lessThan(refresh.getBoundingClientRect().height);
+    const everyone = $('#ph-filter-all');
+    expect(everyone.getBoundingClientRect().width).to.equal(44);
+    expect(everyone.getBoundingClientRect().height).to.equal(24);
+    const offColor = getComputedStyle(everyone).backgroundColor;
+    everyone.click();
+    expect(everyone.checked).to.equal(true);
+    expect(getComputedStyle(everyone).backgroundColor).to.not.equal(offColor);
+    expect(getComputedStyle(everyone, '::before').transform).to.not.equal('none');
+    everyone.click();
+    expect(everyone.checked).to.equal(false);
+    expect(getComputedStyle(everyone, '::before').transform).to.equal('none');
     root.style.width = '360px';
     const filtersBounds = $('#ph-filters').getBoundingClientRect();
     const refreshBounds = refresh.getBoundingClientRect();
