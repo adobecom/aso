@@ -24,10 +24,10 @@ const STATUS_META = {
   failed: { label: 'Failed', hasErrors: true, title: 'Publish failed' },
   queued: { label: 'Queued', hasErrors: false },
   in_progress: { label: 'In progress', hasErrors: false },
-  invoke_failed: { label: 'Invoke failed', hasErrors: true, title: 'Publish could not be started' },
+  invoke_failed: { label: 'Failed', hasErrors: true, title: 'Publish could not be started' },
 };
 
-export const STATUS_OPTIONS = Object.keys(STATUS_META);
+export const STATUS_OPTIONS = Object.keys(STATUS_META).filter((status) => status !== 'invoke_failed');
 
 // ---------- Pure data helpers ----------
 
@@ -35,9 +35,14 @@ export function normalizeStatus(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
+function statusGroup(value) {
+  const status = normalizeStatus(value);
+  return status === 'invoke_failed' ? 'failed' : status;
+}
+
 export function getStatusMeta(value) {
   const key = normalizeStatus(value);
-  if (STATUS_META[key]) return { key, ...STATUS_META[key], known: true };
+  if (STATUS_META[key]) return { key: statusGroup(key), ...STATUS_META[key], known: true };
   return { key, label: String(value ?? '').trim() || 'Unknown', hasErrors: false, known: false };
 }
 
@@ -139,7 +144,7 @@ export function applyFilters(items, filters = {}) {
   return items.filter((item) => {
     if (app && item.app !== app) return false;
     if (platform && item.platform !== platform) return false;
-    if (status && normalizeStatus(item.overallStatus) !== status) return false;
+    if (status && statusGroup(item.overallStatus) !== statusGroup(status)) return false;
     return true;
   });
 }
@@ -158,7 +163,7 @@ export function extractNextCursor(data) {
 
 const PAGE_SIZE = 25;
 
-export async function fetchPublishLogs({
+async function fetchPublishLogPage({
   apiBase, token, cursor, signal, byMe = true, app, platform, status,
 } = {}) {
   const url = new URL(`${apiBase}/list-publish-logs`);
@@ -182,6 +187,25 @@ export async function fetchPublishLogs({
   }
   if (!Array.isArray(data?.items)) throw new Error('Publish results response is missing "items".');
   return { items: data.items, nextCursor: extractNextCursor(data) };
+}
+
+export async function fetchPublishLogs(options = {}) {
+  if (statusGroup(options.status) !== 'failed') return fetchPublishLogPage(options);
+  let { cursor } = options;
+  const visited = new Set(cursor ? [cursor] : []);
+  let items;
+  do {
+    // The service's single-status filter would exclude one of the two failure types.
+    // eslint-disable-next-line no-await-in-loop
+    const page = await fetchPublishLogPage({ ...options, status: undefined, cursor });
+    items = applyFilters(page.items, { status: 'failed' });
+    if (page.nextCursor && visited.has(page.nextCursor)) {
+      throw new Error('Publish results pagination repeated a cursor.');
+    }
+    cursor = page.nextCursor;
+    if (cursor) visited.add(cursor);
+  } while (!items.length && cursor);
+  return { items, nextCursor: cursor };
 }
 
 // The path comes from the history response and is fetched through the DA source client.
@@ -688,7 +712,7 @@ export function init({ context, token }) {
     });
     fillSelect(els.app, 'apps', [...apps.keys()].sort(), (value) => apps.get(value));
     fillSelect(els.platform, 'platforms', [...platforms].sort());
-    const seen = state.items.map((i) => normalizeStatus(i.overallStatus)).filter(Boolean);
+    const seen = state.items.map((i) => statusGroup(i.overallStatus)).filter(Boolean);
     fillSelect(els.statusFilter, 'statuses', [...new Set([...STATUS_OPTIONS, ...seen, els.statusFilter.value].filter(Boolean))], (v) => getStatusMeta(v).label);
   }
 

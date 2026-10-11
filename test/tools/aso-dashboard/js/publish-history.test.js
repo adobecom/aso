@@ -39,6 +39,17 @@ const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), 
 const tick = () => new Promise((r) => { setTimeout(r, 50); });
 
 describe('publish-history data helpers', () => {
+  it('groups invocation failures with Failed without changing the service records', () => {
+    const invoked = { ...FAILED, requestId: 'invoke-error', overallStatus: 'invoke_failed' };
+    expect(getStatusMeta(invoked.overallStatus).key).to.equal('failed');
+    expect(getStatusMeta(invoked.overallStatus).label).to.equal('Failed');
+    expect(getStatusMeta(invoked.overallStatus).title).to.equal('Publish could not be started');
+    expect(renderStatusBadge(invoked).querySelector('.ph-badge-failed').textContent).to.equal('Failed');
+    expect(applyFilters([SUCCESS, FAILED, invoked], { status: 'failed' }))
+      .to.deep.equal([FAILED, invoked]);
+    expect(invoked.overallStatus).to.equal('invoke_failed');
+  });
+
   it('does not highlight history by default, including records without a request ID', () => {
     const view = renderResults([SUCCESS, { ...SUCCESS, requestId: undefined }], {});
     expect(view.querySelector('.ph-highlighted')).to.equal(null);
@@ -728,7 +739,7 @@ describe('publish-history API and controller', () => {
       byMe: false,
       app: 'firefly',
       platform: 'apple',
-      status: 'failed',
+      status: 'partial',
       cursor: 'next&=page',
     });
     const url = stub.firstCall.args[0];
@@ -737,7 +748,7 @@ describe('publish-history API and controller', () => {
       pageSize: '25',
       app: 'firefly',
       platform: 'apple',
-      status: 'failed',
+      status: 'partial',
       cursor: 'next&=page',
     });
     expect(url).to.contain('cursor=next%26%3Dpage');
@@ -756,6 +767,53 @@ describe('publish-history API and controller', () => {
     });
     expect(Object.fromEntries(new URL(stub.firstCall.args[0]).searchParams))
       .to.deep.equal({ byMe: 'true', pageSize: '25' });
+  });
+
+  it('groups both failure types across pages and skips pages with no failures', async () => {
+    const invoked = { ...FAILED, requestId: 'invoke-error', overallStatus: 'invoke_failed' };
+    const stub = sinon.stub(window, 'fetch');
+    stub.onCall(0).resolves(jsonResponse({ items: [SUCCESS], nextCursor: 'scan-next' }));
+    stub.onCall(1).resolves(jsonResponse({ items: [FAILED, invoked, SUCCESS], nextCursor: 'more' }));
+    stub.onCall(2).resolves(jsonResponse({ items: [SUCCESS], nextCursor: 'last' }));
+    stub.onCall(3).resolves(jsonResponse({ items: [invoked] }));
+    const options = {
+      apiBase: 'https://api.example.test/aso-publisher',
+      token: 't',
+      status: 'failed',
+      byMe: false,
+      app: 'test-app',
+      platform: 'apple',
+      signal: new AbortController().signal,
+    };
+    const first = await fetchPublishLogs(options);
+    expect(first).to.deep.equal({ items: [FAILED, invoked], nextCursor: 'more' });
+    const second = await fetchPublishLogs({ ...options, cursor: first.nextCursor });
+    expect(second).to.deep.equal({ items: [invoked], nextCursor: null });
+    stub.getCalls().forEach((call) => {
+      const params = new URL(call.args[0]).searchParams;
+      expect(params.has('status')).to.equal(false);
+      expect(params.get('byMe')).to.equal('false');
+      expect(params.get('app')).to.equal('test-app');
+      expect(params.get('platform')).to.equal('apple');
+      expect(call.args[1].signal).to.equal(options.signal);
+    });
+    expect(new URL(stub.secondCall.args[0]).searchParams.get('cursor')).to.equal('scan-next');
+    expect(new URL(stub.thirdCall.args[0]).searchParams.get('cursor')).to.equal('more');
+  });
+
+  it('returns empty grouped history at the end and surfaces pagination errors', async () => {
+    const stub = sinon.stub(window, 'fetch');
+    stub.onCall(0).resolves(jsonResponse({ items: [SUCCESS] }));
+    expect(await fetchPublishLogs({ apiBase: 'https://api.example.test', status: 'failed' })).to.deep.equal({ items: [], nextCursor: null });
+    stub.onCall(1).resolves(jsonResponse({ items: [], nextCursor: 'loop' }));
+    stub.onCall(2).resolves(jsonResponse({ items: [], nextCursor: 'loop' }));
+    let error;
+    try {
+      await fetchPublishLogs({ apiBase: 'https://api.example.test', status: 'failed' });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error.message).to.contain('repeated a cursor');
   });
 
   it('throws on HTTP and malformed responses', async () => {
@@ -809,6 +867,15 @@ describe('publish-history API and controller', () => {
     return init({ context: { org: 'o', repo: 'r' }, token: 't' });
   }
   const q = (s) => document.querySelector(s);
+
+  it('offers one Failed filter for both failure statuses', async () => {
+    sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [FAILED, { ...FAILED, requestId: 'invoke-error', overallStatus: 'invoke_failed' }] }));
+    const controller = await mount();
+    await controller.load();
+    const options = [...q('#ph-filter-status').options];
+    expect(options.filter((option) => option.textContent === 'Failed')).to.have.length(1);
+    expect(options.some((option) => option.value === 'invoke_failed')).to.equal(false);
+  });
 
   it('populates distinct apps from the publish product source even when history has no records', async () => {
     const stub = sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [] }));
@@ -1167,7 +1234,6 @@ describe('publish-history API and controller', () => {
       pageSize: '25',
       app: FAILED.app,
       platform: FAILED.platform,
-      status: 'failed',
     };
     expect(Object.fromEntries(new URL(stub.secondCall.args[0]).searchParams))
       .to.deep.equal(filters);
