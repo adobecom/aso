@@ -708,7 +708,7 @@ export function init({ context, token }) {
       ? ` Request ${requestId}${state.items.some((item) => item.requestId === requestId)
         ? ' is highlighted below.' : ' is not in the loaded history yet. Refresh to check its status.'}`
       : '';
-    els.more.hidden = !state.nextCursor;
+    els.more.hidden = !state.items.length || !state.nextCursor;
     els.more.disabled = state.loading;
     els.refresh.disabled = state.loading;
     els.refresh.setAttribute('aria-busy', String(state.loading));

@@ -1227,4 +1227,20 @@ describe('publish-history API and controller', () => {
     await tick();
     expect(q('#ph-error').textContent).to.contain('network down');
   });
+
+  it('hides Load more for empty results even when the API returns a cursor', async () => {
+    const stub = sinon.stub(window, 'fetch');
+    stub.onCall(0).resolves(jsonResponse({ items: [], nextCursor: 'empty-page' }));
+    stub.onCall(1).resolves(jsonResponse({ items: [SUCCESS], nextCursor: 'next-page' }));
+    stub.onCall(2).resolves(jsonResponse({ items: [], nextCursor: 'empty-again' }));
+    const controller = await mount();
+    await controller.load();
+    expect(q('#ph-results').textContent).to.contain('No publish requests found');
+    expect(q('#ph-load-more').hidden).to.equal(true);
+    await controller.load();
+    expect(q('#ph-load-more').hidden).to.equal(false);
+    await controller.load();
+    expect(q('#ph-results').textContent).to.contain('No publish requests found');
+    expect(q('#ph-load-more').hidden).to.equal(true);
+  });
 });
