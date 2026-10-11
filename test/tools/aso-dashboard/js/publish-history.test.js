@@ -3,6 +3,7 @@ import { readFile } from '@web/test-runner-commands';
 import sinon from 'sinon';
 import { fetchStorePublishConfig } from '../../../../tools/utils.js';
 import { fetchLanguageIndex } from '../../../../tools/aso-dashboard/js/lib/translate-paths.js';
+import { fetchProducts } from '../../../../tools/aso-dashboard/js/lib/utils.js';
 import {
   NO_ERROR_DETAILS,
   SOURCE_DISCLAIMER,
@@ -777,22 +778,87 @@ describe('publish-history API and controller', () => {
     window.fetch = original;
   }
 
-  async function mount() {
+  let productSourceId = 0;
+
+  async function mount({
+    products = [...new Set(fixture.items.map((item) => item.app))]
+      .map((name) => ({ name, path: `/products/${name}` })),
+  } = {}) {
     await seedPublishConfig();
+    const original = window.fetch;
+    const url = new URL(window.location.href);
+    productSourceId += 1;
+    url.searchParams.set('productsPath', `publish-history-test-${productSourceId}`);
+    window.history.replaceState(null, '', url);
+    window.fetch = async () => jsonResponse(products);
+    try {
+      await fetchProducts({ context: { org: 'o', repo: 'r' }, token: 't' });
+    } finally {
+      window.fetch = original;
+    }
     document.body.innerHTML = `
       <button class="tab-button" data-tab="publish-history"></button>
       <div data-tab-content="publish-history">
         <button id="ph-refresh"></button>
         <select id="ph-filter-app"></select><select id="ph-filter-platform"></select>
         <select id="ph-filter-status"></select>
-        <input id="ph-filter-by-me" type="radio" name="ph-requestor" checked>
-        <input id="ph-filter-all" type="radio" name="ph-requestor">
+        <input id="ph-filter-all" type="checkbox">
         <div id="ph-error" hidden></div><div id="ph-status"></div>
         <div id="ph-results"></div><button id="ph-load-more" hidden></button>
       </div>`;
     return init({ context: { org: 'o', repo: 'r' }, token: 't' });
   }
   const q = (s) => document.querySelector(s);
+
+  it('populates distinct apps from the publish product source even when history has no records', async () => {
+    const stub = sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [] }));
+    const controller = await mount({
+      products: [
+        { name: 'new-app', path: '/products/new-app' },
+        { name: 'adobe-express', path: '/products/adobe-express' },
+        { name: 'new-app', path: '/products/new-app' },
+        { name: 'not-a-product', path: '/products/not-a-product.html', ext: 'html' },
+      ],
+    });
+    await controller.load();
+    expect([...q('#ph-filter-app').options].map((option) => [option.value, option.textContent]))
+      .to.deep.equal([['', 'All apps'], ['adobe-express', 'Adobe express'], ['new-app', 'New app']]);
+    q('#ph-filter-app').value = 'new-app';
+    q('#ph-filter-app').dispatchEvent(new Event('change'));
+    await tick();
+    expect(new URL(stub.lastCall.args[0]).searchParams.get('app')).to.equal('new-app');
+    expect(q('#ph-filter-app').value).to.equal('new-app');
+  });
+
+  it('does not add apps solely from loaded history records', async () => {
+    sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [SUCCESS] }));
+    const controller = await mount({ products: [] });
+    await controller.load();
+    expect([...q('#ph-filter-app').options].map((option) => option.value)).to.deep.equal(['']);
+  });
+
+  it('toggles Everyone in both directions and preserves it through pagination and refresh', async () => {
+    const stub = sinon.stub(window, 'fetch')
+      .callsFake(async () => jsonResponse({ items: [], nextCursor: 'next' }));
+    const controller = await mount();
+    await controller.load();
+    expect(new URL(stub.lastCall.args[0]).searchParams.get('byMe')).to.equal('true');
+    q('#ph-filter-all').click();
+    await tick();
+    expect(new URL(stub.lastCall.args[0]).searchParams.get('byMe')).to.equal('false');
+    q('#ph-load-more').click();
+    await tick();
+    expect(new URL(stub.lastCall.args[0]).searchParams.get('byMe')).to.equal('false');
+    expect(new URL(stub.lastCall.args[0]).searchParams.get('cursor')).to.equal('next');
+    q('#ph-refresh').click();
+    await tick();
+    expect(new URL(stub.lastCall.args[0]).searchParams.get('byMe')).to.equal('false');
+    expect(q('#ph-filter-all').checked).to.equal(true);
+    q('#ph-filter-all').click();
+    await tick();
+    expect(new URL(stub.lastCall.args[0]).searchParams.get('byMe')).to.equal('true');
+    expect(new URL(stub.lastCall.args[0]).searchParams.has('cursor')).to.equal(false);
+  });
 
   it('refreshes submitted requests without stale filters and highlights desktop and mobile results', async () => {
     const stub = sinon.stub(window, 'fetch')
@@ -802,14 +868,12 @@ describe('publish-history API and controller', () => {
     q('#ph-filter-app').value = FAILED.app;
     q('#ph-filter-platform').value = FAILED.platform;
     q('#ph-filter-status').value = 'failed';
-    q('#ph-filter-by-me').checked = false;
     q('#ph-filter-all').checked = true;
     controller.showRequest(SUCCESS.requestId);
     await tick();
     expect(q('#ph-filter-app').value).to.equal('');
     expect(q('#ph-filter-platform').value).to.equal('');
     expect(q('#ph-filter-status').value).to.equal('');
-    expect(q('#ph-filter-by-me').checked).to.equal(true);
     expect(q('#ph-filter-all').checked).to.equal(false);
     const query = new URL(stub.lastCall.args[0]).searchParams;
     expect(query.get('byMe')).to.equal('true');
@@ -1089,7 +1153,7 @@ describe('publish-history API and controller', () => {
     stub.onCall(4).resolves(jsonResponse({ items: [SUCCESS] }));
     const controller = await mount();
     await controller.load();
-    expect(q('#ph-filter-by-me').checked).to.equal(true);
+    expect(q('#ph-filter-all').checked).to.equal(false);
     expect(new URL(stub.firstCall.args[0]).searchParams.get('byMe')).to.equal('true');
 
     q('#ph-filter-app').value = FAILED.app;
@@ -1127,7 +1191,7 @@ describe('publish-history API and controller', () => {
     await tick();
     expect(Object.fromEntries(new URL(stub.getCall(4).args[0]).searchParams))
       .to.deep.equal({ ...filters, byMe: 'false', pageSize: '25' });
-    expect(q('#ph-filter-by-me').checked).to.equal(false);
+    expect(q('#ph-filter-all').checked).to.equal(true);
   });
 
   it('discards stale responses when filters change during a request', async () => {

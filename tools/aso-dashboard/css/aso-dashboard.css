@@ -1013,18 +1013,12 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   font-size: 14px;
 }
 
-.ph-requestor-filter {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  font-size: 14px;
-}
-
 .ph-requestor-option {
   display: inline-flex;
+  align-self: center;
   align-items: center;
   gap: 4px;
-  margin-right: var(--spacing-200);
+  font-size: 14px;
 }
 
 .ph-scope {

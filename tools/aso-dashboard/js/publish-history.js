@@ -1,5 +1,5 @@
 import { getSourceText } from './lib/da-source-client.js';
-import { fetchLanguages, getConfigFileOverride, getStorePublishApi } from './lib/utils.js';
+import { fetchLanguages, fetchProducts, getConfigFileOverride, getStorePublishApi } from './lib/utils.js';
 
 export const NO_ERROR_DETAILS = 'No error details recorded.';
 export const SOURCE_DISCLAIMER = 'Current source JSON\u2014not an archived snapshot.';
@@ -670,11 +670,10 @@ export function init({ context, token }) {
     app: $('ph-filter-app'),
     platform: $('ph-filter-platform'),
     statusFilter: $('ph-filter-status'),
-    byMe: $('ph-filter-by-me'),
     all: $('ph-filter-all'),
   };
   const state = { items: [], nextCursor: null, loading: false, loaded: false, seq: 0 };
-  const apps = new Set();
+  const apps = new Map();
   const platforms = new Set();
   let abortController;
   const { org, repo } = context || {};
@@ -685,10 +684,9 @@ export function init({ context, token }) {
 
   function renderFilters() {
     state.items.forEach((item) => {
-      if (item.app) apps.add(item.app);
       if (item.platform) platforms.add(item.platform);
     });
-    fillSelect(els.app, 'apps', [...apps].sort());
+    fillSelect(els.app, 'apps', [...apps.keys()].sort(), (value) => apps.get(value));
     fillSelect(els.platform, 'platforms', [...platforms].sort());
     const seen = state.items.map((i) => normalizeStatus(i.overallStatus)).filter(Boolean);
     fillSelect(els.statusFilter, 'statuses', [...new Set([...STATUS_OPTIONS, ...seen, els.statusFilter.value].filter(Boolean))], (v) => getStatusMeta(v).label);
@@ -696,7 +694,7 @@ export function init({ context, token }) {
 
   function readFilters() {
     return {
-      byMe: els.byMe.checked,
+      byMe: !els.all.checked,
       app: els.app.value,
       platform: els.platform.value,
       status: els.statusFilter.value,
@@ -746,7 +744,7 @@ export function init({ context, token }) {
     render();
     try {
       const apiBase = await getStorePublishApi({ context, token });
-      const [page, languages] = await Promise.all([
+      const [page, languages, products] = await Promise.all([
         fetchPublishLogs({
           apiBase,
           token,
@@ -755,8 +753,12 @@ export function init({ context, token }) {
           ...readFilters(),
         }),
         fetchLanguages({ context, token, configFile: getConfigFileOverride() }),
+        fetchProducts({ context, token }),
       ]);
       if (seq !== state.seq) return;
+      apps.clear();
+      products.forEach((product) => apps.set(product.value, product.label));
+      renderFilters();
       const details = await loadRequestDetails(page.items, { org, repo, token });
       if (seq !== state.seq) return;
       handlers.languageNames.clear();
@@ -789,7 +791,7 @@ export function init({ context, token }) {
 
   els.refresh.addEventListener('click', () => load());
   els.more.addEventListener('click', () => load({ append: true }));
-  [els.app, els.platform, els.statusFilter, els.byMe, els.all]
+  [els.app, els.platform, els.statusFilter, els.all]
     .forEach((control) => control.addEventListener('change', () => {
       state.items = [];
       state.nextCursor = null;
@@ -807,7 +809,6 @@ export function init({ context, token }) {
     els.app.value = '';
     els.platform.value = '';
     els.statusFilter.value = '';
-    els.byMe.checked = true;
     els.all.checked = false;
     state.items = [];
     state.nextCursor = null;

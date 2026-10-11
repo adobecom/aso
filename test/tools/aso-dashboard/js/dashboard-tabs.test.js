@@ -41,6 +41,25 @@ describe('history-first Publish workspace', () => {
     expect($('#publish-new').classList.contains('ph-button')).to.equal(true);
   });
 
+  it('orders placeholder-only filters with Platform first and Everyone last', () => {
+    const filters = $('#ph-filters');
+    expect([...filters.querySelectorAll('select, button, input')].map((control) => control.id))
+      .to.deep.equal([
+        'ph-filter-platform', 'ph-filter-app', 'ph-filter-status', 'ph-refresh', 'ph-filter-all',
+      ]);
+    expect(filters.querySelector('legend')).to.equal(null);
+    ['platform', 'app', 'status'].forEach((name) => {
+      const select = $(`#ph-filter-${name}`);
+      expect(select.getAttribute('aria-label')).to.equal(name.charAt(0).toUpperCase() + name.slice(1));
+      expect(select.options[0].textContent).to.equal(`All ${name === 'status' ? 'statuses' : `${name}s`}`);
+      expect(filters.querySelector(`label[for="${select.id}"]`)).to.equal(null);
+    });
+    expect($('#ph-filter-all').type).to.equal('checkbox');
+    expect($('#ph-filter-all').checked).to.equal(false);
+    expect($('#ph-filter-all').closest('label').textContent.trim()).to.equal('Everyone');
+    expect($('#ph-requestor-help').textContent).to.contain('Unchecked shows only your publish requests');
+  });
+
   it('renders New publish smaller than Refresh and keeps Refresh inside narrow filter layouts', async () => {
     const stylesheet = document.createElement('link');
     stylesheet.rel = 'stylesheet';

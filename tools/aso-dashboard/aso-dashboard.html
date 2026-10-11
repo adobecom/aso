@@ -323,15 +323,12 @@
           </div>
           <p class="export-description">Results of store publish requests, grouped by section. Requested-on times use your local time. Filters search all history.</p>
           <form class="ph-filters" id="ph-filters" aria-label="Filter publish results" onsubmit="return false">
-            <fieldset class="ph-requestor-filter">
-              <legend>Published by</legend>
-              <label class="ph-requestor-option"><input type="radio" name="ph-requestor" id="ph-filter-by-me" value="me" checked> By Me</label>
-              <label class="ph-requestor-option"><input type="radio" name="ph-requestor" id="ph-filter-all" value="all"> All</label>
-            </fieldset>
-            <div class="control-group"><label for="ph-filter-app">App</label><select id="ph-filter-app" class="select-dropdown"></select></div>
-            <div class="control-group"><label for="ph-filter-platform">Platform</label><select id="ph-filter-platform" class="select-dropdown"></select></div>
-            <div class="control-group"><label for="ph-filter-status">Status</label><select id="ph-filter-status" class="select-dropdown"></select></div>
+            <div class="control-group"><select id="ph-filter-platform" class="select-dropdown" aria-label="Platform"><option value="">All platforms</option></select></div>
+            <div class="control-group"><select id="ph-filter-app" class="select-dropdown" aria-label="App"><option value="">All apps</option></select></div>
+            <div class="control-group"><select id="ph-filter-status" class="select-dropdown" aria-label="Status"><option value="">All statuses</option></select></div>
             <button type="button" class="ph-button ph-filter-refresh" id="ph-refresh">Refresh</button>
+            <label class="ph-requestor-option"><input type="checkbox" id="ph-filter-all" aria-describedby="ph-requestor-help"> Everyone</label>
+            <span class="ph-sr-only" id="ph-requestor-help">Unchecked shows only your publish requests. Checked shows everyone's requests.</span>
           </form>
           <div id="ph-error" class="ph-error" role="alert" hidden></div>
           <div id="ph-status" class="ph-scope" role="status" aria-live="polite"></div>
