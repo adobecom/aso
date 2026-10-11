@@ -557,8 +557,8 @@ export function renderRow(item, handlers) {
   th.append(renderTime(item.startedAt));
   first.append(th);
   const cells = [
-    el('span', 'ph-app', item.app ?? '\u2014'),
     el('span', 'ph-platform', item.platform ?? '\u2014'),
+    el('span', 'ph-app', item.app ?? '\u2014'),
     renderReleasePeriod(item),
     renderStatusBadge(item),
     renderRequestCell(item, handlers),
@@ -589,7 +589,7 @@ export function renderCard(item, handlers) {
     card.classList.add('ph-highlighted');
   }
   const head = el('div', 'ph-card-head');
-  head.append(el('strong', '', item.app ?? '\u2014'), el('span', 'ph-platform', item.platform ?? '\u2014'), renderStatusBadge(item));
+  head.append(el('span', 'ph-platform', item.platform ?? '\u2014'), el('strong', '', item.app ?? '\u2014'), renderStatusBadge(item));
   card.append(head, renderTime(item.startedAt));
   const period = el('div', 'ph-card-group');
   period.append(el('h4', 'ph-card-label', 'Release Period'), renderReleasePeriod(item));
@@ -613,7 +613,7 @@ export function renderResults(items, handlers) {
   const thead = el('thead');
   const headRow = el('tr');
   [
-    'Requested on', 'App', 'Platform', 'Release Period', 'Overall', 'Request', 'Section', 'Languages',
+    'Requested on', 'Platform', 'App', 'Release Period', 'Overall', 'Request', 'Section', 'Languages',
   ].forEach((h) => {
     const th = el('th');
     if (h === 'Request') th.append(el('span', 'ph-sr-only', h));
@@ -698,7 +698,6 @@ export function init({ context, token }) {
   };
   const state = { items: [], nextCursor: null, loading: false, loaded: false, seq: 0 };
   const apps = new Map();
-  const platforms = new Set();
   let abortController;
   const { org, repo } = context || {};
   const handlers = {
@@ -707,11 +706,10 @@ export function init({ context, token }) {
   };
 
   function renderFilters() {
-    state.items.forEach((item) => {
-      if (item.platform) platforms.add(item.platform);
-    });
     fillSelect(els.app, 'apps', [...apps.keys()].sort(), (value) => apps.get(value));
-    fillSelect(els.platform, 'platforms', [...platforms].sort());
+    fillSelect(els.platform, 'platforms', ['apple', 'google'], (value) => (
+      value === 'apple' ? 'Apple' : 'Google'
+    ));
     const seen = state.items.map((i) => statusGroup(i.overallStatus)).filter(Boolean);
     fillSelect(els.statusFilter, 'statuses', [...new Set([...STATUS_OPTIONS, ...seen, els.statusFilter.value].filter(Boolean))], (v) => getStatusMeta(v).label);
   }

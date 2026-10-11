@@ -39,6 +39,18 @@ const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), 
 const tick = () => new Promise((r) => { setTimeout(r, 50); });
 
 describe('publish-history data helpers', () => {
+  it('shows Platform before App in table columns and mobile cards', () => {
+    const view = renderResults([SUCCESS], {});
+    expect([...view.querySelectorAll('thead th')].slice(0, 3).map((cell) => cell.textContent))
+      .to.deep.equal(['Requested on', 'Platform', 'App']);
+    const row = view.querySelector('.ph-row');
+    expect(row.children[1].querySelector('.ph-platform').textContent).to.equal(SUCCESS.platform);
+    expect(row.children[2].querySelector('.ph-app').textContent).to.equal(SUCCESS.app);
+    const head = view.querySelector('.ph-card-head');
+    expect(head.children[0].classList.contains('ph-platform')).to.equal(true);
+    expect(head.children[1].textContent).to.equal(SUCCESS.app);
+  });
+
   it('groups invocation failures with Failed without changing the service records', () => {
     const invoked = { ...FAILED, requestId: 'invoke-error', overallStatus: 'invoke_failed' };
     expect(getStatusMeta(invoked.overallStatus).key).to.equal('failed');
@@ -524,7 +536,7 @@ describe('publish-history rendering', () => {
   it('groups each request into three section rows with shared cells and matching mobile labels', () => {
     const root = renderResults(fixture.items, {});
     expect([...root.querySelectorAll('thead th')].map((t) => t.textContent))
-      .to.deep.equal(['Requested on', 'App', 'Platform', 'Release Period', 'Overall', 'Request', 'Section', 'Languages']);
+      .to.deep.equal(['Requested on', 'Platform', 'App', 'Release Period', 'Overall', 'Request', 'Section', 'Languages']);
     expect(root.querySelector('thead th:nth-child(6) .ph-sr-only').textContent).to.equal('Request');
     expect(root.querySelectorAll('tbody')).to.have.length(fixture.items.length);
     expect(root.querySelectorAll('tbody tr')).to.have.length(fixture.items.length * 3);
@@ -867,6 +879,23 @@ describe('publish-history API and controller', () => {
     return init({ context: { org: 'o', repo: 'r' }, token: 't' });
   }
   const q = (s) => document.querySelector(s);
+
+  it('always offers Apple and Google platforms even with empty history', async () => {
+    const stub = sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [] }));
+    const controller = await mount();
+    const options = () => [...q('#ph-filter-platform').options]
+      .map((option) => [option.value, option.textContent]);
+    const expected = [['', 'All platforms'], ['apple', 'Apple'], ['google', 'Google']];
+    expect(options()).to.deep.equal(expected);
+    await controller.load();
+    expect(options()).to.deep.equal(expected);
+    q('#ph-filter-platform').value = 'google';
+    q('#ph-filter-platform').dispatchEvent(new Event('change'));
+    await tick();
+    expect(new URL(stub.lastCall.args[0]).searchParams.get('platform')).to.equal('google');
+    expect(q('#ph-filter-platform').value).to.equal('google');
+    expect(options()).to.deep.equal(expected);
+  });
 
   it('offers one Failed filter for both failure statuses', async () => {
     sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [FAILED, { ...FAILED, requestId: 'invoke-error', overallStatus: 'invoke_failed' }] }));
