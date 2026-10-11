@@ -71,6 +71,13 @@ describe('history-first Publish workspace', () => {
       root.append(stylesheet);
     });
     $('.tab-button[data-tab="publish"]').click();
+    const loadMore = $('#ph-load-more');
+    expect(loadMore.hidden).to.equal(true);
+    expect(getComputedStyle(loadMore).display).to.equal('none');
+    loadMore.hidden = false;
+    expect(getComputedStyle(loadMore).display).to.not.equal('none');
+    loadMore.hidden = true;
+    expect(loadMore.getBoundingClientRect().height).to.equal(0);
     const newPublish = $('#publish-new');
     const refresh = $('#ph-refresh');
     expect(Number.parseFloat(getComputedStyle(newPublish).fontSize))

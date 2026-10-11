@@ -977,6 +977,10 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   margin: var(--spacing-400) auto;
 }
 
+#ph-load-more[hidden] {
+  display: none;
+}
+
 #publish-new {
   height: 36px;
   padding: 0 var(--spacing-300);
