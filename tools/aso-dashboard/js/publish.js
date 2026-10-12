@@ -138,16 +138,16 @@ async function readPublishServiceResponse(response, reference) {
   try {
     serviceResult = JSON.parse(responseBody);
   } catch (error) {
-    const reason = response.ok ? 'returned invalid JSON' : 'failed';
-    throw new Error(`Publish service ${reason} (${response.status} ${response.statusText}): ${responseBody || error.message}. ${reference}`);
+    if (!response.ok) {
+      const message = responseBody.trim() || `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
+      throw new Error(`Publish service failed: ${message}`);
+    }
+    throw new Error(`Publish service returned invalid JSON (${response.status} ${response.statusText}): ${responseBody || error.message}. ${reference}`);
   }
 
   const serviceError = typeof serviceResult?.error === 'string' ? serviceResult.error.trim() : '';
   if (!response.ok || serviceError) {
-    const activationId = typeof serviceResult?.activationId === 'string'
-      ? serviceResult.activationId.trim() : '';
-    const activation = activationId ? ` Activation ID: ${activationId}.` : '';
-    throw new Error(`Publish service failed (${response.status} ${response.statusText}): ${serviceError || responseBody}.${activation} ${reference}`);
+    throw new Error(`Publish service failed: ${serviceError || responseBody}`);
   }
   return serviceResult;
 }

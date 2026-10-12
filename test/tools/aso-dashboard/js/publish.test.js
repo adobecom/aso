@@ -484,7 +484,7 @@ describe('publish', () => {
 
     [
       { body: { overallStatus: 'failed' }, status: 200, message: 'Publish failed (failed)' },
-      { body: { error: 'Not authorized', activationId: 'activation-123' }, status: 401, message: 'Not authorized. Activation ID: activation-123.' },
+      { body: { error: 'Not authorized', activationId: 'activation-123' }, status: 401, message: 'Publish service failed: Not authorized' },
       { body: {}, status: 200, message: 'missing a valid overallStatus' },
       { body: null, status: 200, message: 'missing a valid overallStatus' },
       { body: { overallStatus: '' }, status: 200, message: 'missing a valid overallStatus' },
@@ -494,7 +494,11 @@ describe('publish', () => {
         const error = await monitor().catch((failure) => failure);
         expect(error).to.be.instanceOf(Error);
         expect(error.message).to.include(message);
-        expect(error.message).to.include(requestId);
+        if (body?.error) {
+          expect(error.message).to.equal(message);
+        } else {
+          expect(error.message).to.include(requestId);
+        }
         expect(fetchStub.callCount).to.equal(1);
         expectRestored();
       });
@@ -572,6 +576,7 @@ describe('publish', () => {
       }
       expect(failure).to.be.instanceOf(Error);
       expect(failure.message).to.include(message);
+      return failure;
     }
 
     it('submits the saved path and adds the service fields to the same file', async () => {
@@ -640,40 +645,49 @@ describe('publish', () => {
 
     it('does not update the file when the service rejects the request', async () => {
       fetchStub.onCall(1).resolves(new Response(JSON.stringify(serviceResult), { status: 500 }));
-      await expectFailure('Publish service failed (500');
+      await expectFailure('Publish service failed:');
       expect(fetchStub.callCount).to.equal(2);
       expect(options.onRequestAccepted.called).to.equal(false);
     });
 
     [400, 200].forEach((status) => {
-      it(`displays the service error and activation ID for HTTP ${status}`, async () => {
+      it(`displays only the service error for HTTP ${status}`, async () => {
         const errorResponse = {
           activationId: 'bb78f0d7af384448b8f0d7af3804486e',
           error: 'daPayloadPath must be a relative .da/ path to a JSON file',
         };
         fetchStub.onCall(1).resolves(new Response(JSON.stringify(errorResponse), { status }));
-        await expectFailure(
-          `${errorResponse.error}. Activation ID: ${errorResponse.activationId}.`,
-        );
+        const message = `Publish service failed: ${errorResponse.error}`;
+        const error = await expectFailure(message);
+        expect(error.message).to.equal(message);
         expect(fetchStub.callCount).to.equal(2);
       });
     });
 
     it('displays a service error without an activation ID', async () => {
-      fetchStub.onCall(1).resolves(new Response(JSON.stringify({ error: 'Invalid path' }), { status: 400 }));
-      await expectFailure('Invalid path.');
+      const message = 'There is no data to update. Please check the filter criteria.';
+      fetchStub.onCall(1).resolves(new Response(
+        JSON.stringify({ error: message }),
+        { status: 400 },
+      ));
+      const error = await expectFailure(message);
+      expect(error.message).to.equal(`Publish service failed: ${message}`);
       expect(fetchStub.callCount).to.equal(2);
     });
 
-    it('displays non-JSON service failures with their HTTP status', async () => {
+    it('displays only the message for non-JSON service failures', async () => {
       fetchStub.onCall(1).resolves(new Response('Service unavailable', { status: 503 }));
-      await expectFailure('Publish service failed (503 ): Service unavailable.');
+      const message = 'Publish service failed: Service unavailable';
+      const error = await expectFailure(message);
+      expect(error.message).to.equal(message);
       expect(fetchStub.callCount).to.equal(2);
     });
 
     it('displays the HTTP failure when the service response is empty', async () => {
       fetchStub.onCall(1).resolves(new Response(null, { status: 500 }));
-      await expectFailure('Publish service failed (500');
+      const message = 'Publish service failed: HTTP 500';
+      const error = await expectFailure(message);
+      expect(error.message).to.equal(message);
       expect(fetchStub.callCount).to.equal(2);
     });
 
