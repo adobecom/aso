@@ -51,6 +51,27 @@ describe('publish-history data helpers', () => {
     expect(head.children[1].textContent).to.equal(SUCCESS.app);
   });
 
+  it('maps app IDs to display names in table rows and mobile cards', () => {
+    const item = { ...SUCCESS, app: 'my-firefly-test' };
+    const appNames = new Map([[item.app, 'My firefly test']]);
+    const view = renderResults([item], { appNames });
+    expect(view.querySelector('.ph-app').textContent).to.equal('My firefly test');
+    expect(view.querySelector('.ph-card-head strong').textContent).to.equal('My firefly test');
+    expect(item.app).to.equal('my-firefly-test');
+  });
+
+  it('falls back to app IDs or a placeholder when display names are unavailable', () => {
+    const items = [
+      { ...SUCCESS, app: 'unknown-app' },
+      { ...SUCCESS, app: undefined },
+    ];
+    const view = renderResults(items, { appNames: new Map() });
+    expect([...view.querySelectorAll('.ph-app')].map((app) => app.textContent))
+      .to.deep.equal(['unknown-app', '\u2014']);
+    expect([...view.querySelectorAll('.ph-card-head strong')].map((app) => app.textContent))
+      .to.deep.equal(['unknown-app', '\u2014']);
+  });
+
   it('groups invocation failures with Failed without changing the service records', () => {
     const invoked = { ...FAILED, requestId: 'invoke-error', overallStatus: 'invoke_failed' };
     expect(getStatusMeta(invoked.overallStatus).key).to.equal('failed');
@@ -879,6 +900,18 @@ describe('publish-history API and controller', () => {
     return init({ context: { org: 'o', repo: 'r' }, token: 't' });
   }
   const q = (s) => document.querySelector(s);
+
+  it('uses product display names when painting loaded publish results', async () => {
+    const item = { ...SUCCESS, app: 'my-firefly-test' };
+    sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [item] }));
+    const controller = await mount({ products: [{ name: item.app, path: `/products/${item.app}` }] });
+    await controller.load();
+    expect(q('.ph-app').textContent).to.equal('My firefly test');
+    expect(q('.ph-card-head strong').textContent).to.equal('My firefly test');
+    expect(controller.state.items[0].app).to.equal(item.app);
+    expect(q('#ph-filter-app').options[1].value).to.equal(item.app);
+    expect(q('#ph-filter-app').options[1].textContent).to.equal('My firefly test');
+  });
 
   it('always offers Apple and Google platforms even with empty history', async () => {
     const stub = sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [] }));

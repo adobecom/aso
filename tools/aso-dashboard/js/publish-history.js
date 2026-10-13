@@ -558,7 +558,7 @@ export function renderRow(item, handlers) {
   first.append(th);
   const cells = [
     el('span', 'ph-platform', item.platform ?? '\u2014'),
-    el('span', 'ph-app', item.app ?? '\u2014'),
+    el('span', 'ph-app', handlers?.appNames?.get(item.app) ?? item.app ?? '\u2014'),
     renderReleasePeriod(item),
     renderStatusBadge(item),
     renderRequestCell(item, handlers),
@@ -589,7 +589,11 @@ export function renderCard(item, handlers) {
     card.classList.add('ph-highlighted');
   }
   const head = el('div', 'ph-card-head');
-  head.append(el('span', 'ph-platform', item.platform ?? '\u2014'), el('strong', '', item.app ?? '\u2014'), renderStatusBadge(item));
+  head.append(
+    el('span', 'ph-platform', item.platform ?? '\u2014'),
+    el('strong', '', handlers?.appNames?.get(item.app) ?? item.app ?? '\u2014'),
+    renderStatusBadge(item),
+  );
   card.append(head, renderTime(item.startedAt));
   const period = el('div', 'ph-card-group');
   period.append(el('h4', 'ph-card-label', 'Release Period'), renderReleasePeriod(item));
@@ -701,6 +705,7 @@ export function init({ context, token }) {
   let abortController;
   const { org, repo } = context || {};
   const handlers = {
+    appNames: apps,
     languageNames: new Map(),
     onViewJson: (path) => openSourceModal({ org, repo, token, path }),
   };
