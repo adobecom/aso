@@ -122,23 +122,33 @@ describe('publish form', () => {
     expect($('#publish-listing-field-count').textContent).to.equal('(not included)');
   });
 
-  it('limits languages to the app-languages list for the chosen app and platform', async () => {
-    const names = () => [...root.querySelectorAll('.publish-language-checkbox')]
-      .map((checkbox) => checkbox.value);
-    const all = names();
+  it('shows every language but disables those unavailable for the chosen app and platform', async () => {
+    const boxes = () => [...root.querySelectorAll('.publish-language-checkbox')];
+    const enabled = () => boxes().filter((box) => !box.disabled).map((box) => box.value);
+    const all = boxes().map((box) => box.value);
     $('#publish-product').value = 'adobe-express';
     change($('#publish-product'));
-    expect(names()).to.deep.equal(all);
+    expect(enabled()).to.deep.equal(all);
 
     $('#publish-platform-apple').checked = true;
     change($('#publish-platform-apple'));
     await flush();
-    expect(names()).to.deep.equal(['English', 'German']);
+    expect(boxes().map((box) => box.value)).to.deep.equal(all);
+    expect(enabled()).to.deep.equal(['English', 'German']);
+    const french = boxes().find((box) => box.disabled);
+    expect(french.parentElement.classList.contains('is-unavailable')).to.equal(true);
+    expect(french.nextElementSibling.title).to.contain('Not available');
+    expect(french.disabled).to.equal(true);
+
+    $('#publish-languages-select-all').click();
+    expect(boxes().filter((box) => box.checked).map((box) => box.value))
+      .to.deep.equal(['English', 'German']);
+    expect($('#publish-languages-count').textContent).to.equal('(2 selected)');
 
     $('#publish-platform-google').checked = true;
     change($('#publish-platform-google'));
     await flush();
-    expect(names()).to.deep.equal(all);
+    expect(enabled()).to.deep.equal(all);
   });
 
   it('requires exactly one CPP campaign when CPP is selected', async () => {

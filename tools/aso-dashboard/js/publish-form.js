@@ -164,7 +164,7 @@ function sanitizeIdPart(value) {
   return String(value).replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
-function renderLanguages(languages) {
+function renderLanguages(languages, applicableNames) {
   const container = byId('publish-languages-checkboxes');
   if (!container) return;
   container.textContent = '';
@@ -181,20 +181,33 @@ function renderLanguages(languages) {
       value: language.name,
       label: language.label,
     });
-    item.querySelector('input').checked = false;
+    const input = item.querySelector('input');
+    input.checked = false;
+    if (applicableNames && !applicableNames.has(language.name)) {
+      input.disabled = true;
+      item.classList.add('is-unavailable');
+      const app = byId('publish-product')?.selectedOptions?.[0]?.textContent || 'this app';
+      const platform = getPlatform() === 'apple' ? 'Apple' : 'Google';
+      item.querySelector('label').title = `Not available for ${app} on ${platform}`;
+    }
     container.append(item);
   });
 }
 
-// Only languages listed for the selected app and platform in store-publish.json are offered.
+// All languages are shown; those not listed for the selected app and platform in
+// store-publish.json are disabled and struck through.
 function refreshLanguages() {
   const previous = new Set(
     [...document.querySelectorAll('.publish-language-checkbox:checked')].map((box) => box.value),
   );
-  renderLanguages(
-    filterLanguagesForApp(allLanguages, appLanguages, byId('publish-product')?.value, getPlatform()),
+  const applicable = filterLanguagesForApp(
+    allLanguages,
+    appLanguages,
+    byId('publish-product')?.value,
+    getPlatform(),
   );
-  document.querySelectorAll('.publish-language-checkbox').forEach((box) => {
+  renderLanguages(allLanguages, new Set(applicable.map((language) => language.name)));
+  document.querySelectorAll('.publish-language-checkbox:not(:disabled)').forEach((box) => {
     box.checked = previous.has(box.value);
   });
 }
@@ -543,8 +556,13 @@ async function handleLoadFile(context, token, file) {
     refreshLanguages();
     const names = languageNamesWithContent(parsed);
     const known = new Set();
+    const unavailable = [];
     document.querySelectorAll('.publish-language-checkbox').forEach((checkbox) => {
       known.add(checkbox.value);
+      if (checkbox.disabled) {
+        if (names.includes(checkbox.value)) unavailable.push(checkbox.value);
+        return;
+      }
       checkbox.checked = names.includes(checkbox.value);
     });
 
@@ -569,6 +587,7 @@ async function handleLoadFile(context, token, file) {
     const missing = names.filter((name) => !known.has(name));
     if (!hasProduct) notes.push(`Product not found: ${product}`);
     if (missing.length) notes.push(`Not found in current languages: ${missing.join(', ')}`);
+    if (unavailable.length) notes.push(`Not available for this app and platform: ${unavailable.join(', ')}`);
     say([`Loaded from file: ${product} — ${names.length} language(s).`, ...notes].join(' '));
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -635,7 +654,7 @@ function setupListeners({ org, repo, token }) {
   });
 
   byId('publish-languages-select-all')?.addEventListener('click', () => {
-    toggleAll('.publish-language-checkbox', () => {
+    toggleAll('.publish-language-checkbox:not(:disabled)', () => {
       refreshPromos(context, token);
       updateButtonState();
     });

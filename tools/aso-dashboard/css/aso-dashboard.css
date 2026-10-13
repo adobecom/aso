@@ -819,6 +819,16 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   color: var(--s2-gray-700);
 }
 
+.checkbox-item.is-unavailable label,
+.checkbox-item.is-unavailable label:hover {
+  background: rgb(245 245 245);
+  border-color: rgb(235 235 235);
+  color: var(--s2-gray-600, #a0a0a0);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  cursor: not-allowed;
+}
+
 .checkbox-item input[type="checkbox"] {
   position: absolute;
   opacity: 0;
