@@ -23,6 +23,7 @@ import {
   renderResults,
   renderRequestCell,
   renderSectionCell,
+  mapSectionItems,
   renderStatusBadge,
   renderTime,
 } from '../../../../tools/aso-dashboard/js/publish-history.js';
@@ -225,6 +226,32 @@ describe('publish-history rendering', () => {
     expect(text).to.contain('Locale: en');
     expect(text).to.contain('Status: Failed');
     expect(text).to.contain(TS_ERR);
+  });
+
+  it('groups promo results per event and expands failures by default', () => {
+    const item = {
+      response: {
+        sections: [
+          { type: 'promos', referenceName: 'Summer', success: ['en', 'fr'] },
+          { type: 'promos', referenceName: 'Winter', success: ['en'], failure: [{ locale: 'de', error: 'bad' }] },
+        ],
+      },
+    };
+    const groups = mapSectionItems(item, 'promos');
+    expect(groups.map((g) => g.name)).to.deep.equal(['Winter', 'Summer']);
+    const cell = renderSectionCell(item, { key: 'promos', label: 'Promos' });
+    const toggle = cell.querySelector('.ph-items-toggle');
+    expect(toggle.textContent).to.contain('2 events');
+    expect(toggle.getAttribute('aria-expanded')).to.equal('true');
+    expect(cell.querySelectorAll('.ph-item')).to.have.length(2);
+    toggle.click();
+    expect(cell.querySelector('.ph-item-list').hidden).to.equal(true);
+  });
+
+  it('keeps the flat chip list when sections carry no item names', () => {
+    const item = { response: { sections: [{ type: 'promos', success: ['en'] }] } };
+    expect(mapSectionItems(item, 'promos')).to.deep.equal([]);
+    expect(renderSectionCell(item, { key: 'promos', label: 'Promos' }).querySelector('.ph-items-toggle')).to.equal(null);
   });
 
   it('renders error HTML as text, and shows fallback when error missing', () => {

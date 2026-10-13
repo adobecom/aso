@@ -534,7 +534,7 @@ body {
 }
 
 /* Buttons (exclude tabs and toggle buttons) */
-button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-select-all):not(.open-new-tab):not(.publish-progress-close):not(:where(.ph-chip, .ph-info, .ph-more, .ph-link, .ph-icon-button)) {
+button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-select-all):not(.open-new-tab):not(.publish-progress-close):not(:where(.ph-chip, .ph-info, .ph-more, .ph-link, .ph-icon-button, .ph-items-toggle)) {
   font-family: var(--body-font-family);
   display: inline-block;
   border: 2px solid #1373e6;
@@ -1632,4 +1632,66 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   .ph-table { display: none; }
   .ph-cards { display: grid; }
   .ph-heading-row { flex-direction: column; }
+}
+
+.ph-items-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ph-rollup {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.ph-rollup-badge {
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ph-rollup-ok {
+  background: #e3f5e9;
+  color: #17642f;
+}
+
+.ph-rollup-fail {
+  background: #fde7e7;
+  color: #a11;
+}
+
+.ph-rollup-pend {
+  background: #fff3d6;
+  color: #8a5a00;
+}
+
+.ph-item-list {
+  margin-top: 4px;
+}
+
+.ph-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 4px 0 4px 4px;
+  padding-left: 12px;
+  border-left: 2px solid #b9c8ee;
+}
+
+.ph-item-failed {
+  border-left-color: #e08a8a;
+}
+
+.ph-item-name {
+  font-weight: 600;
 }

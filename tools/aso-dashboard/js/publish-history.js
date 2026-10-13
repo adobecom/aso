@@ -96,6 +96,51 @@ export function mapSections(item) {
   return columns;
 }
 
+const ITEM_NAME_KEYS = ['referenceName', 'name', 'eventName', 'pageName', 'title'];
+const ITEM_NOUNS = { promos: ['event', 'events'], cpp: ['page', 'pages'] };
+
+function getItemName(source) {
+  const key = ITEM_NAME_KEYS.find((k) => String(source?.[k] ?? '').trim());
+  return key ? String(source[key]).trim() : '';
+}
+
+function buildGroupChips(source, column) {
+  const chips = [];
+  const add = (locale, status, error) => {
+    const name = String(locale ?? '').trim();
+    if (name) chips.push({ locale: name, status, error: cleanMessage(error), section: column });
+  };
+  (source.success ?? []).forEach((l) => add(l, 'success'));
+  (source.failure ?? []).forEach((f) => add(f?.locale, 'failed', f?.error));
+  (source.pending ?? []).forEach((l) => add(l, 'pending'));
+  const statusOrder = ['failed', 'success', 'pending'];
+  return chips.sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
+}
+
+// Per-event / per-page results for promos and cpp; empty when the service sends no item names.
+export function mapSectionItems(item, columnKey) {
+  if (!ITEM_NOUNS[columnKey]) return [];
+  const sections = Array.isArray(item?.response?.sections) ? item.response.sections : [];
+  const groups = new Map();
+  const addGroup = (name, source) => {
+    if (!name) return;
+    const group = groups.get(name) || { name, chips: [] };
+    group.chips.push(...buildGroupChips(source, columnKey));
+    groups.set(name, group);
+  };
+  sections
+    .filter((s) => SECTION_TYPE_MAP[String(s?.type ?? '').trim().toLowerCase()] === columnKey)
+    .forEach((section) => {
+      if (Array.isArray(section.items)) {
+        section.items.forEach((entry) => addGroup(getItemName(entry), entry));
+      } else {
+        addGroup(getItemName(section), section);
+      }
+    });
+  const rank = (g) => (g.chips.some((c) => c.status === 'failed') ? 0 : 1);
+  return [...groups.values()].sort((a, b) => rank(a) - rank(b));
+}
+
 export function isValidSourcePath(path) {
   return typeof path === 'string' && path.trim() !== ''
     && !/^[a-z][a-z0-9+.-]*:/i.test(path.trim()) && !path.includes('..');
@@ -399,7 +444,51 @@ export function renderChip(chip, sectionLabel, languageNames = new Map()) {
   return span;
 }
 
+function countStatus(chips, status) {
+  return chips.filter((c) => c.status === status).length;
+}
+
+function renderRollup(chips) {
+  const wrap = el('span', 'ph-rollup');
+  [['success', 'ok', '\u2713'], ['failed', 'fail', '\u2715'], ['pending', 'pend', '\u23F1']].forEach(([status, cls, icon]) => {
+    const n = countStatus(chips, status);
+    if (n) wrap.append(el('span', `ph-rollup-badge ph-rollup-${cls}`, `${n} ${icon}`));
+  });
+  return wrap;
+}
+
+function renderItemGroups(groups, column, languageNames) {
+  const cell = el('div', 'ph-section-cell ph-items');
+  const all = groups.flatMap((g) => g.chips);
+  const [singular, plural] = ITEM_NOUNS[column.key];
+  const toggle = el('button', 'ph-items-toggle');
+  toggle.type = 'button';
+  const list = el('div', 'ph-item-list');
+  const hasFailure = countStatus(all, 'failed') > 0;
+  const setOpen = (open) => {
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.firstChild.textContent = `${open ? '\u25BE' : '\u25B8'} ${groups.length} ${groups.length === 1 ? singular : plural}`;
+    list.hidden = !open;
+  };
+  toggle.append(document.createTextNode(''), renderRollup(all));
+  toggle.addEventListener('click', () => setOpen(toggle.getAttribute('aria-expanded') !== 'true'));
+  groups.forEach((group) => {
+    const row = el('div', 'ph-item');
+    if (countStatus(group.chips, 'failed')) row.classList.add('ph-item-failed');
+    const name = el('span', 'ph-item-name', group.name);
+    const chips = el('div', 'ph-chips');
+    group.chips.forEach((c) => chips.append(renderChip(c, `${column.label} ${group.name}`, languageNames)));
+    row.append(name, renderRollup(group.chips), chips);
+    list.append(row);
+  });
+  setOpen(hasFailure);
+  cell.append(toggle, list);
+  return cell;
+}
+
 export function renderSectionCell(item, column, languageNames) {
+  const groups = mapSectionItems(item, column.key);
+  if (groups.length) return renderItemGroups(groups, column, languageNames);
   const cell = el('div', 'ph-section-cell');
   const chips = mapSections(item)[column.key];
   if (!chips?.length) {
