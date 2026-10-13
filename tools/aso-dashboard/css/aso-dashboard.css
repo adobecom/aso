@@ -1263,6 +1263,10 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   font-weight: 400;
 }
 
+.ph-table tbody th[scope="rowgroup"] .ph-request-cell {
+  align-items: center;
+}
+
 .ph-table .ph-section-label {
   overflow-wrap: normal;
   word-break: normal;
