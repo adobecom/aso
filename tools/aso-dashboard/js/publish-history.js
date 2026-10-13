@@ -612,10 +612,6 @@ export function renderRequestCell(item, { onViewJson } = {}) {
   addRow('Started (original)', item.startedAt);
   addRow('Ended (original)', item.endedAt);
   content.append(body);
-  const copy = el('button', 'ph-link', 'Copy request ID');
-  copy.type = 'button';
-  copy.addEventListener('click', () => copyText(item.requestId, copy));
-  content.append(copy);
 
   if (item.daPayloadPath) {
     const view = el('button', 'ph-link', 'View JSON');
