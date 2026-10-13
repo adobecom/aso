@@ -674,14 +674,20 @@ function setupListeners({ org, repo, token }) {
   });
 }
 
-// Disables publishing (History "New publish" and the form's Publish button) and shows the
-// access notice on the History tab when the user lacks publish access.
-export function setPublishAccess(allowed) {
+const NO_ACCESS_MESSAGE = 'You do not have access to publish. Kindly check if you are logged into the right organization or have access to publish.';
+
+// When publish access is denied (401/403), the History section is replaced by just the
+// service's message and the form's Publish button stays disabled.
+export function setPublishAccess({ allowed, message }) {
   hasPublishAccess = allowed;
   const newPublish = byId('publish-new');
   if (newPublish) newPublish.disabled = !allowed;
   const notice = byId('ph-access-notice');
-  if (notice) notice.hidden = allowed;
+  if (notice) {
+    notice.hidden = allowed;
+    notice.textContent = message || NO_ACCESS_MESSAGE;
+  }
+  document.querySelector('.ph-container')?.classList.toggle('ph-no-access', !allowed);
   updateButtonState();
 }
 

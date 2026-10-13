@@ -19,7 +19,7 @@ describe('checkPublishAccess', () => {
 
   it('calls check-publish-access with the user token and allows access on success', async () => {
     const stub = sinon.stub(window, 'fetch').resolves(new Response('{}', { status: 200 }));
-    expect(await checkPublishAccess({ apiBase: API_BASE, token: 'tok' })).to.equal(true);
+    expect(await checkPublishAccess({ apiBase: API_BASE, token: 'tok' })).to.include({ allowed: true });
     const [url, init] = stub.firstCall.args;
     expect(url).to.equal(`${API_BASE}/check-publish-access`);
     expect(init.headers.Authorization).to.match(/tok$/);
@@ -27,7 +27,22 @@ describe('checkPublishAccess', () => {
 
   it('denies access on 401', async () => {
     sinon.stub(window, 'fetch').resolves(new Response('', { status: 401 }));
-    expect(await checkPublishAccess({ apiBase: API_BASE, token: 'tok' })).to.equal(false);
+    expect(await checkPublishAccess({ apiBase: API_BASE, token: 'tok' }))
+      .to.deep.equal({ allowed: false, status: 401, message: '' });
+  });
+
+  it('relays the service message from a 403 response payload', async () => {
+    sinon.stub(window, 'fetch').resolves(new Response(JSON.stringify({ message: 'Not in the publisher group' }), { status: 403 }));
+    expect(await checkPublishAccess({ apiBase: API_BASE, token: 'tok' }))
+      .to.deep.equal({ allowed: false, status: 403, message: 'Not in the publisher group' });
+  });
+
+  it('falls back to an empty message for an empty or plain-text 403', async () => {
+    const stub = sinon.stub(window, 'fetch');
+    stub.onCall(0).resolves(new Response('', { status: 403 }));
+    stub.onCall(1).resolves(new Response('Forbidden here', { status: 403 }));
+    expect((await checkPublishAccess({ apiBase: API_BASE, token: 'tok' })).message).to.equal('');
+    expect((await checkPublishAccess({ apiBase: API_BASE, token: 'tok' })).message).to.equal('Forbidden here');
   });
 
   it('throws on other failures so they are not treated as a denial', async () => {

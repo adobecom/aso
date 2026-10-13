@@ -153,27 +153,35 @@ describe('publish form', () => {
 
   it('keeps Publish and New publish disabled and shows the notice without publish access', async () => {
     const history = document.createElement('div');
-    history.innerHTML = `<button id="publish-new"></button>
-      <div id="ph-access-notice" hidden>You do not have access to Publish functionality.</div>`;
+    history.innerHTML = `<section class="ph-container"><button id="publish-new"></button>
+      <div id="ph-access-notice" hidden>You do not have access to Publish functionality.</div></section>`;
+    const container = history.querySelector('.ph-container');
     document.body.append(history);
     try {
       await selectEverything();
       expect($('#publish-button').disabled).to.equal(false);
 
-      setPublishAccess(false);
+      setPublishAccess({ allowed: false, status: 401 });
       expect($('#publish-button').disabled).to.equal(true);
       expect(history.querySelector('#publish-new').disabled).to.equal(true);
       expect(history.querySelector('#ph-access-notice').hidden).to.equal(false);
+      expect(container.classList.contains('ph-no-access')).to.equal(true);
 
       change($('#publish-product'));
       expect($('#publish-button').disabled).to.equal(true);
 
-      setPublishAccess(true);
+      setPublishAccess({ allowed: true });
       expect($('#publish-button').disabled).to.equal(false);
       expect(history.querySelector('#publish-new').disabled).to.equal(false);
       expect(history.querySelector('#ph-access-notice').hidden).to.equal(true);
+
+      setPublishAccess({ allowed: false, status: 403, message: 'Not authorized by service' });
+      expect(history.querySelector('#ph-access-notice').textContent).to.equal('Not authorized by service');
+      expect(container.classList.contains('ph-no-access')).to.equal(true);
+      setPublishAccess({ allowed: false, status: 403 });
+      expect(history.querySelector('#ph-access-notice').textContent).to.contain('right organization');
     } finally {
-      setPublishAccess(true);
+      setPublishAccess({ allowed: true });
       history.remove();
     }
   });

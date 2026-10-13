@@ -1104,6 +1104,10 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   overflow-wrap: anywhere;
 }
 
+.ph-no-access > :not(#ph-access-notice) {
+  display: none;
+}
+
 .ph-empty {
   padding: var(--spacing-500);
   text-align: center;

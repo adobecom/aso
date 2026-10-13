@@ -13,13 +13,24 @@ const PUBLISH_BLOCK_TYPES = ['listing', 'promo'];
 
 const pad = (value, length = 2) => String(value).padStart(length, '0');
 
-// Resolves false only when the service rejects the user's token with 401; any other failure
-// throws so callers can decide not to block on an unreachable check.
+// Resolves { allowed: true } on success and { allowed: false, status, message } when the service
+// answers 401 or 403 (message is the service's own text from the response payload, if any).
+// Other failures throw so callers can decide not to block on an unreachable check.
 export async function checkPublishAccess({ apiBase, token }) {
   const response = await fetch(`${apiBase}/check-publish-access`, { headers: { Authorization: `Bearer ${token}` } });
-  if (response.status === 401) return false;
+  if (response.status === 401 || response.status === 403) {
+    const body = (await response.text().catch(() => '')).trim();
+    let message = body;
+    try {
+      const parsed = JSON.parse(body);
+      message = [parsed?.message, parsed?.error].find((value) => typeof value === 'string') ?? '';
+    } catch {
+      // Plain-text body: use it as is.
+    }
+    return { allowed: false, status: response.status, message: message.trim() };
+  }
   if (!response.ok) throw new Error(`Publish access check failed: HTTP ${response.status}`);
-  return true;
+  return { allowed: true, status: response.status };
 }
 
 export async function fetchRequestorName(token) {
