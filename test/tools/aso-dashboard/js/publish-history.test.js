@@ -269,6 +269,18 @@ describe('publish-history rendering', () => {
     expect(collectOverallErrors(item)).to.include('Invalid event');
   });
 
+  it('closes open request details when clicking outside', () => {
+    const cell = renderRequestCell(SUCCESS);
+    document.body.append(cell);
+    const details = cell.querySelector('details');
+    details.open = true;
+    details.querySelector('.ph-request-body').click();
+    expect(details.open).to.equal(true);
+    document.body.click();
+    expect(details.open).to.equal(false);
+    cell.remove();
+  });
+
   it('keeps the flat chip list when sections carry no item names', () => {
     const item = { response: { sections: [{ type: 'promos', success: ['en'] }] } };
     expect(mapSectionItems(item, 'promos')).to.deep.equal([]);
@@ -628,8 +640,8 @@ describe('publish-history rendering', () => {
   it('groups each request into three section rows with shared cells and matching mobile labels', () => {
     const root = renderResults(fixture.items, {});
     expect([...root.querySelectorAll('thead th')].map((t) => t.textContent))
-      .to.deep.equal(['Requested on', 'Platform', 'App', 'Release Period', 'Overall', 'Request', 'Section', 'Languages']);
-    expect(root.querySelector('thead th:nth-child(6) .ph-sr-only').textContent).to.equal('Request');
+      .to.deep.equal(['Requested on', 'Platform', 'App', 'Release Period', 'Overall', 'Section', 'Languages']);
+    expect(root.querySelector('th[scope="rowgroup"] .ph-request-cell')).to.not.equal(null);
     expect(root.querySelectorAll('tbody')).to.have.length(fixture.items.length);
     expect(root.querySelectorAll('tbody tr')).to.have.length(fixture.items.length * 3);
     const labels = ['Metadata', 'Promos/In-App Events', 'Custom Product Pages'];
@@ -637,10 +649,10 @@ describe('publish-history rendering', () => {
       expect(group.dataset.requestId).to.equal(fixture.items[index].requestId);
       expect([...group.querySelectorAll('.ph-section-label')].map((cell) => cell.textContent))
         .to.deep.equal(labels);
-      expect(group.rows[0].cells).to.have.length(8);
+      expect(group.rows[0].cells).to.have.length(7);
       expect(group.rows[1].cells).to.have.length(2);
       expect(group.rows[2].cells).to.have.length(2);
-      expect(group.querySelectorAll('[rowspan="3"]')).to.have.length(6);
+      expect(group.querySelectorAll('[rowspan="3"]')).to.have.length(5);
       expect(group.rows[0].cells[0].scope).to.equal('rowgroup');
       expect(group.querySelectorAll('.ph-request-toggle')).to.have.length(1);
       expect(group.querySelectorAll('.ph-section-cell')).to.have.length(3);

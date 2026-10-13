@@ -385,6 +385,13 @@ document.addEventListener('click', (e) => {
   anchor.setAttribute('aria-expanded', 'false');
 });
 
+// Request details are a popover: any click outside the open one closes it.
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('details.ph-details[open]').forEach((details) => {
+    if (!details.contains(e.target)) details.open = false;
+  });
+});
+
 let tooltipNode = null;
 function showTooltip(anchor, text) {
   if (!tooltipNode) {
@@ -484,7 +491,7 @@ function renderItemGroups(groups, column, languageNames) {
     const name = el('span', 'ph-item-name', group.name);
     const chips = el('div', 'ph-chips');
     group.chips.forEach((c) => chips.append(renderChip(c, `${column.label} ${group.name}`, languageNames)));
-    row.append(name, renderRollup(group.chips), chips);
+    row.append(name, chips);
     list.append(row);
   });
   setOpen(hasFailure);
@@ -656,14 +663,13 @@ export function renderRow(item, handlers) {
   const th = el('th', 'ph-cell');
   th.scope = 'rowgroup';
   th.rowSpan = SECTION_COLUMNS.length;
-  th.append(renderTime(item.startedAt, getRequestorLdap(item)));
+  th.append(renderTime(item.startedAt, getRequestorLdap(item)), renderRequestCell(item, handlers));
   first.append(th);
   const cells = [
     el('span', 'ph-platform', item.platform ?? '\u2014'),
     el('span', 'ph-app', handlers?.appNames?.get(item.app) ?? item.app ?? '\u2014'),
     renderReleasePeriod(item),
     renderStatusBadge(item),
-    renderRequestCell(item, handlers),
   ];
   cells.forEach((c) => {
     const td = el('td', 'ph-cell');
@@ -719,11 +725,10 @@ export function renderResults(items, handlers) {
   const thead = el('thead');
   const headRow = el('tr');
   [
-    'Requested on', 'Platform', 'App', 'Release Period', 'Overall', 'Request', 'Section', 'Languages',
+    'Requested on', 'Platform', 'App', 'Release Period', 'Overall', 'Section', 'Languages',
   ].forEach((h) => {
     const th = el('th');
-    if (h === 'Request') th.append(el('span', 'ph-sr-only', h));
-    else th.textContent = h;
+    th.textContent = h;
     th.scope = 'col';
     headRow.append(th);
   });

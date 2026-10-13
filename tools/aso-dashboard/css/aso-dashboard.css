@@ -1528,7 +1528,7 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
 .ph-request-body {
   position: absolute;
   top: 100%;
-  right: 0;
+  left: 0;
   z-index: 10;
   display: flex;
   flex-direction: column;
@@ -1541,11 +1541,6 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   border-radius: var(--s2-radius-100);
   background: #fff;
   box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
-}
-
-.ph-card .ph-request-body {
-  right: auto;
-  left: 0;
 }
 
 .ph-request-close {
