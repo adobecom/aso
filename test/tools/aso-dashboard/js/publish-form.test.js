@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import sinon from 'sinon';
-import { init } from '../../../../tools/aso-dashboard/js/publish-form.js';
+import { init, setPublishAccess } from '../../../../tools/aso-dashboard/js/publish-form.js';
 import { initReleasePeriodSettings } from '../../../../tools/aso-dashboard/js/release-period-settings.js';
 import { clearListCache } from '../../../../tools/aso-dashboard/js/lib/utils.js';
 
@@ -149,6 +149,33 @@ describe('publish form', () => {
     change($('#publish-platform-google'));
     await flush();
     expect(enabled()).to.deep.equal(all);
+  });
+
+  it('keeps Publish and New publish disabled and shows the notice without publish access', async () => {
+    const history = document.createElement('div');
+    history.innerHTML = `<button id="publish-new"></button>
+      <div id="ph-access-notice" hidden>You do not have access to Publish functionality.</div>`;
+    document.body.append(history);
+    try {
+      await selectEverything();
+      expect($('#publish-button').disabled).to.equal(false);
+
+      setPublishAccess(false);
+      expect($('#publish-button').disabled).to.equal(true);
+      expect(history.querySelector('#publish-new').disabled).to.equal(true);
+      expect(history.querySelector('#ph-access-notice').hidden).to.equal(false);
+
+      change($('#publish-product'));
+      expect($('#publish-button').disabled).to.equal(true);
+
+      setPublishAccess(true);
+      expect($('#publish-button').disabled).to.equal(false);
+      expect(history.querySelector('#publish-new').disabled).to.equal(false);
+      expect(history.querySelector('#ph-access-notice').hidden).to.equal(true);
+    } finally {
+      setPublishAccess(true);
+      history.remove();
+    }
   });
 
   it('requires exactly one CPP campaign when CPP is selected', async () => {

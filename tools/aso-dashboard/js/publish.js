@@ -13,6 +13,15 @@ const PUBLISH_BLOCK_TYPES = ['listing', 'promo'];
 
 const pad = (value, length = 2) => String(value).padStart(length, '0');
 
+// Resolves false only when the service rejects the user's token with 401; any other failure
+// throws so callers can decide not to block on an unreachable check.
+export async function checkPublishAccess({ apiBase, token }) {
+  const response = await fetch(`${apiBase}/check-publish-access`, { headers: { Authorization: `Bearer ${token}` } });
+  if (response.status === 401) return false;
+  if (!response.ok) throw new Error(`Publish access check failed: HTTP ${response.status}`);
+  return true;
+}
+
 export async function fetchRequestorName(token) {
   const response = await fetch(IMS_PROFILE_URL, { headers: { Authorization: `Bearer ${token}` } });
   if (!response.ok) {

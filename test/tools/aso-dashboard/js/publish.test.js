@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import {
   formatPublishTimestamp,
   buildPublishPayload,
+  checkPublishAccess,
   createPublishProgressModal,
   fetchRequestorName,
   publishSelection,
@@ -12,6 +13,34 @@ import {
 import { buildLanguageIndex } from '../../../../tools/aso-dashboard/js/lib/translate-paths.js';
 
 const API_BASE = 'https://api.example.test/aso-publisher';
+
+describe('checkPublishAccess', () => {
+  afterEach(() => sinon.restore());
+
+  it('calls check-publish-access with the user token and allows access on success', async () => {
+    const stub = sinon.stub(window, 'fetch').resolves(new Response('{}', { status: 200 }));
+    expect(await checkPublishAccess({ apiBase: API_BASE, token: 'tok' })).to.equal(true);
+    const [url, init] = stub.firstCall.args;
+    expect(url).to.equal(`${API_BASE}/check-publish-access`);
+    expect(init.headers.Authorization).to.match(/tok$/);
+  });
+
+  it('denies access on 401', async () => {
+    sinon.stub(window, 'fetch').resolves(new Response('', { status: 401 }));
+    expect(await checkPublishAccess({ apiBase: API_BASE, token: 'tok' })).to.equal(false);
+  });
+
+  it('throws on other failures so they are not treated as a denial', async () => {
+    sinon.stub(window, 'fetch').resolves(new Response('', { status: 500 }));
+    let failure;
+    try {
+      await checkPublishAccess({ apiBase: API_BASE, token: 'tok' });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure.message).to.contain('HTTP 500');
+  });
+});
 
 describe('publish', () => {
   it('formats the request filename as YYYY-MM-DD-t-HH-MI-SS-SSS (24h, UTC)', () => {

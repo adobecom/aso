@@ -47,6 +47,7 @@ let appLanguages = [];
 let schemaCache = null;
 let sheetMapCache = null;
 let promoRefreshSeq = 0;
+let hasPublishAccess = true;
 
 const byId = (id) => document.getElementById(id);
 
@@ -125,7 +126,8 @@ function updateSummaries() {
 function updateButtonState() {
   const button = byId('publish-button');
   if (!button) return;
-  const ready = Boolean(byId('publish-product')?.value)
+  const ready = hasPublishAccess
+    && Boolean(byId('publish-product')?.value)
     && getSelectedLanguages().length > 0
     && Boolean(getPlatform())
     && isReleasePeriodComplete()
@@ -670,6 +672,17 @@ function setupListeners({ org, repo, token }) {
     event.target.value = '';
     if (file) await handleLoadFile(context, token, file);
   });
+}
+
+// Disables publishing (History "New publish" and the form's Publish button) and shows the
+// access notice on the History tab when the user lacks publish access.
+export function setPublishAccess(allowed) {
+  hasPublishAccess = allowed;
+  const newPublish = byId('publish-new');
+  if (newPublish) newPublish.disabled = !allowed;
+  const notice = byId('ph-access-notice');
+  if (notice) notice.hidden = allowed;
+  updateButtonState();
 }
 
 // eslint-disable-next-line import/prefer-default-export
