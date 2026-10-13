@@ -9,24 +9,32 @@ import { checkPublishAccess } from './publish.js';
 import { getStorePublishApi } from './lib/utils.js';
 import { setupTabs } from './dashboard-tabs.js';
 
-async function applyPublishAccess({ context, token }) {
+// Never rejects: an unreachable check must not lock users out (the service still enforces access).
+async function resolvePublishAccess({ context, token }) {
+  let apiBase;
   try {
-    const apiBase = await getStorePublishApi({ context, token });
-    setPublishAccess(await checkPublishAccess({ apiBase, token }));
+    apiBase = await getStorePublishApi({ context, token });
   } catch (error) {
-    // An unreachable check must not lock users out; the service still enforces access.
+    console.warn('Could not load store publish configuration:', error);
+    return { allowed: false, message: error.message };
+  }
+  try {
+    return await checkPublishAccess({ apiBase, token });
+  } catch (error) {
     console.warn('Could not verify publish access:', error);
+    return { allowed: true };
   }
 }
 
 (async function init() {
   try {
     const { context, token } = await DA_SDK;
-    const publishHistory = initPublishHistory({ context, token });
+    const accessReady = resolvePublishAccess({ context, token });
+    accessReady.then(setPublishAccess);
+    const publishHistory = initPublishHistory({ context, token, accessReady });
     setupTabs({ publishHistory });
     initReleasePeriodSettings();
     await Promise.all([
-      applyPublishAccess({ context, token }),
       initPreview({ context, token }),
       initExport({ context, token }),
       initImport({ context, token }),

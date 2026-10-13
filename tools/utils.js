@@ -65,7 +65,7 @@ export function resolveStorePublishApi(config, env) {
 
 export async function getStorePublishApi({ context, token, env = getEnvOverride() } = {}) {
   const config = await fetchStorePublishConfig({ context, token });
-  if (!config) throw new Error(`Could not load .da/${STORE_PUBLISH_CONFIG_FILE}.`);
+  if (!config) throw new Error('Unable to load store publish configuration. Check if you are logged into the right organization and have access to publish.');
   return resolveStorePublishApi(config, env);
 }
 

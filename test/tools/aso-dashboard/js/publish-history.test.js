@@ -9,6 +9,7 @@ import {
   SOURCE_DISCLAIMER,
   applyFilters,
   closePopover,
+  formatUpdatedAgo,
   collectOverallErrors,
   fetchPublishLogs,
   fetchSourceJson,
@@ -40,6 +41,16 @@ const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), 
 const tick = () => new Promise((r) => { setTimeout(r, 50); });
 
 describe('publish-history data helpers', () => {
+  it('formats how long ago the history was updated', () => {
+    const now = 10 * 60 * 60 * 1000;
+    expect(formatUpdatedAgo(null, now)).to.equal('');
+    expect(formatUpdatedAgo(now - 20000, now)).to.equal('Updated just now');
+    expect(formatUpdatedAgo(now - 5 * 60000, now)).to.equal('Updated 5 min ago');
+    expect(formatUpdatedAgo(now - 60 * 60000, now)).to.equal('Updated 1 hr ago');
+    expect(formatUpdatedAgo(now - 150 * 60000, now)).to.equal('Updated 2 hrs ago');
+    expect(formatUpdatedAgo(now + 5000, now)).to.equal('Updated just now');
+  });
+
   it('shows Platform before App in table columns and mobile cards', () => {
     const view = renderResults([SUCCESS], {});
     expect([...view.querySelectorAll('thead th')].slice(0, 3).map((cell) => cell.textContent))
@@ -884,6 +895,7 @@ describe('publish-history API and controller', () => {
   let productSourceId = 0;
 
   async function mount({
+    accessReady,
     products = [...new Set(fixture.items.map((item) => item.app))]
       .map((name) => ({ name, path: `/products/${name}` })),
   } = {}) {
@@ -902,14 +914,14 @@ describe('publish-history API and controller', () => {
     document.body.innerHTML = `
       <button class="tab-button" data-tab="publish-history"></button>
       <div data-tab-content="publish-history">
-        <button id="ph-refresh"></button>
+        <button id="ph-refresh"></button><span id="ph-updated"></span>
         <select id="ph-filter-app"></select><select id="ph-filter-platform"></select>
         <select id="ph-filter-status"></select>
         <input id="ph-filter-all" type="checkbox">
         <div id="ph-error" hidden></div><div id="ph-status"></div>
         <div id="ph-results"></div><button id="ph-load-more" hidden></button>
       </div>`;
-    return init({ context: { org: 'o', repo: 'r' }, token: 't' });
+    return init({ context: { org: 'o', repo: 'r' }, token: 't', accessReady });
   }
   const q = (s) => document.querySelector(s);
 
@@ -923,6 +935,46 @@ describe('publish-history API and controller', () => {
     expect(controller.state.items[0].app).to.equal(item.app);
     expect(q('#ph-filter-app').options[1].value).to.equal(item.app);
     expect(q('#ph-filter-app').options[1].textContent).to.equal('My firefly test');
+  });
+
+  it('makes no publish service calls when publish access is denied', async () => {
+    const stub = sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [] }));
+    const accessReady = Promise.resolve({ allowed: false, status: 403 });
+    const controller = await mount({ accessReady });
+    stub.resetHistory();
+    controller.ensureLoaded();
+    await controller.load();
+    q('#ph-refresh').click();
+    await tick();
+    expect(stub.called).to.equal(false);
+    expect(controller.state.loaded).to.equal(false);
+  });
+
+  it('makes no publish service calls when access is denied after a load was requested', async () => {
+    const stub = sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [] }));
+    let deny;
+    const accessReady = new Promise((resolve) => { deny = resolve; });
+    const controller = await mount({ accessReady });
+    stub.resetHistory();
+    controller.ensureLoaded();
+    deny({ allowed: false, status: 401 });
+    await tick();
+    expect(stub.called).to.equal(false);
+  });
+
+  it('shows when the history was last updated after loading', async () => {
+    sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [] }));
+    const controller = await mount();
+    expect(q('#ph-updated').textContent).to.equal('');
+    await controller.load();
+    expect(q('#ph-updated').textContent).to.equal('Updated just now');
+  });
+
+  it('loads history once access is confirmed', async () => {
+    const stub = sinon.stub(window, 'fetch').callsFake(async () => jsonResponse({ items: [] }));
+    const controller = await mount({ accessReady: Promise.resolve({ allowed: true }) });
+    await controller.load();
+    expect(stub.args.some(([url]) => String(url).includes('list-publish-logs'))).to.equal(true);
   });
 
   it('always offers Apple and Google platforms even with empty history', async () => {

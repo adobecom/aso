@@ -32,20 +32,24 @@ describe('history-first Publish workspace', () => {
     expect(publishHistory.ensureLoaded.calledOnce).to.equal(true);
   });
 
-  it('places Refresh with the filters and keeps a compact New publish action in the heading', () => {
-    expect($('#ph-filters').contains($('#ph-refresh'))).to.equal(true);
+  it('places an icon-only Refresh next to the title and keeps a compact New publish action', () => {
+    const group = $('.ph-title-group');
+    expect(group.contains($('#ph-title'))).to.equal(true);
+    expect(group.contains($('#ph-refresh'))).to.equal(true);
+    expect(group.contains($('#ph-updated'))).to.equal(true);
+    expect($('#ph-filters').contains($('#ph-refresh'))).to.equal(false);
     expect($('#ph-refresh').type).to.equal('button');
-    expect($('#ph-refresh').classList.contains('ph-button')).to.equal(true);
-    expect($('.ph-heading-actions').contains($('#ph-refresh'))).to.equal(false);
+    expect($('#ph-refresh').textContent.trim()).to.equal('');
+    expect($('#ph-refresh').getAttribute('aria-label')).to.equal('Refresh publish results');
     expect($('.ph-heading-actions').contains($('#publish-new'))).to.equal(true);
     expect($('#publish-new').classList.contains('ph-button')).to.equal(true);
   });
 
-  it('orders placeholder-only filters with Platform first and Everyone before Refresh', () => {
+  it('orders placeholder-only filters with Platform first and Everyone last', () => {
     const filters = $('#ph-filters');
     expect([...filters.querySelectorAll('select, button, input')].map((control) => control.id))
       .to.deep.equal([
-        'ph-filter-platform', 'ph-filter-app', 'ph-filter-status', 'ph-filter-all', 'ph-refresh',
+        'ph-filter-platform', 'ph-filter-app', 'ph-filter-status', 'ph-filter-all',
       ]);
     expect(filters.querySelector('legend')).to.equal(null);
     ['platform', 'app', 'status'].forEach((name) => {
@@ -61,7 +65,7 @@ describe('history-first Publish workspace', () => {
     expect($('#ph-requestor-help').textContent).to.contain('Unchecked shows only your publish requests');
   });
 
-  it('renders New publish smaller than Refresh and keeps Refresh inside narrow filter layouts', async () => {
+  it('renders New publish compactly and keeps the Everyone switch styled', async () => {
     const stylesheet = document.createElement('link');
     stylesheet.rel = 'stylesheet';
     stylesheet.href = '/tools/aso-dashboard/css/aso-dashboard.css';
@@ -80,10 +84,9 @@ describe('history-first Publish workspace', () => {
     expect(loadMore.getBoundingClientRect().height).to.equal(0);
     const newPublish = $('#publish-new');
     const refresh = $('#ph-refresh');
-    expect(Number.parseFloat(getComputedStyle(newPublish).fontSize))
-      .to.be.lessThan(Number.parseFloat(getComputedStyle(refresh).fontSize));
-    expect(newPublish.getBoundingClientRect().height)
-      .to.be.lessThan(refresh.getBoundingClientRect().height);
+    expect(refresh.getBoundingClientRect().width).to.equal(32);
+    expect(refresh.getBoundingClientRect().height).to.equal(32);
+    expect(newPublish.getBoundingClientRect().height).to.be.lessThan(40);
     const everyone = $('#ph-filter-all');
     expect(everyone.getBoundingClientRect().width).to.equal(44);
     expect(everyone.getBoundingClientRect().height).to.equal(24);
@@ -96,11 +99,10 @@ describe('history-first Publish workspace', () => {
     expect(everyone.checked).to.equal(false);
     expect(getComputedStyle(everyone, '::before').transform).to.equal('none');
     root.style.width = '360px';
-    const filtersBounds = $('#ph-filters').getBoundingClientRect();
+    const groupBounds = $('.ph-title-group').getBoundingClientRect();
     const refreshBounds = refresh.getBoundingClientRect();
-    expect(refreshBounds.left).to.be.at.least(filtersBounds.left);
-    expect(refreshBounds.right).to.be.at.most(filtersBounds.right);
-    expect(refreshBounds.bottom).to.be.at.most(filtersBounds.bottom);
+    expect(refreshBounds.left).to.be.at.least(groupBounds.left);
+    expect(refreshBounds.right).to.be.at.most(groupBounds.right + 1);
   });
 
   it('preserves form selections and shared scope while navigating between views', () => {

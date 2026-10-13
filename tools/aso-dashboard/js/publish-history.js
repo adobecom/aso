@@ -692,12 +692,22 @@ function fillSelect(select, label, values, format = (v) => v) {
   select.value = values.includes(current) ? current : '';
 }
 
-export function init({ context, token }) {
+export function formatUpdatedAgo(updatedAt, now = Date.now()) {
+  if (!updatedAt) return '';
+  const minutes = Math.floor(Math.max(0, now - updatedAt) / 60000);
+  if (minutes < 1) return 'Updated just now';
+  if (minutes < 60) return `Updated ${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return `Updated ${hours} hr${hours === 1 ? '' : 's'} ago`;
+}
+
+export function init({ context, token, accessReady = Promise.resolve({ allowed: true }) }) {
   const root = document.querySelector('[data-tab-content="publish-history"]');
   if (!root) return null;
   const $ = (id) => root.querySelector(`#${id}`);
   const els = {
     refresh: $('ph-refresh'),
+    updated: $('ph-updated'),
     error: $('ph-error'),
     status: $('ph-status'),
     results: $('ph-results'),
@@ -708,6 +718,9 @@ export function init({ context, token }) {
     all: $('ph-filter-all'),
   };
   const state = { items: [], nextCursor: null, loading: false, loaded: false, seq: 0 };
+  let updatedAt = null;
+  let access;
+  accessReady.then((result) => { access = result; });
   const apps = new Map();
   let abortController;
   const { org, repo } = context || {};
@@ -716,6 +729,12 @@ export function init({ context, token }) {
     languageNames: new Map(),
     onViewJson: (path) => openSourceModal({ org, repo, token, path }),
   };
+
+  function renderUpdated() {
+    if (els.updated) els.updated.textContent = formatUpdatedAgo(updatedAt);
+  }
+  const updatedTimer = setInterval(renderUpdated, 30000);
+  window.addEventListener('pagehide', () => clearInterval(updatedTimer), { once: true });
 
   function renderFilters() {
     fillSelect(els.app, 'apps', [...apps.keys()].sort(), (value) => apps.get(value));
@@ -768,6 +787,8 @@ export function init({ context, token }) {
   }
 
   async function load({ append = false } = {}) {
+    // Users denied publish access never call the publish service from History.
+    if (access && !access.allowed) return;
     if (append && state.loading) return;
     abortController?.abort();
     abortController = new AbortController();
@@ -777,6 +798,8 @@ export function init({ context, token }) {
     els.error.hidden = true;
     render();
     try {
+      if (!access) access = await accessReady;
+      if (!access.allowed) return;
       const apiBase = await getStorePublishApi({ context, token });
       const [page, languages, products] = await Promise.all([
         fetchPublishLogs({
@@ -805,6 +828,8 @@ export function init({ context, token }) {
         ? mergeItems(state.items, details.items) : mergeItems([], details.items);
       state.nextCursor = page.nextCursor;
       state.loaded = true;
+      updatedAt = Date.now();
+      renderUpdated();
       if (details.errors.length) {
         els.error.textContent = `Some publish request details could not be loaded. Grey pills may be missing and release periods may be unavailable. ${details.errors.join(' ')}`;
         els.error.hidden = false;

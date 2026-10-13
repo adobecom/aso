@@ -316,7 +316,13 @@
       <div class="tab-content" data-tab-content="publish-history">
         <section class="ph-container" aria-labelledby="ph-title">
           <div class="ph-heading-row">
-            <h2 class="export-title" id="ph-title" tabindex="-1">Publish History</h2>
+            <div class="ph-title-group">
+              <h2 class="export-title" id="ph-title" tabindex="-1">Publish History</h2>
+              <button type="button" class="ph-icon-button" id="ph-refresh" aria-label="Refresh publish results" title="Refresh">
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <span class="ph-updated" id="ph-updated"></span>
+            </div>
             <div class="ph-heading-actions">
               <button type="button" class="ph-button" id="publish-new">New publish</button>
             </div>
@@ -327,7 +333,6 @@
             <div class="control-group"><select id="ph-filter-app" class="select-dropdown" aria-label="App"><option value="">All apps</option></select></div>
             <div class="control-group"><select id="ph-filter-status" class="select-dropdown" aria-label="Status"><option value="">All statuses</option></select></div>
             <label class="ph-requestor-option"><input type="checkbox" role="switch" id="ph-filter-all" aria-describedby="ph-requestor-help"> Everyone</label>
-            <button type="button" class="ph-button ph-filter-refresh" id="ph-refresh">Refresh</button>
             <span class="ph-sr-only" id="ph-requestor-help">Unchecked shows only your publish requests. Checked shows everyone's requests.</span>
           </form>
           <div id="ph-access-notice" class="ph-error" role="alert" hidden>You do not have access to Publish functionality. Please reach out to ASO admin for access.</div>
