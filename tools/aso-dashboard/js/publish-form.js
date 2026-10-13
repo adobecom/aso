@@ -80,14 +80,14 @@ function getSelectedFieldKeys() {
     .map((checkbox) => checkbox.value);
 }
 
-// Publish covers Store updates and a single CPP campaign; the shared panel is hidden for
-// Store tests, so an instance name is only ever required for CPP.
-function getCppName() {
-  return isStoreTestsScope() ? getSelectedTestNames()[0] : undefined;
+// Publish covers Store updates and one or more CPP campaigns; the shared panel is hidden for
+// Store tests, so instance names are only ever required for CPP.
+function getCppNames() {
+  return isStoreTestsScope() ? getSelectedTestNames() : [];
 }
 
 function isStoreScopeReady() {
-  return !isStoreTestsScope() || getSelectedTestNames().length === 1;
+  return !isStoreTestsScope() || getSelectedTestNames().length >= 1;
 }
 
 function getPromoContexts() {
@@ -286,7 +286,7 @@ function getPromoProbe() {
   const probe = getBaseProbe();
   if (!probe) return null;
   if (isStoreTestsScope()) {
-    const testName = getCppName();
+    const [testName] = getCppNames();
     if (!testName) return null;
     return { ...probe, testName };
   }
@@ -415,7 +415,7 @@ async function handlePublish(org, repo, token) {
 
     const platform = getPlatform();
     if (!platform) throw new Error('Select a platform');
-    if (!isStoreScopeReady()) throw new Error('Select one CPP campaign');
+    if (!isStoreScopeReady()) throw new Error('Select at least one CPP campaign');
     const blockTypes = getPublishBlockTypes();
     if (!blockTypes.length) throw new Error('Select content');
     const promoContexts = getPromoContexts();
@@ -439,7 +439,7 @@ async function handlePublish(org, repo, token) {
       languages: getSelectedLanguages(),
       releasePeriod: readReleasePeriod(),
       storeType: readStoreType(),
-      testName: getCppName(),
+      testNames: getCppNames(),
       fetchPage: createFetchPage(org, repo, token, adminFetch),
       blockTypes,
       promoContexts,
@@ -671,16 +671,11 @@ function setupListeners({ org, repo, token }) {
       }
     });
   });
-  // CPP campaigns are published one at a time; the checkboxes live in the shared store panel.
+  // CPP campaign checkboxes live in the shared store panel; any number can be selected.
   const formRoot = byId('publish-product-section')?.parentElement;
   document.addEventListener('change', (event) => {
     const { target } = event;
     if (!target?.classList?.contains('store-test-checkbox') || !formRoot?.contains(target)) return;
-    if (target.checked) {
-      document.querySelectorAll('.store-test-checkbox').forEach((checkbox) => {
-        if (checkbox !== target) checkbox.checked = false;
-      });
-    }
     updateStoreTestsCount();
     refreshPromos(context, token);
     updateButtonState();

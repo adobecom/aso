@@ -299,6 +299,7 @@ export async function publishSelection({
   requestorName,
   storeType = STORE_TYPE_UPDATES,
   testName,
+  testNames,
   fetchPage,
   blockTypes = PUBLISH_BLOCK_TYPES,
   promoContexts = [],
@@ -317,7 +318,8 @@ export async function publishSelection({
     ? [...new Set(platformPromoContexts.map((context) => context.promoName))]
     : [];
 
-  const { cells } = await collectExportData({
+  const campaigns = storeType === STORE_TYPE_CPP && testNames?.length ? testNames : [testName];
+  const collect = (name, types, contexts) => collectExportData({
     org,
     repo,
     token,
@@ -331,29 +333,38 @@ export async function publishSelection({
     month: releasePeriod.month,
     productsPath: getRelativeProductsPath(),
     storeType,
-    testName,
-    blockTypes: effectiveBlockTypes,
-    promoContexts: platformPromoContexts,
-    selection: {
-      ...selection,
-      blockTypes: effectiveBlockTypes,
-      promoContexts: platformPromoContexts,
-    },
+    testName: name,
+    blockTypes: types,
+    promoContexts: contexts,
+    selection: { ...selection, blockTypes: types, promoContexts: contexts },
     rowRoles: ['localized'],
     fetchPage,
   });
 
   const publisherName = requestorName || await fetchRequestorName(token);
-  const payload = buildPublishPayload(cells, {
+  const buildFor = (cells, name, types, names) => buildPublishPayload(cells, {
     product,
     platform,
     languages,
     releasePeriod,
     requestorName: publisherName,
     storeType,
-    testName,
-    promoNames,
-    blockTypes: effectiveBlockTypes,
+    testName: name,
+    promoNames: names,
+    blockTypes: types,
+  });
+
+  const { cells } = await collect(campaigns[0], effectiveBlockTypes, platformPromoContexts);
+  const payload = buildFor(cells, campaigns[0], effectiveBlockTypes, promoNames);
+
+  // Each extra CPP campaign adds its own entry; promos are collected once with the first.
+  const extraTypes = effectiveBlockTypes.filter((blockType) => blockType !== 'promo');
+  const extras = extraTypes.length ? await Promise.all(campaigns.slice(1).map(async (name) => {
+    const { cells: extraCells } = await collect(name, extraTypes, []);
+    return buildFor(extraCells, name, extraTypes, []);
+  })) : [];
+  extras.forEach((extra) => {
+    if (extra.cpp) payload.cpp = [...(payload.cpp || []), ...extra.cpp];
   });
 
   const filePath = `${PUBLISH_REQUEST_PATH}/${formatPublishTimestamp(now)}.json`;

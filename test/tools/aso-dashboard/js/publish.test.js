@@ -656,6 +656,15 @@ describe('publish', () => {
       expect(result).to.deep.equal({ ok: true, status: 200, filePath, requestId: serviceResult.requestId, publishStatus: 'queued' });
     });
 
+    it('adds one cpp entry per selected campaign', async () => {
+      options.storeType = 'cpp';
+      options.testNames = ['Holiday Campaign', 'Spring Campaign'];
+      await publishSelection(options);
+      const initialPayload = JSON.parse(await fetchStub.firstCall.args[1].body.get('data').text());
+      expect(initialPayload.cpp.map((entry) => entry.referenceName))
+        .to.deep.equal(['Holiday Campaign', 'Spring Campaign']);
+    });
+
     it('does not call the service if saving the initial file fails', async () => {
       fetchStub.onCall(0).resolves(new Response(null, { status: 500 }));
       fetchStub.onCall(1).resolves(new Response(null, { status: 500, statusText: 'Write failed' }));

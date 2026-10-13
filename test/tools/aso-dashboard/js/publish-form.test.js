@@ -186,7 +186,7 @@ describe('publish form', () => {
     }
   });
 
-  it('requires exactly one CPP campaign when CPP is selected', async () => {
+  it('requires at least one CPP campaign and allows selecting several', async () => {
     await selectEverything({ promos: false });
     const cpp = $('#store-type-cpp');
     cpp.checked = true;
@@ -200,7 +200,8 @@ describe('publish form', () => {
     change(campaigns[0]);
     campaigns[1].checked = true;
     change(campaigns[1]);
-    expect(campaigns[0].checked).to.equal(false);
+    expect(campaigns[0].checked).to.equal(true);
+    expect(campaigns[1].checked).to.equal(true);
     expect($('#publish-button').disabled).to.equal(false);
   });
 
