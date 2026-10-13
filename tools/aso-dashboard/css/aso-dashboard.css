@@ -93,9 +93,8 @@ body {
   margin-bottom: var(--spacing-400);
 }
 
-/* Publish supports Store updates and CPP only, and publishes one CPP campaign per request. */
-[data-tab-content="publish"] .store-type-tests-option,
-[data-tab-content="publish"] #store-tests-select-all {
+/* Publish supports Store updates and CPP only (any number of CPP campaigns). */
+[data-tab-content="publish"] .store-type-tests-option {
   display: none;
 }
 

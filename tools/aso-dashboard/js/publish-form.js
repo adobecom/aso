@@ -680,6 +680,14 @@ function setupListeners({ org, repo, token }) {
     refreshPromos(context, token);
     updateButtonState();
   });
+  // The shared Select All toggles the campaigns without a change event; refresh once it has run.
+  byId('store-tests-select-all')?.addEventListener('click', () => {
+    queueMicrotask(() => {
+      updateStoreTestsCount();
+      refreshPromos(context, token);
+      updateButtonState();
+    });
+  });
   byId('publish-scope-listing')?.addEventListener('change', () => { refreshFields(); updateButtonState(); });
   byId('publish-scope-promos')?.addEventListener('change', () => refreshPromos(context, token));
   byId('publish-languages-checkboxes')?.addEventListener('change', (event) => {
