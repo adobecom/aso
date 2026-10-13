@@ -1713,3 +1713,8 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
 .publish-file-details > :not(summary) {
   margin-top: var(--spacing-200);
 }
+
+.ph-release-part {
+  display: block;
+  white-space: nowrap;
+}

@@ -651,9 +651,11 @@ function renderReleasePeriod(item) {
     String(period.quarter ?? '').toUpperCase(),
     String(period.month ?? '').replace(/^./, (letter) => letter.toUpperCase()),
   ] : [];
-  const value = parts.length ? parts
-    .map((part) => String(part ?? '').trim() || '\u2014').join(' / ') : '\u2014';
-  return el('span', 'ph-release-period', value);
+  const wrap = el('span', 'ph-release-period');
+  (parts.length ? parts : ['\u2014']).forEach((part) => {
+    wrap.append(el('span', 'ph-release-part', String(part ?? '').trim() || '\u2014'));
+  });
+  return wrap;
 }
 
 export function renderRow(item, handlers) {

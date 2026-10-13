@@ -671,7 +671,7 @@ describe('publish-history rendering', () => {
       LEGACY,
     ], {});
     [root.querySelector('.ph-table'), root.querySelector('.ph-cards')].forEach((view) => {
-      expect([...view.querySelectorAll('.ph-release-period')].map((period) => period.textContent))
+      expect([...view.querySelectorAll('.ph-release-period')].map((period) => [...period.children].map((part) => part.textContent).join(' / ')))
         .to.deep.equal(['2026 / Q4 / October', '2025 / Q1 / January', '\u2014']);
     });
   });
@@ -1178,7 +1178,7 @@ describe('publish-history API and controller', () => {
     expect(source.calledOnce).to.equal(true);
     expect(controller.state.items[0].releasePeriod).to.deep.equal(releasePeriod);
     expect(controller.state.items[0].selectedLocales).to.deep.equal(SUCCESS.selectedLocales);
-    expect([...document.querySelectorAll('.ph-release-period')].map((period) => period.textContent))
+    expect([...document.querySelectorAll('.ph-release-period')].map((period) => [...period.children].map((part) => part.textContent).join(' / ')))
       .to.deep.equal(['2026 / Q4 / October', '2026 / Q4 / October']);
     expect(q('#ph-error').hidden).to.equal(true);
   });
