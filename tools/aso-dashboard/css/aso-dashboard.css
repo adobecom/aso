@@ -1262,10 +1262,6 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
   font-weight: 400;
 }
 
-.ph-table tbody th[scope="rowgroup"] .ph-request-cell {
-  align-items: center;
-}
-
 .ph-table .ph-section-label {
   overflow-wrap: normal;
   word-break: normal;
@@ -1504,19 +1500,25 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
 .ph-request-toggle {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   box-sizing: border-box;
   min-width: 40px;
   min-height: 40px;
-  padding: 10px;
+  padding: 10px 0;
   border-radius: 6px;
   color: #292929;
   cursor: pointer;
   list-style: none;
 }
 
-.ph-request-toggle:hover {
-  background: #eaeaea;
+.ph-request-link {
+  color: var(--s2-blue-800);
+  font-size: 14px;
+  text-decoration: underline;
+}
+
+.ph-request-toggle:hover .ph-request-link {
+  text-decoration: none;
 }
 
 .ph-request-toggle:focus-visible {

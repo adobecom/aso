@@ -397,14 +397,14 @@ describe('publish-history rendering', () => {
     expect(renderRequestCell(SUCCESS).textContent).to.contain('View JSON');
   });
 
-  it('shows a request icon that expands details and retains the source JSON action', () => {
+  it('shows a request details link that expands details and retains the source JSON action', () => {
     const onViewJson = sinon.spy();
     const cell = renderRequestCell(SUCCESS, { onViewJson });
     document.body.append(cell);
     const details = cell.querySelector('details');
     const summary = cell.querySelector('summary');
     expect(details.open).to.equal(false);
-    expect(summary.querySelector('svg').getAttribute('aria-hidden')).to.equal('true');
+    expect(summary.querySelector('svg')).to.equal(null);
     expect(summary.getAttribute('aria-label')).to.contain(SUCCESS.requestId);
     expect(summary.textContent).to.equal('Request details');
     summary.click();
