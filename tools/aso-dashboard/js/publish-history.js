@@ -462,11 +462,18 @@ export function renderStatusBadge(item) {
   return wrap;
 }
 
-export function renderTime(value) {
+// LDAP is the part of the requestor email before the "@".
+export function getRequestorLdap(item) {
+  const requestor = typeof item?.requestor === 'string' ? item.requestor.trim() : '';
+  return requestor.split('@')[0];
+}
+
+export function renderTime(value, ldap) {
   const parts = formatTimestampParts(value);
   const time = el('time', 'ph-time');
   time.append(el('span', 'ph-time-date', parts.date));
   if (parts.time) time.append(el('span', 'ph-time-clock', parts.time));
+  if (ldap) time.append(el('span', 'ph-time-by', `by ${ldap}`));
   time.dateTime = String(value ?? '');
   time.title = `Shown in your local time. Original: ${value ?? '\u2014'}`;
   return time;
@@ -554,7 +561,7 @@ export function renderRow(item, handlers) {
   const th = el('th', 'ph-cell');
   th.scope = 'rowgroup';
   th.rowSpan = SECTION_COLUMNS.length;
-  th.append(renderTime(item.startedAt));
+  th.append(renderTime(item.startedAt, getRequestorLdap(item)));
   first.append(th);
   const cells = [
     el('span', 'ph-platform', item.platform ?? '\u2014'),
@@ -594,7 +601,7 @@ export function renderCard(item, handlers) {
     el('strong', '', handlers?.appNames?.get(item.app) ?? item.app ?? '\u2014'),
     renderStatusBadge(item),
   );
-  card.append(head, renderTime(item.startedAt));
+  card.append(head, renderTime(item.startedAt, getRequestorLdap(item)));
   const period = el('div', 'ph-card-group');
   period.append(el('h4', 'ph-card-label', 'Release Period'), renderReleasePeriod(item));
   card.append(period);

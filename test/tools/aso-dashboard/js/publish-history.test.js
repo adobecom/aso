@@ -12,6 +12,7 @@ import {
   collectOverallErrors,
   fetchPublishLogs,
   fetchSourceJson,
+  getRequestorLdap,
   getStatusMeta,
   init,
   isValidSourcePath,
@@ -407,6 +408,17 @@ describe('publish-history rendering', () => {
     expect(time.dateTime).to.equal(value);
     expect(time.title).to.contain('your local time');
     expect(time.title).to.contain(value);
+  });
+
+  it('shows the requestor LDAP (email local part) under the requested time', () => {
+    const item = { ...SUCCESS, requestor: 'raga@adobe.com' };
+    const view = renderResults([item], {});
+    expect(view.querySelector('.ph-row .ph-time-by').textContent).to.equal('by raga');
+    expect(view.querySelector('.ph-card .ph-time-by').textContent).to.equal('by raga');
+    expect(getRequestorLdap({ requestor: 'plain' })).to.equal('plain');
+    expect(getRequestorLdap({})).to.equal('');
+    const missing = renderResults([{ ...SUCCESS, requestor: undefined }], {});
+    expect(missing.querySelector('.ph-time-by')).to.equal(null);
   });
 
   it('styles the loading state as a tall panel with a full-width gradient bar', async () => {

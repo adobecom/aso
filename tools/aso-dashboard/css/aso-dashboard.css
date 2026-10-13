@@ -1214,9 +1214,14 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
 }
 
 .ph-time-date,
-.ph-time-clock {
+.ph-time-clock,
+.ph-time-by {
   display: block;
   white-space: nowrap;
+}
+
+.ph-time-by {
+  color: #777;
 }
 
 .ph-app {
