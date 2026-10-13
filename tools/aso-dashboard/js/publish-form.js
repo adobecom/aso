@@ -34,7 +34,6 @@ import {
   applyReleasePeriod,
   devicesFromParsed,
   fieldKeysWithContent,
-  languageNamesWithContent,
 } from './export.js';
 import { createPublishProgressModal, publishSelection, waitForPublishCompletion } from './publish.js';
 
@@ -514,6 +513,72 @@ function restrictPromosToFile(parsed) {
   });
 }
 
+let loadedFile = null;
+
+function hasText(value) {
+  return String(value ?? '').trim() !== '';
+}
+
+// Languages with filled content for the platform (both platforms when none is chosen yet).
+export function languageNamesForPlatform(parsed, platform) {
+  const platforms = platform ? [platform] : ['apple', 'google'];
+  const withContent = new Set();
+  platforms.forEach((device) => {
+    const fields = [...(parsed.metadata?.[device] || [])];
+    (parsed.promos || []).forEach((promo) => {
+      Object.values(promo.devices?.[device]?.variants || {}).forEach((variant) => {
+        fields.push(...(variant.fields || []));
+      });
+    });
+    fields.forEach((field) => {
+      Object.entries(field.englishSource || {}).forEach(([name, text]) => {
+        if (hasText(text)) withContent.add(name);
+      });
+    });
+  });
+  return (parsed.languageNames || []).filter((name) => withContent.has(name));
+}
+
+// Applies the loaded file's languages, content scopes, fields and promos for the platform
+// currently chosen, so switching Apple/Google re-scopes the form from the same file.
+async function applyFileScope(parsed, context, token) {
+  const platform = getPlatform();
+  refreshLanguages();
+  const names = languageNamesForPlatform(parsed, platform);
+  const known = new Set();
+  const unavailable = [];
+  document.querySelectorAll('.publish-language-checkbox').forEach((checkbox) => {
+    known.add(checkbox.value);
+    if (checkbox.disabled) {
+      if (names.includes(checkbox.value)) unavailable.push(checkbox.value);
+      return;
+    }
+    checkbox.checked = names.includes(checkbox.value);
+  });
+
+  const platforms = platform ? [platform] : ['apple', 'google'];
+  const hasListing = platforms.some((device) => (parsed.metadata?.[device]?.length || 0) > 0);
+  const hasPromos = (parsed.promos || []).some(
+    (promo) => platforms.some((device) => promo.devices?.[device]),
+  );
+  byId('publish-scope-listing').checked = hasListing;
+  byId('publish-scope-promos').checked = hasPromos;
+
+  refreshFields();
+  if (hasListing) restrictFieldsToFile(parsed);
+  await refreshStoreNames(context, token);
+  if (isStoreTestsScope() && parsed.settings.testName) {
+    document.querySelectorAll('.store-test-checkbox').forEach((checkbox) => {
+      checkbox.checked = checkbox.value === parsed.settings.testName;
+    });
+    updateStoreTestsCount();
+  }
+  await refreshPromos(context, token);
+  if (isPromosChecked()) restrictPromosToFile(parsed);
+  updateButtonState();
+  return { names, known, unavailable };
+}
+
 async function handleLoadFile(context, token, file) {
   const summary = byId('publish-scope-file-summary');
   const say = (text) => { if (summary) summary.textContent = text; };
@@ -555,36 +620,8 @@ async function handleLoadFile(context, token, file) {
       notes.push('File has both platforms — choose one to publish.');
     }
 
-    refreshLanguages();
-    const names = languageNamesWithContent(parsed);
-    const known = new Set();
-    const unavailable = [];
-    document.querySelectorAll('.publish-language-checkbox').forEach((checkbox) => {
-      known.add(checkbox.value);
-      if (checkbox.disabled) {
-        if (names.includes(checkbox.value)) unavailable.push(checkbox.value);
-        return;
-      }
-      checkbox.checked = names.includes(checkbox.value);
-    });
-
-    const hasListing = (parsed.metadata?.apple?.length || 0)
-      + (parsed.metadata?.google?.length || 0) > 0;
-    byId('publish-scope-listing').checked = hasListing;
-    byId('publish-scope-promos').checked = (parsed.promos?.length || 0) > 0;
-
-    refreshFields();
-    if (hasListing) restrictFieldsToFile(parsed);
-    await refreshStoreNames(context, token);
-    if (isStoreTestsScope() && parsed.settings.testName) {
-      document.querySelectorAll('.store-test-checkbox').forEach((checkbox) => {
-        checkbox.checked = checkbox.value === parsed.settings.testName;
-      });
-      updateStoreTestsCount();
-    }
-    await refreshPromos(context, token);
-    if (isPromosChecked()) restrictPromosToFile(parsed);
-    updateButtonState();
+    loadedFile = { parsed };
+    const { names, known, unavailable } = await applyFileScope(parsed, context, token);
 
     const missing = names.filter((name) => !known.has(name));
     if (!hasProduct) notes.push(`Product not found: ${product}`);
@@ -622,6 +659,17 @@ function setupListeners({ org, repo, token }) {
 
   document.querySelectorAll(`${promoTriggers}, input[name="store-type"]`).forEach((element) => {
     element.addEventListener('change', refreshAll);
+  });
+  document.querySelectorAll('input[name="publish-platform"]').forEach((radio) => {
+    radio.addEventListener('change', async () => {
+      if (!loadedFile) return;
+      await refreshAll();
+      const { names } = await applyFileScope(loadedFile.parsed, context, token);
+      const summary = byId('publish-scope-file-summary');
+      if (summary) {
+        summary.textContent = `Loaded from file for ${radio.value === 'apple' ? 'Apple' : 'Google'}: ${names.length} language(s).`;
+      }
+    });
   });
   // CPP campaigns are published one at a time; the checkboxes live in the shared store panel.
   const formRoot = byId('publish-product-section')?.parentElement;

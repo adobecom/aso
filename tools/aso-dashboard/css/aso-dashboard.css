@@ -1695,3 +1695,26 @@ button:not(.tab-button):not(.checkbox-item):not(.select-all-link):not(.publish-s
 .ph-item-name {
   font-weight: 600;
 }
+
+.publish-file-details > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-200);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.publish-file-details > summary::before {
+  content: '▶';
+  font-size: 10px;
+  color: var(--s2-gray-700);
+  transition: transform 150ms;
+}
+
+.publish-file-details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.publish-file-details > :not(summary) {
+  margin-top: var(--spacing-200);
+}

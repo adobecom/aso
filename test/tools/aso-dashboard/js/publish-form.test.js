@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { readFile } from '@web/test-runner-commands';
 import sinon from 'sinon';
-import { init, setPublishAccess } from '../../../../tools/aso-dashboard/js/publish-form.js';
+import { init, languageNamesForPlatform, setPublishAccess } from '../../../../tools/aso-dashboard/js/publish-form.js';
 import { initReleasePeriodSettings } from '../../../../tools/aso-dashboard/js/release-period-settings.js';
 import { clearListCache } from '../../../../tools/aso-dashboard/js/lib/utils.js';
 
@@ -244,5 +244,25 @@ describe('publish form', () => {
     await flush();
     expect(submitted.called).to.equal(false);
     expect($('#publish-summary').textContent).to.not.equal('');
+  });
+});
+
+describe('languageNamesForPlatform', () => {
+  const parsed = {
+    languageNames: ['English', 'French', 'German'],
+    metadata: {
+      apple: [{ englishSource: { English: 'a', French: 'b' } }],
+      google: [{ englishSource: { English: 'a', German: 'c' } }],
+    },
+    promos: [],
+  };
+
+  it('returns only languages with content for the chosen platform', () => {
+    expect(languageNamesForPlatform(parsed, 'apple')).to.deep.equal(['English', 'French']);
+    expect(languageNamesForPlatform(parsed, 'google')).to.deep.equal(['English', 'German']);
+  });
+
+  it('unions both platforms when none is chosen', () => {
+    expect(languageNamesForPlatform(parsed, '')).to.deep.equal(['English', 'French', 'German']);
   });
 });
