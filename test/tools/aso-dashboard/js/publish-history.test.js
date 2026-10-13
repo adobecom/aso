@@ -248,6 +248,27 @@ describe('publish-history rendering', () => {
     expect(cell.querySelector('.ph-item-list').hidden).to.equal(true);
   });
 
+  it('reads the service payload shape with items and top-level sections', () => {
+    const item = {
+      sections: [
+        { type: 'metadata', success: ['en-US'], failure: [{ locale: 'fr-FR', error: 'x' }] },
+        {
+          type: 'promos',
+          items: [
+            { name: 'evt1', success: ['en-US', 'fr-FR'] },
+            { name: 'evt2', failure: [{ locale: 'en-US', error: 'Invalid event' }] },
+          ],
+        },
+        { type: 'cpp', items: [{ name: 'page1', success: ['en-US'] }] },
+      ],
+      errorMessage: ['Invalid event'],
+    };
+    expect(mapSectionItems(item, 'promos').map((g) => g.name)).to.deep.equal(['evt2', 'evt1']);
+    expect(mapSectionItems(item, 'cpp')).to.have.length(1);
+    expect(mapSections(item).metadata).to.have.length(2);
+    expect(collectOverallErrors(item)).to.include('Invalid event');
+  });
+
   it('keeps the flat chip list when sections carry no item names', () => {
     const item = { response: { sections: [{ type: 'promos', success: ['en'] }] } };
     expect(mapSectionItems(item, 'promos')).to.deep.equal([]);

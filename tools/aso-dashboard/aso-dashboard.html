@@ -234,6 +234,14 @@
           <h2 class="export-title">Publish to Store</h2>
           <p class="export-description">Publish current DA content for one product and one platform to the store request queue. After submission, return to history to track the request.</p>
 
+          <details class="export-section publish-file-details" id="publish-load-from-file-section">
+            <summary>Load fields from a file (optional)</summary>
+            <p class="export-description">Pre-fills product, languages, platform, and content below — content is always pulled fresh from DA, not from this file.</p>
+            <input type="file" id="publish-scope-file" class="hidden" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <button type="button" class="export-button" id="publish-scope-file-button">Load Fields From File…</button>
+            <div id="publish-scope-file-summary" class="action-summary" aria-live="polite"></div>
+          </details>
+
           <div class="export-section" id="publish-platform-section">
             <h3>Platform</h3>
             <div class="checkbox-group horizontal">
@@ -248,13 +256,6 @@
             </div>
           </div>
 
-          <details class="export-section publish-file-details" id="publish-load-from-file-section">
-            <summary>Load fields from a file (optional)</summary>
-            <p class="export-description">Pre-fills product, languages, platform, and content below — content is always pulled fresh from DA, not from this file.</p>
-            <input type="file" id="publish-scope-file" class="hidden" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-            <button type="button" class="export-button" id="publish-scope-file-button">Load Fields From File…</button>
-            <div id="publish-scope-file-summary" class="action-summary" aria-live="polite"></div>
-          </details>
 
           <div class="export-section" id="publish-product-section">
             <h3>Product</h3>

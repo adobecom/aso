@@ -48,11 +48,17 @@ export function getStatusMeta(value) {
 
 const cleanMessage = (message) => (typeof message === 'string' ? message.trim() : '');
 
+// Sections live under `response` in log items; a bare service payload keeps them at the top.
+function getSections(item) {
+  const list = item?.response?.sections ?? item?.sections;
+  return Array.isArray(list) ? list : [];
+}
+
 export function collectOverallErrors(item) {
   const messages = [];
-  const summary = item?.responseSummary?.errorMessage;
+  const summary = item?.responseSummary?.errorMessage ?? item?.errorMessage;
   (Array.isArray(summary) ? summary : [summary]).forEach((m) => messages.push(cleanMessage(m)));
-  (item?.response?.sections ?? []).forEach((section) => {
+  getSections(item).forEach((section) => {
     (Array.isArray(section?.failure) ? section.failure : [])
       .forEach((f) => messages.push(cleanMessage(f?.error)));
   });
@@ -70,7 +76,7 @@ export function getSelectedLocales(item) {
 // Order failures, successes, pending and unreported locales; absent sections stay undefined.
 export function mapSections(item) {
   const columns = {};
-  const sections = Array.isArray(item?.response?.sections) ? item.response.sections : [];
+  const sections = getSections(item);
   sections.forEach((section) => {
     const column = SECTION_TYPE_MAP[String(section?.type ?? '').trim().toLowerCase()];
     if (!column) return;
@@ -120,7 +126,7 @@ function buildGroupChips(source, column) {
 // Per-event / per-page results for promos and cpp; empty when the service sends no item names.
 export function mapSectionItems(item, columnKey) {
   if (!ITEM_NOUNS[columnKey]) return [];
-  const sections = Array.isArray(item?.response?.sections) ? item.response.sections : [];
+  const sections = getSections(item);
   const groups = new Map();
   const addGroup = (name, source) => {
     if (!name) return;
