@@ -213,12 +213,28 @@ async function putKeywordsSidecar(org, repo, basePath, obj, token, options = {})
   };
 }
 
+async function putJsonSource(org, repo, sourcePath, obj, token) {
+  const url = buildSourceUrl(org, repo, sourcePath);
+  const body = `${JSON.stringify(obj, null, 2)}\n`;
+  const formData = new FormData();
+  formData.append('data', new Blob([body], { type: 'application/json' }));
+  const postResp = await fetch(url, { method: 'POST', headers: authHeaders(token), body: formData });
+  if (postResp.ok) return { ok: true, method: 'POST', status: postResp.status };
+  const putResp = await fetch(url, {
+    method: 'PUT',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body,
+  });
+  return { ok: putResp.ok, method: 'PUT', status: putResp.status, statusText: putResp.statusText };
+}
+
 export {
   buildBeforeImportVersionLabel,
   getKeywordsSidecar,
   getSourceText,
   getSpacingSidecar,
   listDirectory,
+  putJsonSource,
   putKeywordsSidecar,
   putSourceText,
   putSpacingSidecar,
