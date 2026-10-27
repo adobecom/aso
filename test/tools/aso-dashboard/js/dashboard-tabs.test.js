@@ -127,6 +127,18 @@ describe('history-first Publish workspace', () => {
     expect($('.scope-sections')).to.equal(scope);
   });
 
+  it('clears the previous publish result whenever New publish is opened', () => {
+    $('.tab-button[data-tab="publish"]').click();
+    ['Published. Request ID: request-123.', 'Publish failed: request rejected.'].forEach((message) => {
+      $('#publish-new').click();
+      $('#publish-summary').textContent = message;
+      $('#publish-back').click();
+      expect($('#publish-summary').textContent).to.equal(message);
+      $('#publish-new').click();
+      expect($('#publish-summary').textContent).to.equal('');
+    });
+  });
+
   it('moves shared scope between Preview, Export and the publish form only', () => {
     const scope = $('.scope-sections');
     ['preview', 'export'].forEach((name) => {

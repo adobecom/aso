@@ -26,6 +26,8 @@ export function setupTabs({ publishHistory }) {
     showTab(button.dataset.tab === 'publish' ? 'publish-history' : button.dataset.tab);
   });
   document.getElementById('publish-new')?.addEventListener('click', () => {
+    const summary = document.getElementById('publish-summary');
+    if (summary) summary.textContent = '';
     showTab('publish');
     document.getElementById('publish-back')?.focus();
   });
