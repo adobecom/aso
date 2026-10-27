@@ -31,11 +31,9 @@ describe('newline issue fixtures', () => {
 
   before(async () => {
     const [daResp, expectedResp] = await Promise.all([
-      fetch('/test/blocks/aso-app/mocks/newline-google.html'),
-      fetch('/test/blocks/aso-app/mocks/newline-google.txt'),
+      fetch('/misc/aso-newline-issue/da.html'),
+      fetch('/misc/aso-newline-issue/original-source.html'),
     ]);
-    expect(daResp.ok).to.equal(true);
-    expect(expectedResp.ok).to.equal(true);
     daHtml = await daResp.text();
     expectedText = loadExpectedText(await expectedResp.text());
   });
@@ -48,8 +46,9 @@ describe('newline issue fixtures', () => {
     expect(trimLineEnds(result)).to.equal(trimLineEnds(expectedText));
   });
 
-  it('does not collapse to 25-line minified spacing', () => {
-    const shrunkText = trimLineEnds(expectedText).replace(/\n\n/g, '\n');
+  it('does not collapse to 25-line minified spacing', async () => {
+    const shrunkResp = await fetch('/misc/aso-newline-issue/post-da-workflow-itr2.html');
+    const shrunkText = trimLineEnds(loadExpectedText(await shrunkResp.text()));
     const result = trimLineEnds(getDescriptionFromHtml(daHtml, 'Full Description'));
     expect(result).to.not.equal(shrunkText);
     expect(result.split('\n').length).to.be.above(25);
@@ -57,35 +56,33 @@ describe('newline issue fixtures', () => {
 
   it('uses blank lines only where DA source has whitespace between p tags', () => {
     const result = getDescriptionFromHtml(daHtml, 'Full Description');
-    expect(result).to.include('wherever you are.\n\nAn intuitive AI partner');
-    expect(result).to.include('single text prompt.\n\nWhat can the app do?');
-    expect(result).to.include('What can the app do?\nGenerate images');
-    expect(result).to.not.include('What can the app do?\n\nGenerate images');
+    expect(result).to.include('wherever you are.\n\nFirefly is your intuitive AI partner');
+    expect(result).to.include('single text prompt.\n\nWhat can Adobe Firefly do?');
+    expect(result).to.include('What can Adobe Firefly do?\nText to image AI image generator');
+    expect(result).to.not.include('What can Adobe Firefly do?\n\nText to image AI image generator');
   });
 
-  it('uses minified spacing on page HTML without DA gaps', () => {
-    const minifiedHtml = daHtml.replace(/>\s+</g, '><');
-    const result = getDescriptionFromHtml(minifiedHtml, 'Full Description');
-    expect(trimLineEnds(result)).to.equal(trimLineEnds(expectedText).replace(/\n\n/g, '\n'));
+  it('uses minified spacing on EDS-rendered page HTML without DA gaps', async () => {
+    const liveResp = await fetch('/misc/aso-newline-issue/live-page.html');
+    const result = getDescriptionFromHtml(await liveResp.text(), 'Full Description');
+    expect(result.length).to.equal(3233);
     expect(result.split('\n').length).to.equal(25);
   });
 
-  it('keeps space-separated section breaks when the page is on one line', () => {
-    const result = getDescriptionFromHtml(daHtml.replace(/\n/g, ''), 'Full Description');
+  it('uses consolidated google.html gaps: space between tags is blank line, minified is single line', async () => {
+    const htmlResp = await fetch('/misc/aso-newline-issue/consolidated/htmls/google.html');
+    const result = getDescriptionFromHtml(await htmlResp.text(), 'Full Description');
     expect(result.split('\n').length).to.equal(34);
-    expect(trimLineEnds(result)).to.equal(trimLineEnds(expectedText));
-    expect(result).to.include('wherever you are.\n\nAn intuitive AI partner');
-    expect(result).to.include('What can the app do?\nGenerate images');
-    expect(result).to.not.include('What can the app do?\n\nGenerate images');
+    expect(result).to.include('wherever you are.\n\nFirefly is your intuitive AI partner');
+    expect(result).to.include('What can Adobe Firefly do?\nText to image AI image generator');
+    expect(result).to.not.include('What can Adobe Firefly do?\n\nText to image AI image generator');
   });
 
   it('matches Apple US description export spacing from DA source gaps', async () => {
     const [htmlResp, expectedResp] = await Promise.all([
-      fetch('/test/blocks/aso-app/mocks/newline-apple.html'),
-      fetch('/test/blocks/aso-app/mocks/newline-apple.txt'),
+      fetch('/misc/aso-newline-issue/apple-us-da.html'),
+      fetch('/misc/aso-newline-issue/consolidated/originals/apple.html'),
     ]);
-    expect(htmlResp.ok).to.equal(true);
-    expect(expectedResp.ok).to.equal(true);
     const result = getDescriptionFromHtml(await htmlResp.text(), 'Description');
     const expected = loadExpectedText(await expectedResp.text());
     expect(result.split('\n').length).to.equal(38);

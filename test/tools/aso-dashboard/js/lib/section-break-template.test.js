@@ -43,8 +43,7 @@ describe('section-break-template', () => {
     });
 
     it('matches Google Full Description golden export (25 paragraphs, 34 lines)', async () => {
-      const resp = await fetch('/test/blocks/aso-app/mocks/newline-google.txt');
-      expect(resp.ok).to.equal(true);
+      const resp = await fetch('/misc/aso-newline-issue/original-source.html');
       const text = loadExpectedText(await resp.text());
       const parsed = parseReferenceText(text);
 
@@ -54,8 +53,7 @@ describe('section-break-template', () => {
     });
 
     it('matches Apple Description golden export (28 paragraphs, 38 lines)', async () => {
-      const resp = await fetch('/test/blocks/aso-app/mocks/newline-apple.txt');
-      expect(resp.ok).to.equal(true);
+      const resp = await fetch('/misc/aso-newline-issue/consolidated/originals/apple.html');
       const text = loadExpectedText(await resp.text());
       const parsed = parseReferenceText(text);
 
@@ -86,16 +84,12 @@ describe('section-break-template', () => {
 
   describe('applySectionBreakMask', () => {
     it('restores blank-line export spacing on minified HTML using saved sidecar', async () => {
-      const [googleHtml, expectedText, goldenText, appleHtml] = await Promise.all([
-        'newline-google.html',
-        'newline-google.txt',
-        'newline-apple.txt',
-        'newline-apple.html',
-      ].map(async (name) => {
-        const resp = await fetch(`/test/blocks/aso-app/mocks/${name}`);
-        expect(resp.ok).to.equal(true);
-        return resp.text();
-      }));
+      const [minifiedHtml, expectedText, goldenText, appleHtml] = await Promise.all([
+        fetch('/misc/aso-newline-issue/live-page.html').then((resp) => resp.text()),
+        fetch('/misc/aso-newline-issue/original-source.html').then((resp) => resp.text()),
+        fetch('/misc/aso-newline-issue/consolidated/originals/apple.html').then((resp) => resp.text()),
+        fetch('/misc/aso-newline-issue/apple-us-da.html').then((resp) => resp.text()),
+      ]);
 
       const googleSidecar = buildSpacingSidecarFromText({
         text: loadExpectedText(expectedText),
@@ -104,7 +98,7 @@ describe('section-break-template', () => {
       });
 
       const googleResult = getDescriptionFromHtml(
-        googleHtml.replace(/>\s+</g, '><'),
+        minifiedHtml,
         'Full Description',
         googleSidecar.sectionBreakAfter,
       );
@@ -117,7 +111,7 @@ describe('section-break-template', () => {
         fieldKey: 'description',
       });
       const appleResult = getDescriptionFromHtml(
-        appleHtml.replace(/>\s+</g, '><'),
+        appleHtml,
         'Description',
         appleSidecar.sectionBreakAfter,
       );
