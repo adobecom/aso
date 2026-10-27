@@ -43,7 +43,7 @@ describe('section-break-template', () => {
     });
 
     it('matches Google Full Description golden export (25 paragraphs, 34 lines)', async () => {
-      const resp = await fetch('/misc/aso-newline-issue/original-source.html');
+      const resp = await fetch('/test/blocks/aso-app/mocks/newline-issue/original-source.html');
       const text = loadExpectedText(await resp.text());
       const parsed = parseReferenceText(text);
 
@@ -53,7 +53,7 @@ describe('section-break-template', () => {
     });
 
     it('matches Apple Description golden export (28 paragraphs, 38 lines)', async () => {
-      const resp = await fetch('/misc/aso-newline-issue/consolidated/originals/apple.html');
+      const resp = await fetch('/test/blocks/aso-app/mocks/newline-issue/consolidated/originals/apple.html');
       const text = loadExpectedText(await resp.text());
       const parsed = parseReferenceText(text);
 
@@ -85,10 +85,10 @@ describe('section-break-template', () => {
   describe('applySectionBreakMask', () => {
     it('restores blank-line export spacing on minified HTML using saved sidecar', async () => {
       const [minifiedHtml, expectedText, goldenText, appleHtml] = await Promise.all([
-        fetch('/misc/aso-newline-issue/live-page.html').then((resp) => resp.text()),
-        fetch('/misc/aso-newline-issue/original-source.html').then((resp) => resp.text()),
-        fetch('/misc/aso-newline-issue/consolidated/originals/apple.html').then((resp) => resp.text()),
-        fetch('/misc/aso-newline-issue/apple-us-da.html').then((resp) => resp.text()),
+        fetch('/test/blocks/aso-app/mocks/newline-issue/live-page.html').then((resp) => resp.text()),
+        fetch('/test/blocks/aso-app/mocks/newline-issue/original-source.html').then((resp) => resp.text()),
+        fetch('/test/blocks/aso-app/mocks/newline-issue/consolidated/originals/apple.html').then((resp) => resp.text()),
+        fetch('/test/blocks/aso-app/mocks/newline-issue/apple-us-da.html').then((resp) => resp.text()),
       ]);
 
       const googleSidecar = buildSpacingSidecarFromText({
