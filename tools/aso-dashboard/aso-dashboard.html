@@ -25,6 +25,7 @@
         <button class="tab-button active" data-tab="import">Import</button>
         <button class="tab-button" data-tab="preview">Preview</button>
         <button class="tab-button" data-tab="export">Export</button>
+        <button class="tab-button" data-tab="publish">Publish</button>
       </div>
 
       <div class="tab-content" data-tab-content="preview">
@@ -53,7 +54,7 @@
                   <input type="radio" name="store-type" id="store-type-updates" value="store-updates" checked>
                   <label for="store-type-updates">Store updates</label>
                 </div>
-                <div class="checkbox-item">
+                <div class="checkbox-item store-type-tests-option">
                   <input type="radio" name="store-type" id="store-type-tests" value="store-tests">
                   <label for="store-type-tests">Store tests</label>
                 </div>
@@ -225,6 +226,122 @@
             <div id="image-export-summary" class="action-summary" aria-live="polite"></div>
           </div>
         </div>
+      </div>
+
+      <div class="tab-content" data-tab-content="publish">
+        <div class="export-container">
+          <button type="button" class="ph-link" id="publish-back">Back to history</button>
+          <h2 class="export-title">Publish to Store</h2>
+          <p class="export-description">Publish current DA content for one product and one platform to the store request queue. After submission, return to history to track the request.</p>
+
+          <details class="export-section publish-file-details" id="publish-load-from-file-section">
+            <summary>Load fields from a file (optional)</summary>
+            <p class="export-description">Pre-fills product, languages, platform, and content below — content is always pulled fresh from DA, not from this file.</p>
+            <input type="file" id="publish-scope-file" class="hidden" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <button type="button" class="export-button" id="publish-scope-file-button">Load Fields From File…</button>
+            <div id="publish-scope-file-summary" class="action-summary" aria-live="polite"></div>
+          </details>
+
+          <div class="export-section" id="publish-platform-section">
+            <h3>Platform</h3>
+            <div class="checkbox-group horizontal">
+              <div class="checkbox-item">
+                <input type="radio" name="publish-platform" id="publish-platform-apple" value="apple">
+                <label for="publish-platform-apple">Apple</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="radio" name="publish-platform" id="publish-platform-google" value="google">
+                <label for="publish-platform-google">Google</label>
+              </div>
+            </div>
+          </div>
+
+
+          <div class="export-section" id="publish-product-section">
+            <h3>Product</h3>
+            <select id="publish-product" class="select-dropdown">
+              <option value="">Loading products...</option>
+            </select>
+          </div>
+
+          <div class="scope-sections-slot"></div>
+
+          <div class="export-section" id="publish-languages-section">
+            <h3>
+              <span>Languages <span class="selection-count" id="publish-languages-count">(0 selected)</span></span>
+              <button type="button" class="publish-select-all" id="publish-languages-select-all">Select All</button>
+            </h3>
+            <div class="checkbox-group" id="publish-languages-checkboxes">
+              <p>Loading languages...</p>
+            </div>
+          </div>
+
+          <div class="export-section" id="publish-scope-section">
+            <h3>Content to publish</h3>
+            <div class="checkbox-group horizontal">
+              <div class="checkbox-item">
+                <input type="checkbox" id="publish-scope-listing" checked>
+                <label for="publish-scope-listing">Metadata (listing)</label>
+              </div>
+              <div class="checkbox-item">
+                <input type="checkbox" id="publish-scope-promos" checked>
+                <label for="publish-scope-promos">Promos</label>
+              </div>
+            </div>
+            <details id="publish-listing-fields" class="field-scope-section" open>
+              <summary>
+                <span>Metadata Fields <span class="field-scope-count" id="publish-listing-field-count"></span></span>
+                <button type="button" class="publish-select-all" id="publish-listing-select-all">Select All</button>
+              </summary>
+              <div class="promo-device-boxes" id="publish-listing-field-groups">
+                <p>Select a platform…</p>
+              </div>
+            </details>
+            <details id="publish-promo-fields" class="field-scope-section" open>
+              <summary>
+                <span>Promos</span>
+                <span class="field-scope-count" id="publish-promo-count"></span>
+              </summary>
+              <div class="promo-device-boxes" id="publish-promo-groups">
+                <p>Select product, language, platform, and release period…</p>
+              </div>
+            </details>
+            <button type="button" class="export-button" id="publish-button" disabled>
+              Publish to Store
+            </button>
+            <div id="publish-summary" class="action-summary" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" data-tab-content="publish-history">
+        <section class="ph-container" aria-labelledby="ph-title">
+          <div class="ph-heading-row">
+            <div class="ph-title-group">
+              <h2 class="export-title" id="ph-title" tabindex="-1">Publish History</h2>
+              <button type="button" class="ph-icon-button" id="ph-refresh" aria-label="Refresh publish results" title="Refresh">
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <span class="ph-updated" id="ph-updated"></span>
+            </div>
+            <div class="ph-heading-actions">
+              <button type="button" class="ph-button" id="publish-new">New publish</button>
+            </div>
+          </div>
+          <p class="export-description">Results of store publish requests, grouped by section. Requested-on times use your local time. Filters search all history.</p>
+          <form class="ph-filters" id="ph-filters" aria-label="Filter publish results" onsubmit="return false">
+            <div class="control-group"><select id="ph-filter-platform" class="select-dropdown" aria-label="Platform"><option value="">All platforms</option></select></div>
+            <div class="control-group"><select id="ph-filter-app" class="select-dropdown" aria-label="App"><option value="">All apps</option></select></div>
+            <div class="control-group"><select id="ph-filter-status" class="select-dropdown" aria-label="Status"><option value="">All statuses</option></select></div>
+            <label class="ph-requestor-option"><input type="checkbox" role="switch" id="ph-filter-all" aria-describedby="ph-requestor-help"> Everyone</label>
+            <span class="ph-sr-only" id="ph-requestor-help">Unchecked shows only your publish requests. Checked shows everyone's requests.</span>
+          </form>
+          <div id="ph-access-notice" class="ph-error" role="alert" hidden>You do not have access to Publish functionality. Please reach out to ASO admin for access.</div>
+          <div id="ph-error" class="ph-error" role="alert" hidden></div>
+          <div id="ph-status" class="ph-scope" role="status" aria-live="polite"></div>
+          <div id="ph-results"></div>
+          <button type="button" class="ph-button ph-load-more" id="ph-load-more" hidden>Load more</button>
+        </section>
       </div>
 
       <div class="tab-content active" data-tab-content="import">

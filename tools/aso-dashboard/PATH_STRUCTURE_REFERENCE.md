@@ -52,6 +52,56 @@ Tests mirror under `test/tools/aso-dashboard/js/` with shared `mocks/` and `help
 
 ## Final page paths
 
+### Publish requests
+
+Google publishing currently supports metadata only: `title`, `shortDescription`,
+and `fullDescription` in `metadata.localizations`, alongside the `app` and
+`platform` identifiers. Release notes, release tracks, promos, and media assets
+are not included in the Google payload. Apple publishing is unchanged.
+
+Publish mode in the Export section saves the selected product/platform payload to
+`/.da/store-publish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json` (UTC), then sends a JSON
+`POST` to
+`<store-publish.api>/publish-to-appstore` (from `.da/store-publish.json`)
+with `{"daPayloadPath": ".da/store-publish/request/YYYY-MM-DD-t-HH-MI-SS-SSS.json"}`.
+The service path does not include a leading slash. The service request includes
+the current DA token in the `Authorization: Bearer <token>` header; the token is
+not included in the JSON body or saved request file.
+
+On a successful HTTP response with non-empty string `requestId` and `status`
+fields, those fields are added to the original payload in the same DA file.
+The dashboard displays the submitted request ID and status; `queued` does not
+mean publication is complete. Failed saves, service requests, or invalid
+responses are reported as failures. Service failures display the returned
+`error` message and `activationId` when present, along with the HTTP status
+and request file path. If the service accepts the request but
+writing its response fails, the error includes the request ID and status;
+the service request is not automatically retried.
+
+After saving the service response, the dashboard immediately calls
+`GET <store-publish.api>/get-publish-log?requestId=<requestId>`
+with the same bearer token. It polls at 10-second intervals for up to one minute.
+The modal displays `Starting to Publish...` immediately when Publish to Store is
+clicked, before configuration, content, or the service response has loaded.
+The title changes to `Publishing in progress` and the request ID is added as soon
+as the service accepts the request, even if saving its response later fails.
+The modal backdrop masks the dashboard without hiding the publish button.
+The button stays disabled while submission or monitoring is active.
+
+The top-right X button (accessible label: Close) stays hidden and disabled during submission and polling, and
+Escape cannot dismiss the modal while either is active. Close and Escape become
+available after success or an error. Errors, success, and timeout messages are
+shown in both the modal and the dashboard summary.
+
+Only `overallStatus: "success"` displays `Published`. Terminal failure
+statuses and service errors stop monitoring and display an error. A timeout
+reports that publishing may still finish, includes the last status and request
+ID, and advises against resubmitting. This monitoring error allows dismissal
+without claiming the publish succeeded or failed. An in-flight log request is aborted at the
+one-minute deadline. The publish button is restored on success, error, or timeout.
+The modal remains open with the result until the user closes it; polling does
+not resubmit the publish request.
+
 ### Store updates (single versioned page)
 
 `/{lang}/{productsPath}/{product}/{device}/store-updates`

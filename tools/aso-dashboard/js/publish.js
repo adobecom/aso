@@ -1,0 +1,411 @@
+import { STORE_TYPE_CPP, STORE_TYPE_UPDATES } from './store-scope-settings.js';
+import { collectExportData } from './import-export/collect.js';
+import { putJsonSource } from './lib/da-source-client.js';
+import { getRelativeProductsPath } from './lib/utils.js';
+
+export const PUBLISH_REQUEST_PATH = '/.da/store-publish/request';
+
+const IMS_PROFILE_URL = 'https://ims-na1.adobelogin.com/ims/profile/v1';
+const PUBLISH_POLL_INTERVAL_MS = 10000;
+const PUBLISH_POLL_TIMEOUT_MS = 60000;
+
+const PUBLISH_BLOCK_TYPES = ['listing', 'promo'];
+
+const pad = (value, length = 2) => String(value).padStart(length, '0');
+
+// Resolves { allowed: true } on success and { allowed: false, status, message } when the service
+// answers 401 or 403 (message is the service's own text from the response payload, if any).
+// Other failures throw so callers can decide not to block on an unreachable check.
+export async function checkPublishAccess({ apiBase, token }) {
+  const response = await fetch(`${apiBase}/check-publish-access`, { headers: { Authorization: `Bearer ${token}` } });
+  if (response.status === 401 || response.status === 403) {
+    const body = (await response.text().catch(() => '')).trim();
+    let message = body;
+    try {
+      const parsed = JSON.parse(body);
+      message = [parsed?.message, parsed?.error].find((value) => typeof value === 'string') ?? '';
+    } catch {
+      // Plain-text body: use it as is.
+    }
+    return { allowed: false, status: response.status, message: message.trim() };
+  }
+  if (!response.ok) throw new Error(`Publish access check failed: HTTP ${response.status}`);
+  return { allowed: true, status: response.status };
+}
+
+export async function fetchRequestorName(token) {
+  const response = await fetch(IMS_PROFILE_URL, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) {
+    throw new Error(`Failed to load the publish requestor's name: HTTP ${response.status}`);
+  }
+  const profile = await response.json();
+  const name = [profile?.displayName, profile?.name,
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(' ')]
+    .find((value) => typeof value === 'string' && value.trim());
+  if (!name) throw new Error('The signed-in user profile does not include a full name.');
+  return name.trim();
+}
+
+// Publish request filename: YYYY-MM-DD-t-HH-MI-SS-SSS (24-hour clock, UTC).
+export function formatPublishTimestamp(date = new Date()) {
+  return [
+    date.getUTCFullYear(),
+    pad(date.getUTCMonth() + 1),
+    pad(date.getUTCDate()),
+    't',
+    pad(date.getUTCHours()),
+    pad(date.getUTCMinutes()),
+    pad(date.getUTCSeconds()),
+    pad(date.getUTCMilliseconds(), 3),
+  ].join('-');
+}
+
+function fieldValue(cellIndex, langCode, device, blockType, fieldKey, promoName) {
+  return cellIndex.get(`${langCode}|${device}|${blockType}|${fieldKey}|${promoName ?? ''}`) ?? '';
+}
+
+function buildLocalization(cellIndex, langCode, device, blockType, fieldKeys, promoName) {
+  const loc = { locale: langCode };
+  fieldKeys.forEach((key) => {
+    const val = fieldValue(cellIndex, langCode, device, blockType, key, promoName);
+    if (val) loc[key] = val;
+  });
+  return Object.keys(loc).length > 1 ? loc : null;
+}
+
+function omitEmptyContainers(value) {
+  if (Array.isArray(value)) {
+    const items = value.map(omitEmptyContainers).filter((item) => item !== undefined);
+    return items.length ? items : undefined;
+  }
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value)
+      .map(([key, entry]) => [key, omitEmptyContainers(entry)])
+      .filter(([, entry]) => entry !== undefined);
+    return entries.length ? Object.fromEntries(entries) : undefined;
+  }
+  return value;
+}
+
+export function buildPublishPayload(cells, options) {
+  const {
+    product,
+    platform,
+    languages,
+    releasePeriod,
+    requestorName,
+    storeType = STORE_TYPE_UPDATES,
+    testName,
+    promoNames = [],
+    blockTypes = PUBLISH_BLOCK_TYPES,
+  } = options;
+  // storeType is UI-only: CPP content is sent as a `cpp` entry instead of `metadata`.
+  const isCpp = storeType === STORE_TYPE_CPP;
+  const listingKey = isCpp ? 'cpp' : 'metadata';
+  const listingEntry = (localizations) => {
+    if (!isCpp) return { localizations };
+    return [{ referenceName: testName, localizations }];
+  };
+  const cellIndex = new Map();
+  cells.forEach((cell) => {
+    const key = `${cell.language.code}|${cell.device}|${cell.blockType}|${cell.fieldKey}|${cell.promoName ?? ''}`;
+    if (!cellIndex.has(key) || cell.hasHtml) cellIndex.set(key, cell.text);
+  });
+
+  const langCodes = languages.map((l) => l.code);
+
+  if (platform === 'apple') {
+    const listingFields = ['name', 'subtitle', 'description', 'keywords', 'marketingUrl', 'promotionalText', 'supportUrl'];
+    const payload = {
+      app: product,
+      selectedLocales: langCodes,
+      releasePeriod,
+      requestorName,
+    };
+    if (blockTypes.includes('listing')) {
+      payload[listingKey] = listingEntry(langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'listing', listingFields)).filter(Boolean));
+    }
+
+    if (blockTypes.includes('promo') && promoNames.length) {
+      const promoFields = ['eventName', 'shortDescription', 'longDescription'];
+      payload.promos = promoNames.map((promoName) => ({
+        referenceName: promoName,
+        localizations: langCodes.map((code) => buildLocalization(cellIndex, code, 'apple', 'promo', promoFields, promoName)).filter(Boolean),
+      }));
+    }
+
+    return omitEmptyContainers(payload);
+  }
+
+  // Google
+  const googleFields = ['title', 'shortDescription', 'fullDescription'];
+  const payload = {
+    app: product,
+    platform: 'google',
+    selectedLocales: langCodes,
+    releasePeriod,
+    requestorName,
+  };
+  if (blockTypes.includes('listing')) {
+    payload[listingKey] = listingEntry(langCodes.map((code) => buildLocalization(cellIndex, code, 'google', 'listing', googleFields)).filter(Boolean));
+  }
+  return omitEmptyContainers(payload);
+}
+
+async function readPublishServiceResponse(response, reference) {
+  const responseBody = await response.text();
+  let serviceResult;
+  try {
+    serviceResult = JSON.parse(responseBody);
+  } catch (error) {
+    if (!response.ok) {
+      const message = responseBody.trim() || `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
+      throw new Error(`Publish service failed: ${message}`);
+    }
+    throw new Error(`Publish service returned invalid JSON (${response.status} ${response.statusText}): ${responseBody || error.message}. ${reference}`);
+  }
+
+  const serviceError = typeof serviceResult?.error === 'string' ? serviceResult.error.trim() : '';
+  if (!response.ok || serviceError) {
+    throw new Error(`Publish service failed: ${serviceError || responseBody}`);
+  }
+  return serviceResult;
+}
+
+export function createPublishProgressModal(button) {
+  const modal = document.createElement('dialog');
+  modal.className = 'publish-progress-modal';
+  modal.setAttribute('aria-labelledby', 'publish-progress-title');
+  modal.setAttribute('aria-describedby', 'publish-progress-message publish-progress-reference');
+  const title = document.createElement('h2');
+  title.id = 'publish-progress-title';
+  title.textContent = 'Starting to Publish...';
+  const reference = document.createElement('p');
+  reference.id = 'publish-progress-reference';
+  reference.className = 'publish-progress-reference';
+  reference.hidden = true;
+  const message = document.createElement('p');
+  message.id = 'publish-progress-message';
+  message.className = 'publish-progress-message';
+  message.setAttribute('role', 'status');
+  message.textContent = 'Preparing publish request...';
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'publish-progress-close';
+  closeButton.textContent = '\u00d7';
+  closeButton.setAttribute('aria-label', 'Close');
+  closeButton.hidden = true;
+  closeButton.disabled = true;
+  let finished = false;
+  modal.append(title, message, reference, closeButton);
+  const close = () => {
+    if (modal.open) modal.close();
+    modal.remove();
+  };
+  closeButton.addEventListener('click', () => {
+    if (finished) close();
+  });
+  modal.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    if (finished) close();
+  });
+  modal.addEventListener('close', () => modal.remove());
+
+  const wasDisabled = button.disabled;
+  document.body.append(modal);
+  try {
+    modal.showModal();
+  } catch (error) {
+    modal.remove();
+    throw error;
+  }
+  button.disabled = true;
+
+  return {
+    close,
+    setRequestId(requestId) {
+      title.textContent = 'Publishing in progress';
+      reference.textContent = `Request ID: ${requestId}`;
+      reference.hidden = false;
+      message.textContent = 'Waiting for publish completion...';
+    },
+    finish(titleText, messageText, isError = false) {
+      finished = true;
+      title.textContent = titleText;
+      message.setAttribute('role', isError ? 'alert' : 'status');
+      message.textContent = messageText;
+      closeButton.hidden = false;
+      closeButton.disabled = false;
+      button.disabled = wasDisabled;
+    },
+  };
+}
+
+export async function waitForPublishCompletion({ apiBase, requestId, token }) {
+  const controller = new AbortController();
+  const deadline = Date.now() + PUBLISH_POLL_TIMEOUT_MS;
+  const timeout = window.setTimeout(() => controller.abort(), PUBLISH_POLL_TIMEOUT_MS);
+  let overallStatus = 'pending';
+  try {
+    while (Date.now() < deadline) {
+      // eslint-disable-next-line no-await-in-loop
+      const response = await fetch(`${apiBase}/get-publish-log?requestId=${encodeURIComponent(requestId)}`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      });
+      // eslint-disable-next-line no-await-in-loop
+      const log = await readPublishServiceResponse(response, `Request ID: ${requestId}`);
+      if (controller.signal.aborted) break;
+      if (typeof log?.overallStatus !== 'string' || !log.overallStatus.trim()) {
+        throw new Error(`Publish log response is missing a valid overallStatus. Request ID: ${requestId}`);
+      }
+      overallStatus = log.overallStatus.trim().toLowerCase();
+      if (overallStatus === 'success') return { overallStatus, timedOut: false };
+      if (['failed', 'failure', 'error'].includes(overallStatus)) {
+        throw new Error(`Publish failed (${overallStatus}). Request ID: ${requestId}`);
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, Math.min(PUBLISH_POLL_INTERVAL_MS, deadline - Date.now()));
+      });
+    }
+    return { overallStatus, timedOut: true };
+  } catch (error) {
+    if (controller.signal.aborted && error.name === 'AbortError') {
+      return { overallStatus, timedOut: true };
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+// Saves and submits a publish payload for a single product/platform, then records the
+// service request ID and status. Shares the Export tab's product/language/device/release-period
+// "Content to publish" filters (block types, selected promos/variants, per-field selection),
+// plus the DA fetch plumbing — callers (export.js) pass in an already-authenticated fetchPage.
+export async function publishSelection({
+  apiBase,
+  org,
+  repo,
+  token,
+  schema,
+  sheetMap,
+  product,
+  platform,
+  languages,
+  releasePeriod,
+  requestorName,
+  storeType = STORE_TYPE_UPDATES,
+  testName,
+  testNames,
+  fetchPage,
+  blockTypes = PUBLISH_BLOCK_TYPES,
+  promoContexts = [],
+  selection = {},
+  now = new Date(),
+  onRequestAccepted,
+}) {
+  const platformPromoContexts = promoContexts.filter(
+    (context) => !context.device || context.device === platform,
+  );
+  const effectiveBlockTypes = blockTypes.filter(
+    (blockType) => PUBLISH_BLOCK_TYPES.includes(blockType)
+      && (blockType !== 'promo' || platformPromoContexts.length),
+  );
+  const promoNames = effectiveBlockTypes.includes('promo')
+    ? [...new Set(platformPromoContexts.map((context) => context.promoName))]
+    : [];
+
+  const campaigns = storeType === STORE_TYPE_CPP && testNames?.length ? testNames : [testName];
+  const collect = (name, types, contexts) => collectExportData({
+    org,
+    repo,
+    token,
+    schema,
+    sheetMap,
+    products: [product],
+    languages,
+    devices: [platform],
+    year: releasePeriod.year,
+    quarter: releasePeriod.quarter,
+    month: releasePeriod.month,
+    productsPath: getRelativeProductsPath(),
+    storeType,
+    testName: name,
+    blockTypes: types,
+    promoContexts: contexts,
+    selection: { ...selection, blockTypes: types, promoContexts: contexts },
+    rowRoles: ['localized'],
+    fetchPage,
+  });
+
+  const publisherName = requestorName || await fetchRequestorName(token);
+  const buildFor = (cells, name, types, names) => buildPublishPayload(cells, {
+    product,
+    platform,
+    languages,
+    releasePeriod,
+    requestorName: publisherName,
+    storeType,
+    testName: name,
+    promoNames: names,
+    blockTypes: types,
+  });
+
+  const { cells } = await collect(campaigns[0], effectiveBlockTypes, platformPromoContexts);
+  const payload = buildFor(cells, campaigns[0], effectiveBlockTypes, promoNames);
+
+  // Each extra CPP campaign adds its own entry; promos are collected once with the first.
+  const extraTypes = effectiveBlockTypes.filter((blockType) => blockType !== 'promo');
+  const extras = extraTypes.length ? await Promise.all(campaigns.slice(1).map(async (name) => {
+    const { cells: extraCells } = await collect(name, extraTypes, []);
+    return buildFor(extraCells, name, extraTypes, []);
+  })) : [];
+  extras.forEach((extra) => {
+    if (extra.cpp) payload.cpp = [...(payload.cpp || []), ...extra.cpp];
+  });
+
+  const filePath = `${PUBLISH_REQUEST_PATH}/${formatPublishTimestamp(now)}.json`;
+  const result = await putJsonSource(org, repo, filePath, payload, token);
+  if (!result.ok) {
+    return { ok: false, status: result.status, statusText: result.statusText, filePath };
+  }
+
+  const response = await fetch(`${apiBase}/publish-to-appstore`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ daPayloadPath: filePath.slice(1) }),
+  });
+  const serviceResult = await readPublishServiceResponse(response, `Request file: ${filePath}`);
+  const requestId = serviceResult?.requestId;
+  const status = serviceResult?.status;
+  if (typeof requestId !== 'string' || !requestId.trim()
+    || typeof status !== 'string' || !status.trim()) {
+    throw new Error(`Publish service response is missing a valid requestId or status. Request file: ${filePath}`);
+  }
+  onRequestAccepted?.(requestId);
+
+  const updatedPayload = { ...payload, requestId, status };
+  let updateResult;
+  try {
+    updateResult = await putJsonSource(org, repo, filePath, updatedPayload, token);
+  } catch (error) {
+    throw new Error(`Publish request ${requestId} was accepted (${status}), but updating ${filePath} failed: ${error.message}`);
+  }
+  if (!updateResult.ok) {
+    throw new Error(`Publish request ${requestId} was accepted (${status}), but updating ${filePath} failed (${updateResult.status} ${updateResult.statusText || 'write failed'}).`);
+  }
+
+  return {
+    ok: true,
+    status: updateResult.status,
+    filePath,
+    requestId,
+    publishStatus: status,
+  };
+}

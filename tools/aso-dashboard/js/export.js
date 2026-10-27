@@ -1,4 +1,3 @@
-import { loadConstantsValuesForPage } from '../../../blocks/aso-app/constants-runtime.js';
 import {
   isReleasePeriodComplete,
   readReleasePeriod,
@@ -41,12 +40,7 @@ import {
   buildWorkbook,
   parseWorkbook,
 } from './import-export/template.js';
-import { buildHtmlSourcePath } from './import-export/paths.js';
-import {
-  getKeywordsSidecar,
-  getSourceText,
-  getSpacingSidecar,
-} from './lib/da-source-client.js';
+import { createAdminFetch, createFetchPage } from './lib/da-page-fetch.js';
 import { isFileTooLarge, loadExcelJS, MAX_WORKBOOK_FILE_BYTES } from './lib/excel-loader.js';
 import { loadJSZip } from './lib/zip-loader.js';
 import {
@@ -194,40 +188,6 @@ function togglePromoFields() {
   if (countEl) {
     countEl.textContent = promosChecked ? `(${getSelectedPromoContexts().length} selected)` : '(not included)';
   }
-}
-
-function createAdminFetch(org, repo, token) {
-  const adminOrigin = `https://admin.da.live/source/${org}/${repo}`;
-  return async (input) => {
-    const url = typeof input === 'string' ? input : input.url;
-    if (url.startsWith('/')) {
-      // .json/.html fetched verbatim; extensionless source paths get .html appended.
-      const sourcePath = url.endsWith('.html') || url.endsWith('.json') ? url : `${url}.html`;
-      return fetch(`${adminOrigin}${sourcePath}`, { headers: { Authorization: `Bearer ${token}` } });
-    }
-    return fetch(input);
-  };
-}
-
-function createFetchPage(org, repo, token, adminFetch) {
-  return async (_org, _repo, pagePath) => {
-    const htmlPath = buildHtmlSourcePath(pagePath);
-    const [html, spacingSidecar, keywordsSidecar] = await Promise.all([
-      getSourceText(org, repo, htmlPath, token),
-      getSpacingSidecar(org, repo, pagePath, token),
-      getKeywordsSidecar(org, repo, pagePath, token),
-    ]);
-    const constantsValues = html !== null
-      ? await loadConstantsValuesForPage({ pathname: pagePath, fetch: adminFetch })
-      : {};
-    return {
-      html: html ?? '',
-      htmlFound: html !== null,
-      spacingSidecar,
-      keywordsSidecar,
-      constantsValues,
-    };
-  };
 }
 
 function downloadWorkbook(buffer, filename) {
