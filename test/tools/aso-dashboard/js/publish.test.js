@@ -206,21 +206,39 @@ describe('publish', () => {
           title: 'title',
           shortDescription: 'shortDescription',
           fullDescription: 'fullDescription',
+          releaseNotes: 'releaseNotes',
         }],
       },
     });
   });
 
-  it('omits Google metadata when only unsupported release notes are populated', () => {
-    const language = { code: 'en-US' };
-    const payload = buildPublishPayload([{
-      language, device: 'google', blockType: 'listing', fieldKey: 'releaseNotes', text: 'New release', hasHtml: true,
-    }], {
+  it('includes Google release-notes-only localizations and omits empty ones', () => {
+    const languages = [{ code: 'en' }, { code: 'fr-fr' }, { code: 'de-de' }];
+    const texts = ['New release\n\nBug fixes.', 'Nouvelle version', ''];
+    const cells = languages.map((language, index) => ({
+      language,
+      device: 'google',
+      blockType: 'listing',
+      fieldKey: 'releaseNotes',
+      text: texts[index],
+      hasHtml: true,
+    }));
+    const payload = buildPublishPayload(cells, {
       product: 'app',
       platform: 'google',
-      languages: [language],
+      languages,
     });
-    expect(payload).to.deep.equal({ app: 'app', platform: 'google', selectedLocales: ['en-US'] });
+    expect(payload).to.deep.equal({
+      app: 'app',
+      platform: 'google',
+      selectedLocales: ['en', 'fr-fr', 'de-de'],
+      metadata: {
+        localizations: [
+          { locale: 'en', releaseNotes: texts[0] },
+          { locale: 'fr-fr', releaseNotes: texts[1] },
+        ],
+      },
+    });
   });
 
   it('omits empty Apple promo localizations independently for each promo', () => {

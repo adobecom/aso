@@ -138,7 +138,7 @@ export function buildPublishPayload(cells, options) {
   }
 
   // Google
-  const googleFields = ['title', 'shortDescription', 'fullDescription'];
+  const googleFields = ['title', 'shortDescription', 'fullDescription', 'releaseNotes'];
   const payload = {
     app: product,
     platform: 'google',
